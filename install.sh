@@ -116,7 +116,7 @@ fi
 step "Installing packages"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -q
-PKGS=(pipewire-alsa wireplumber pipewire-bin python3 python3-paho-mqtt python3-websocket python3-tk
+PKGS=(pipewire-alsa wireplumber pipewire-bin python3 python3-paho-mqtt python3-websocket python3-tk python3-xlib
       xprintidle xdotool curl avahi-daemon xinit x11-xserver-utils alsa-utils chromium)
 yes_ "${ENABLE_MUSIC_ASSISTANT:-yes}" && PKGS+=(squeezelite)
 if yes_ "${ENABLE_AIRPLAY:-yes}" && [ "$SKIP_AIRPLAY_BUILD" = no ]; then

@@ -25,7 +25,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 CONF_PATH = os.environ.get("PLEXPIE_CONF", "/etc/plexpie/plexpie.conf")
 WWW = os.path.join(os.path.dirname(os.path.abspath(__file__)), "www")
 HTTP_PORT = int(os.environ.get("PLEXPIE_HTTP_PORT", "8080"))
@@ -162,6 +162,8 @@ class State:
         self.volume = None
         self.ma_up = False
         self.cpu_temp = None
+        self.text_focus = False
+        self.text_y = None
         self.changed = threading.Event()
 
     def now_source(self):
@@ -199,6 +201,9 @@ def state_json():
             "volume": ST.volume,
             "ma_up": ST.ma_up,
             "home_button": cfg("HOME_BUTTON_POSITION", "bottom-left"),
+            "home_autohide": cfg_int("HOME_BUTTON_AUTOHIDE_SECS", 5),
+            "text_focus": ST.text_focus,
+            "text_y": ST.text_y,
         }
 
 
@@ -262,29 +267,73 @@ class Browser:
             return (False, None)
         if "webSocketDebuggerUrl" not in tab:
             return (True, None)
+        return (True, self.eval_target(tab["webSocketDebuggerUrl"], expr))
+
+    @staticmethod
+    def eval_target(ws_url, expr, timeout=4):
         ws = None
         try:
             import websocket  # python3-websocket
-            ws = websocket.create_connection(tab["webSocketDebuggerUrl"], timeout=4, suppress_origin=True)
+            ws = websocket.create_connection(ws_url, timeout=timeout, suppress_origin=True)
             ws.send(json.dumps({"id": 1, "method": "Runtime.evaluate",
                                 "params": {"expression": expr, "returnByValue": True, "awaitPromise": True}}))
-            deadline = time.time() + 4
+            deadline = time.time() + timeout
             while time.time() < deadline:
                 msg = json.loads(ws.recv())
                 if msg.get("id") == 1:
-                    return (True, msg.get("result", {}).get("result", {}).get("value"))
+                    return msg.get("result", {}).get("result", {}).get("value")
         except Exception as e:
-            log.debug("evaluate in %s failed: %s", src, e)
+            log.debug("evaluate failed: %s", e)
         finally:
             if ws is not None:
                 try:
                     ws.close()
                 except Exception:
                     pass
-        return (True, None)
+        return None
+
+    def text_focus(self, src):
+        """(is a text field focused in this source's tab, its centre y in CSS px or None)."""
+        try:
+            targets = json.loads(http_get(CDP + "/json/list", 2))
+        except Exception:
+            return False, None
+        pages = [t for t in targets if t.get("type") == "page"]
+        tab = self.find(src, pages)
+        if not tab or "webSocketDebuggerUrl" not in tab:
+            return False, None
+        p = self.eval_target(tab["webSocketDebuggerUrl"], FOCUS_JS, 2)
+        if not isinstance(p, dict):
+            return False, None
+        if p.get("text"):
+            return True, p.get("y")
+        if p.get("iframe"):
+            # Sign-in pop-ups (Apple ID) live in cross-site iframes, which are separate targets.
+            for t in targets:
+                if t.get("type") != "iframe" or "webSocketDebuggerUrl" not in t:
+                    continue
+                if t.get("parentId") not in (None, tab.get("id")):
+                    continue
+                f = self.eval_target(t["webSocketDebuggerUrl"], FOCUS_JS, 2)
+                if isinstance(f, dict) and f.get("text"):
+                    y = f.get("y")
+                    return True, (p.get("top") or 0) + y if y is not None else p.get("y")
+        return False, None
 
 
 BROWSER = Browser()
+
+FOCUS_JS = """(() => {
+  const TEXT = ['', 'text', 'email', 'password', 'search', 'tel', 'url', 'number'];
+  let e = document.activeElement;
+  while (e && e.shadowRoot && e.shadowRoot.activeElement) e = e.shadowRoot.activeElement;
+  if (!e) return {text: false};
+  const t = e.tagName;
+  const text = (t === 'INPUT' && TEXT.includes((e.getAttribute('type') || '').toLowerCase()) && !e.readOnly && !e.disabled)
+    || t === 'TEXTAREA' || e.isContentEditable === true;
+  const r = e.getBoundingClientRect();
+  return {text: !!text, iframe: t === 'IFRAME', y: (r.top + r.bottom) / 2, top: r.top};
+})()"""
 
 APPLE_STATE_JS = """(() => {
   try {
@@ -725,6 +774,24 @@ def fast_poller():
         time.sleep(2)
 
 
+def focus_poller():
+    """Tell the overlay when a text field is focused, so the keyboard can pop up."""
+    scale = float(cfg("CHROMIUM_SCALE", "1") or 1)
+    while True:
+        try:
+            with ST.lock:
+                src = ST.source
+            focus, y = (False, None)
+            if src in ("plexamp", "apple", "ma"):
+                focus, y = BROWSER.text_focus(src)
+            y = round(y * scale) if (focus and isinstance(y, (int, float))) else None
+            with ST.lock:
+                ST.text_focus, ST.text_y = bool(focus), y
+        except Exception as e:
+            log.debug("focus poller: %s", e)
+        time.sleep(0.5)
+
+
 def slow_poller():
     host = urllib.parse.urlparse(MA_URL).hostname
     port = urllib.parse.urlparse(MA_URL).port or 8095
@@ -1036,7 +1103,7 @@ def main():
     SCREEN.apply()
     if "airplay" in SOURCES:
         spawn(airplay_reader)
-    for fn in (fast_poller, slow_poller, screen_loop, watchdog):
+    for fn in (fast_poller, slow_poller, focus_poller, screen_loop, watchdog):
         spawn(fn)
     HA.start()
     while True:

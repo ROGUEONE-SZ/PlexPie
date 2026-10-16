@@ -10,7 +10,7 @@ A Raspberry Pi 4 music endpoint with a 7" touchscreen and a USB DAC. One launche
 | **Music Assistant** | Squeezelite player for Music Assistant, plus MA's own interface on screen |
 | **Home** | The launcher itself, with now playing, volume, pause all and screen off |
 
-Starting any source pauses the others. A floating Home button and an on-screen keyboard button sit over every app (the keyboard types into sign-in fields, including Apple ID pop-ups). The screen turns off after a minute with no touch and nothing playing. The first tap only wakes it, so it never presses a button by accident.
+Starting any source pauses the others. Inside an app, a small Home pill appears when you touch the screen and fades out after 5 seconds. A full keyboard pops up by itself when you tap a text field (including the Apple ID pop-up) and moves to the top if the field is low on the screen. The screen turns off after a minute with no touch and nothing playing. The first tap only wakes it, so it never presses a button by accident.
 
 ## Install or update
 
@@ -59,7 +59,7 @@ In Music Assistant, go to **Settings → Providers** and make sure the **Squeeze
 
 ## First-time sign-ins
 
-Plexamp, Apple Music and Music Assistant each ask you to sign in once on the screen. Tap the field, then the keyboard button next to Home, and type. The sign-ins are kept.
+Plexamp, Apple Music and Music Assistant each ask you to sign in once on the screen. Tap a field and the keyboard appears; **return** submits. If it ever doesn't appear, touch the screen and tap the keyboard icon on the Home pill. The sign-ins are kept.
 
 ## Troubleshooting
 
@@ -78,7 +78,7 @@ Plexamp, Apple Music and Music Assistant each ask you to sign in once on the scr
 ```
 install.sh  rollback.sh  plexpie.conf
 files/plexpied.py           control daemon (launcher API, tabs, screen, MQTT)
-files/plexpie-overlay.py    Home button, on-screen keyboard, touch-to-wake shield
+files/plexpie-overlay.py    Home pill, pop-up keyboard, touch-to-wake shield
 tools/diagnose.sh           read-only report of audio, AirPlay and logs
 files/plexpie-session       X session: overlay + Chromium kiosk
 files/www/                  launcher and AirPlay screens
