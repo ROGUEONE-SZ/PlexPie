@@ -10,9 +10,10 @@ Group=@USER@
 Environment=HOME=@HOME@
 Environment=XDG_RUNTIME_DIR=/run/user/@UID@
 EnvironmentFile=/etc/plexpie/plexpie.conf
-# -s: Music Assistant lives on another subnet, so no auto-discovery.
+# -s: the Music Assistant server (MA_HOST, else HA_HOST; empty = auto-discover on this subnet)
 # -C 5: let go of the audio device 5 s after playback stops.
-ExecStart=/usr/bin/squeezelite -n "${PLAYER_NAME}" -s ${HA_HOST} -o default -C 5
+# ($$ hands the variables to the shell instead of systemd)
+ExecStart=/bin/sh -c 'S="$${MA_HOST:-$$HA_HOST}"; exec /usr/bin/squeezelite -n "$$PLAYER_NAME" $${S:+-s "$$S"} -o default -C 5'
 Restart=always
 RestartSec=5
 

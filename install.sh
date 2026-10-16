@@ -35,22 +35,20 @@ yes_() { case "${1,,}" in yes|true|1|on) return 0 ;; *) return 1 ;; esac; }
 echo "PlexPie install started $(date)"
 
 if [ ! -f "$REPO/plexpie.conf" ]; then
-  if [ -f "$REPO/plexpie.conf.example" ]; then
-    cp "$REPO/plexpie.conf.example" "$REPO/plexpie.conf"
-    echo "Created $REPO/plexpie.conf from the example."
-    echo "Edit it (MQTT password, addresses, player name), then run this installer again."
-  else
-    echo "plexpie.conf not found next to install.sh"
-  fi
-  exit 1
+  echo "No plexpie.conf yet: starting the setup wizard."
+  bash "$REPO/configure.sh"
+  [ -f "$REPO/plexpie.conf" ] || { echo "Setup cancelled."; exit 1; }
 fi
 # shellcheck disable=SC1091
 . "$REPO/plexpie.conf"
-U="${APPLIANCE_USER:-sz}"
+U="${APPLIANCE_USER:-${SUDO_USER:-$(getent passwd 1000 | cut -d: -f1)}}"
 id "$U" >/dev/null 2>&1 || { echo "User '$U' does not exist"; exit 1; }
 AUID=$(id -u "$U")
 UHOME=$(getent passwd "$U" | cut -d: -f6)
+PLAYER_NAME="${PLAYER_NAME:-PlexPie}"
 AIRPLAY_NAME="${AIRPLAY_NAME:-$PLAYER_NAME}"
+DAC_MATCH="${DAC_MATCH:-alsa_output.usb-.*}"
+PLEXAMP_VERSION="${PLEXAMP_VERSION:-4.12.4}"
 
 as_user() {
   sudo -u "$U" HOME="$UHOME" XDG_RUNTIME_DIR="/run/user/$AUID" \
@@ -58,7 +56,7 @@ as_user() {
 }
 render() {
   sed -e "s|@USER@|$U|g" -e "s|@UID@|$AUID|g" -e "s|@HOME@|$UHOME|g" \
-      -e "s|@AIRPLAY_NAME@|$AIRPLAY_NAME|g" "$1"
+      -e "s|@AIRPLAY_NAME@|$AIRPLAY_NAME|g" -e "s|@DAC_MATCH@|$DAC_MATCH|g" "$1"
 }
 pick_pkg() {
   for p in "$@"; do
@@ -116,8 +114,16 @@ fi
 step "Installing packages"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -q
-PKGS=(pipewire-alsa wireplumber pipewire-bin python3 python3-paho-mqtt python3-websocket python3-tk python3-xlib
-      xprintidle xdotool curl avahi-daemon xinit x11-xserver-utils alsa-utils chromium)
+PKGS=(pipewire pipewire-pulse pipewire-alsa wireplumber pipewire-bin python3 python3-paho-mqtt
+      python3-websocket python3-tk xprintidle xdotool curl git avahi-daemon xserver-xorg xinit
+      x11-xserver-utils alsa-utils nodejs fonts-dejavu-core)
+# Chromium is "chromium" on Trixie and "chromium-browser" on older Raspberry Pi OS;
+# Widevine (needed by the Apple Music web player) comes from Raspberry Pi's repository.
+for alts in "chromium chromium-browser" "libwidevinecdm0"; do
+  # shellcheck disable=SC2086
+  p=$(pick_pkg $alts)
+  [ -n "$p" ] && PKGS+=("$p")
+done
 yes_ "${ENABLE_MUSIC_ASSISTANT:-yes}" && PKGS+=(squeezelite)
 if yes_ "${ENABLE_AIRPLAY:-yes}" && [ "$SKIP_AIRPLAY_BUILD" = no ]; then
   PKGS+=(build-essential git autoconf automake libtool pkg-config libpopt-dev libconfig-dev
@@ -130,6 +136,10 @@ if yes_ "${ENABLE_AIRPLAY:-yes}" && [ "$SKIP_AIRPLAY_BUILD" = no ]; then
   done
 fi
 apt-get install -y -q --no-install-recommends "${PKGS[@]}"
+if ! dpkg -s libwidevinecdm0 >/dev/null 2>&1 && yes_ "${ENABLE_APPLE_MUSIC_WEB:-yes}"; then
+  note "Widevine isn't available on this OS, so the Apple Music web player won't play."
+  note "Use Raspberry Pi OS (64-bit) for it, or turn ENABLE_APPLE_MUSIC_WEB off."
+fi
 # Debian's own Squeezelite service would run a second player; ours replaces it.
 systemctl disable --now squeezelite >/dev/null 2>&1 || true
 ok "packages installed"
@@ -140,7 +150,8 @@ loginctl enable-linger "$U"
 for _ in $(seq 30); do [ -d "/run/user/$AUID/systemd" ] && break; sleep 0.5; done
 install -m 644 "$REPO/files/audio/asound.conf" /etc/asound.conf
 as_user mkdir -p "$UHOME/.config/wireplumber/wireplumber.conf.d" "$UHOME/.config/pipewire/pipewire.conf.d"
-install -o "$U" -g "$U" -m 644 "$REPO/files/audio/51-plexpie-dac.conf" "$UHOME/.config/wireplumber/wireplumber.conf.d/"
+render "$REPO/files/audio/51-plexpie-dac.conf" > "$UHOME/.config/wireplumber/wireplumber.conf.d/51-plexpie-dac.conf"
+chown "$U:$U" "$UHOME/.config/wireplumber/wireplumber.conf.d/51-plexpie-dac.conf"
 install -o "$U" -g "$U" -m 644 "$REPO/files/audio/10-plexpie-rates.conf" "$UHOME/.config/pipewire/pipewire.conf.d/"
 as_user systemctl --user enable pipewire.socket pipewire-pulse.socket wireplumber.service >/dev/null 2>&1 || true
 if as_user systemctl --user restart pipewire pipewire-pulse wireplumber; then
@@ -148,10 +159,9 @@ if as_user systemctl --user restart pipewire pipewire-pulse wireplumber; then
 else
   note "PipeWire will pick up the new settings at the next reboot"
 fi
-# The DAC used to get the full signal (Plexamp wrote to it directly). Keep it at
-# 100% and leave volume to the Onkyo, Plexamp and the phone.
+# Give the DAC the full signal and leave volume to the amplifier, Plexamp and the phone.
 for _ in $(seq 20); do
-  as_user wpctl status 2>/dev/null | grep -q "SMSL" && break
+  as_user wpctl inspect @DEFAULT_AUDIO_SINK@ >/dev/null 2>&1 && break
   sleep 0.5
 done
 if as_user wpctl set-volume @DEFAULT_AUDIO_SINK@ 1.0 2>/dev/null; then
@@ -160,13 +170,44 @@ fi
 
 # -------------------------------------------------------------- 4. plexamp
 step "Plexamp"
-if [ -f /opt/plexamp/js/index.js ]; then
-  mkdir -p /etc/systemd/system/plexamp.service.d
-  render "$REPO/files/systemd/plexamp-override.conf" > /etc/systemd/system/plexamp.service.d/plexpie.conf
-  ok "kept your existing Plexamp install and sign-in; it now plays through PipeWire"
+node_major=$(node -v 2>/dev/null | sed 's/^v\([0-9]*\).*/\1/' || true)
+if [ -z "$node_major" ] || [ "$node_major" -lt 20 ]; then
+  echo "    installing Node.js 20 (Plexamp needs 20 or newer, this OS has ${node_major:-none})"
+  curl -fsSL https://deb.nodesource.com/setup_20.x | bash - >/dev/null
+  apt-get install -y -q nodejs
+fi
+if [ ! -f /opt/plexamp/js/index.js ]; then
+  echo "    downloading Plexamp headless $PLEXAMP_VERSION"
+  tmp=$(mktemp -d)
+  curl -fsSL "https://plexamp.plex.tv/headless/Plexamp-Linux-headless-v${PLEXAMP_VERSION}.tar.bz2" -o "$tmp/plexamp.tar.bz2"
+  tar -xjf "$tmp/plexamp.tar.bz2" -C "$tmp"
+  rm -rf /opt/plexamp && mv "$tmp/plexamp" /opt/plexamp
+  rm -rf "$tmp"
+  chown -R "$U:$U" /opt/plexamp
+fi
+if [ ! -f /etc/systemd/system/plexamp.service ]; then
+  render "$REPO/files/systemd/plexamp.service" > /etc/systemd/system/plexamp.service
+fi
+mkdir -p /etc/systemd/system/plexamp.service.d
+render "$REPO/files/systemd/plexamp-override.conf" > /etc/systemd/system/plexamp.service.d/plexpie.conf
+systemctl daemon-reload
+systemctl enable plexamp >/dev/null 2>&1
+PLEX_TOKEN="$UHOME/.local/share/Plexamp/Settings/%40Plexamp%3Auser%3Atoken"
+if [ -s "$PLEX_TOKEN" ]; then
+  ok "Plexamp is installed and signed in"
+elif [ -t 0 ]; then
+  systemctl stop plexamp 2>/dev/null || true
+  echo
+  echo "    Plexamp needs to be linked to your Plex account once:"
+  echo "      1. On any device, open https://plex.tv/claim and copy the claim code."
+  echo "      2. Paste it below, then type the player name ($PLAYER_NAME)."
+  echo "      3. When Plexamp says it is ready, press Ctrl+C to continue the install."
+  echo
+  as_user node /opt/plexamp/js/index.js </dev/tty || true
+  [ -s "$PLEX_TOKEN" ] && ok "Plexamp linked" || note "Plexamp isn't linked yet; run this installer again to retry."
 else
-  note "Plexamp headless is not in /opt/plexamp. Install it, run 'node /opt/plexamp/js/index.js' once"
-  note "to claim it, then re-run this installer."
+  note "Plexamp isn't linked to a Plex account yet. Run this installer again from an"
+  note "interactive terminal (ssh -t ...) to link it with a claim code from https://plex.tv/claim."
 fi
 
 # --------------------------------------------------------------- 5. airplay

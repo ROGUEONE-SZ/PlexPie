@@ -25,7 +25,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 
-VERSION = "1.5.0"
+VERSION = "2.0.0"
 CONF_PATH = os.environ.get("PLEXPIE_CONF", "/etc/plexpie/plexpie.conf")
 WWW = os.path.join(os.path.dirname(os.path.abspath(__file__)), "www")
 HTTP_PORT = int(os.environ.get("PLEXPIE_HTTP_PORT", "8080"))
@@ -1141,7 +1141,8 @@ class HomeAssistant:
 
     def disc(self, component, oid, conf):
         dev = {"identifiers": [f"plexpie_{self.node}"], "name": socket.gethostname(),
-               "manufacturer": "Raspberry Pi", "model": "Raspberry Pi 4 (PlexPie)", "sw_version": VERSION}
+               "manufacturer": "PlexPie", "sw_version": VERSION,
+               "model": (read_file("/proc/device-tree/model", "Raspberry Pi") or "Raspberry Pi").strip("\x00")}
         payload = {"unique_id": f"plexpie_{self.node}_{oid}", "availability_topic": f"{self.base}/status",
                    "device": dev, **conf}
         self.client.publish(f"homeassistant/{component}/{self.node}/{oid}/config", json.dumps(payload), retain=True)

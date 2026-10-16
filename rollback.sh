@@ -9,7 +9,7 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 [ -f "$BACKUP_DIR/original.tar.gz" ] || { echo "No backup found in $BACKUP_DIR"; exit 1; }
 # shellcheck disable=SC1091
 [ -f "$REPO/plexpie.conf" ] && . "$REPO/plexpie.conf"
-U="${APPLIANCE_USER:-sz}"
+U="${APPLIANCE_USER:-${SUDO_USER:-$(getent passwd 1000 | cut -d: -f1)}}"
 UHOME=$(getent passwd "$U" | cut -d: -f6)
 
 echo "==> Stopping PlexPie services"

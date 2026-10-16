@@ -1,0 +1,19 @@
+[Unit]
+Description=Plexamp (headless)
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=@USER@
+Group=@USER@
+Environment=HOME=@HOME@
+Environment=USER=@USER@
+WorkingDirectory=/opt/plexamp
+ExecStart=/usr/bin/env node /opt/plexamp/js/index.js
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

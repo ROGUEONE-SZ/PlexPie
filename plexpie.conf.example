@@ -1,44 +1,48 @@
-# PlexPie appliance settings.
-# Edit here, then re-run: sudo bash ~/plexpie/install.sh
+# PlexPie settings. Create yours with: bash configure.sh  (or copy this file to plexpie.conf)
+# Edit here or run configure.sh again, then: sudo bash install.sh
 # Keep comments on their own lines (systemd reads this file too).
 
-# Linux user that runs everything (autologin on the touchscreen)
-APPLIANCE_USER="sz"
+# Linux user that runs everything (autologin on the touchscreen; empty = the user running the installer)
+APPLIANCE_USER=""
 
 # Name shown in Plexamp, AirPlay and Music Assistant
-PLAYER_NAME="GymMusicPlayer"
-AIRPLAY_NAME="GymMusicPlayer"
-
-# Home Assistant / MQTT (Mosquitto add-on on Home Assistant)
-HA_HOST="192.168.13.107"
-MQTT_HOST="192.168.13.107"
-MQTT_PORT="1883"
-MQTT_USER="mqtt"
-MQTT_PASS=""
-# Old topic kept for existing automations (payload: playing / idle). Empty to stop.
-MQTT_LEGACY_TOPIC="plexamp/state"
-
-# Music Assistant web interface (add-on port 8095 on Home Assistant)
-MA_URL="http://192.168.13.107:8095"
+PLAYER_NAME="PlexPie"
+AIRPLAY_NAME="PlexPie"
 
 # Sources: yes / no
-ENABLE_APPLE_MUSIC_WEB="yes"
 ENABLE_AIRPLAY="yes"
-ENABLE_MUSIC_ASSISTANT="yes"
+ENABLE_APPLE_MUSIC_WEB="yes"
+ENABLE_MUSIC_ASSISTANT="no"
 
-# Screen: turn off after this many seconds with no touch and nothing playing (0 = never)
+# Music Assistant server (Squeezelite connects here) and its web interface
+MA_HOST=""
+MA_URL=""
+
+# Home Assistant over MQTT (MQTT_HOST empty = off)
+HA_HOST=""
+MQTT_HOST=""
+MQTT_PORT="1883"
+MQTT_USER=""
+MQTT_PASS=""
+# Extra topic with payload playing / idle, for older automations (empty = off)
+MQTT_LEGACY_TOPIC=""
+
+# Screen: off after this many seconds with no touch and nothing playing (0 = never)
 SCREEN_OFF_AFTER_SECS="60"
 # Brightness in percent
 SCREEN_BRIGHTNESS="100"
-# Browser zoom for the apps (1 = normal, 0.9 fits more on the 800x480 screen)
+# Browser zoom for the apps (1 = normal)
 CHROMIUM_SCALE="1"
 # Apple Music web player zoom in percent (75 shows the full desktop layout; 100 = normal)
 APPLE_MUSIC_ZOOM="75"
 
 # Starting one source pauses the others
 PAUSE_OTHERS="yes"
-# When something starts playing, bring that app to the screen
-# (any of: plexamp airplay ma apple; empty = never)
+# When something starts playing, bring that app to the screen (plexamp airplay ma apple)
 AUTO_SHOW_SOURCES="plexamp airplay ma"
-# Jump to the AirPlay "now playing" screen when someone starts AirPlay
 AUTO_SHOW_AIRPLAY="yes"
+
+# Audio device PipeWire prefers (regex on the PipeWire node name; default: any USB DAC)
+DAC_MATCH="alsa_output.usb-.*"
+# Plexamp headless version to install when /opt/plexamp is missing
+PLEXAMP_VERSION="4.12.4"
