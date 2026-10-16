@@ -26,7 +26,7 @@
 <body class="noimg">
 <img id="pic" alt="">
 <div class="txt">
-  <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <svg class="ico" id="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg>
   <div id="title"></div>
   <div id="msg"></div>
@@ -37,7 +37,14 @@
 const $ = (id) => document.getElementById(id);
 let cur = null, total = 1, lastPic = 0;
 function layout() { document.body.classList.toggle("portrait", innerHeight > innerWidth * 1.05); }
+const POWER = '<path d="M12 3v9"/><path d="M6.3 7.3a8 8 0 1 0 11.4 0"/>';
+let bell = null;
 function show(a) {
+  bell = bell || $("ico").innerHTML;
+  $("ico").innerHTML = a.icon === "power" ? POWER : bell;
+  $("ico").style.animation = a.icon === "power" ? "none" : "";
+  document.querySelector(".hint").style.display = a.icon === "power" ? "none" : "";
+  $("bar").style.display = a.icon === "power" ? "none" : "";
   if (!a.id) { cur = null; $("title").textContent = ""; $("msg").textContent = ""; $("pic").style.display = "none"; return; }
   const left = Math.max(0, a.until - Date.now() / 1000);
   if (!cur || cur.id !== a.id) { total = Math.max(left, 1); lastPic = 0; }

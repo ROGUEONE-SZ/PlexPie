@@ -119,6 +119,7 @@ your MQTT password, so it's never committed to git. A few you might want:
 | `DAC_MATCH` | Which audio device to prefer (default: any USB DAC) |
 | `CHROMIUM_SCALE` | Zoom for all apps, for screens that aren't 800×480 |
 | `SWIPE_HOME`, `TOUCH_ROTATE` | Edge swipes to go home; rotation if the screen is mounted rotated |
+| `POWER_BUTTON` | `yes` if you wire a push button to pins 5 and 6: press to shut down, press again to start |
 
 ## Home Assistant
 
@@ -129,7 +130,7 @@ With MQTT set up, the Pi appears automatically under **Settings → Devices** wi
 - **Playing:** a binary sensor.
 - **Screen:** an on/off switch, plus **Screen brightness**.
 - **Volume.**
-- **Buttons:** **Pause all**, **Restart screen**, **Reboot**.
+- **Buttons:** **Pause all**, **Restart screen**, **Reboot**, **Shut down**.
 - **AirPlay artwork:** an image entity.
 - **Diagnostics:** CPU temperature, and whether Music Assistant is reachable.
 - **Screen alert:** a notify entity that puts a message on the screen with a chime.

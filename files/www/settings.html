@@ -153,6 +153,8 @@
     <div class="row"><div class="t"><b>Restart PlexPie</b><small>Reloads the screen and the apps</small></div>
       <button class="btn" data-sys="restart">Restart</button></div>
     <div class="row"><div class="t"><b>Reboot the Pi</b></div><button class="btn danger" data-sys="reboot">Reboot</button></div>
+    <div class="row"><div class="t"><b>Shut down</b><small>Before unplugging or moving the player. Plug it back in to start it.</small></div>
+      <button class="btn danger" data-sys="shutdown">Shut down</button></div>
   </div>
   <div class="note" id="ver"></div>
 </div>
@@ -330,8 +332,10 @@ document.addEventListener("click", async e => {
     setTimeout(load, 1500);
   }
   const sys = e.target.closest("[data-sys]");
-  if (sys && confirm(sys.dataset.sys === "reboot" ? "Reboot the Pi now?" : "Restart PlexPie?")) {
-    await api("/api/system", {action: sys.dataset.sys}); toast(sys.dataset.sys === "reboot" ? "Rebooting…" : "Restarting…");
+  const Q = {reboot: ["Reboot the Pi now?", "Rebooting…"], restart: ["Restart PlexPie?", "Restarting…"],
+             shutdown: ["Shut down the player? Music stops, and it stays off until you unplug it and plug it back in.", "Shutting down…"]};
+  if (sys && confirm(Q[sys.dataset.sys][0])) {
+    await api("/api/system", {action: sys.dataset.sys}); toast(Q[sys.dataset.sys][1]);
     if (sys.dataset.sys === "restart") waitBack();
   }
 });

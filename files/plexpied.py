@@ -25,7 +25,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 
-VERSION = "2.4.0"
+VERSION = "2.5.0"
 CONF_PATH = os.environ.get("PLEXPIE_CONF", "/etc/plexpie/plexpie.conf")
 WWW = os.path.join(os.path.dirname(os.path.abspath(__file__)), "www")
 HTTP_PORT = int(os.environ.get("PLEXPIE_HTTP_PORT", "8080"))
@@ -777,6 +777,22 @@ def show_alert(data):
         mine = ST.alert.get("id") == n
     if mine:
         end_alert()
+
+
+def shutdown():
+    """Stop the music, say when it's safe to unplug, then power off."""
+    log.info("shutting down")
+    pause_all()
+    with ST.lock:
+        ST.alert_n += 1
+        ST.alert = {"id": ST.alert_n, "icon": "power", "title": "Shutting down",
+                    "message": "Wait about 15 seconds, until the green light on the Pi stops blinking, then unplug the power.",
+                    "image": "", "refresh": False, "until": time.time() + 120, "prev": "home"}
+    SCREEN.wake("shutdown")
+    switch_source("alert")
+    HA.pub(f"{HA.base}/status", "offline")
+    time.sleep(4)
+    sudo("/usr/sbin/poweroff")
 
 
 def end_alert():
@@ -1706,6 +1722,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 spawn(lambda: (time.sleep(0.5), run(["pkill", "-f", "plexpie-chromium"]), os._exit(0)))
             elif what == "reboot":
                 spawn(lambda: (time.sleep(0.5), sudo("/usr/sbin/reboot")))
+            elif what == "shutdown":
+                spawn(shutdown)
             elif what in ("wifi-on", "wifi-off"):
                 ok, _ = admin(what, timeout=20)
                 return self._send(200 if ok else 500, json.dumps({"ok": ok}).encode())
@@ -1834,7 +1852,8 @@ class HomeAssistant:
                                        "state_topic": f"{b}/volume", "command_topic": f"{b}/volume/set"})
         for oid, name, icon in (("pause_all", "Pause all", "mdi:pause"),
                                 ("restart_screen", "Restart screen", "mdi:restart"),
-                                ("reboot", "Reboot", "mdi:power")):
+                                ("reboot", "Reboot", "mdi:restart-alert"),
+                                ("shutdown", "Shut down", "mdi:power")):
             extra = {"device_class": "restart"} if oid == "reboot" else {}
             self.disc("button", oid, {"name": name, "icon": icon, "command_topic": f"{b}/{oid}/set",
                                       "payload_press": "PRESS", **extra})
@@ -1907,6 +1926,8 @@ class HomeAssistant:
                 spawn(admin, "update-run")
             elif key == "reboot":
                 sudo("/usr/sbin/reboot")
+            elif key == "shutdown":
+                spawn(shutdown)
         except ValueError:
             log.warning("bad value for %s: %s", key, val)
 

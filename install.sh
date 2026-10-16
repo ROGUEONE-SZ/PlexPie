@@ -289,10 +289,19 @@ for unit in plexpie plexpie-airplay plexpie-squeezelite plexpie-spotify; do
   render "$REPO/files/systemd/$unit.service" > "/etc/systemd/system/$unit.service"
 done
 
+# Optional power button between pins 5 and 6 (GPIO3 and ground): press to shut down, press to start.
+# The Pi already starts from that button; the overlay adds the shut-down half.
+BOOTCFG=$( [ -f /boot/firmware/config.txt ] && echo /boot/firmware/config.txt || echo /boot/config.txt )
+if [ "${POWER_BUTTON:-no}" = yes ]; then
+  grep -q '^dtoverlay=gpio-shutdown' "$BOOTCFG" || { echo 'dtoverlay=gpio-shutdown' >> "$BOOTCFG"; note "power button enabled (active after a reboot)"; }
+else
+  sed -i '/^dtoverlay=gpio-shutdown$/d' "$BOOTCFG" 2>/dev/null || true
+fi
+
 # Let the daemon restart its own services and reboot, nothing else.
 cat > /etc/sudoers.d/plexpie <<EOF
-# PlexPie daemon: restart apps and reboot without a password
-$U ALL=(root) NOPASSWD: /usr/bin/systemctl restart plexamp, /usr/sbin/reboot
+# PlexPie daemon: restart apps, reboot and shut down without a password
+$U ALL=(root) NOPASSWD: /usr/bin/systemctl restart plexamp, /usr/sbin/reboot, /usr/sbin/poweroff
 $U ALL=(root) NOPASSWD: /opt/plexpie/plexpie-admin
 $U ALL=(root) NOPASSWD: /usr/bin/systemctl start plexpie-airplay, /usr/bin/systemctl stop plexpie-airplay, /usr/bin/systemctl restart plexpie-airplay
 $U ALL=(root) NOPASSWD: /usr/bin/systemctl start plexpie-squeezelite, /usr/bin/systemctl stop plexpie-squeezelite, /usr/bin/systemctl restart plexpie-squeezelite

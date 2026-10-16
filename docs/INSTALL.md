@@ -249,6 +249,12 @@ rings. The [main README](../README.md#home-assistant) has the details and exampl
   itself twice a day.
 - **Change your wizard answers:** connect to the Pi (step 4) and run
   `bash ~/plexpie/configure.sh && sudo bash ~/plexpie/install.sh`.
+- **Turn it off:** **Settings → System → Shut down**. Wait about 15 seconds, until the green light on
+  the Pi stops blinking, then unplug it. (Some screens stay lit after the Pi is off; that's normal.) Plug it back in to start it. Don't just pull the plug while
+  it's running: that can damage the memory card.
+- **Want a real power button?** Wire a small push button to pins 5 and 6 of the Pi (the third pair
+  of pins from the end nearest the memory card), set `POWER_BUTTON="yes"` in `~/plexpie/plexpie.conf`, run
+  `sudo bash ~/plexpie/install.sh` and reboot. Press it to shut down, press again to start.
 - **Uninstall:** run `sudo bash ~/plexpie/rollback.sh`, then `sudo reboot`. The Pi goes back to how
   it was before PlexPie.
 

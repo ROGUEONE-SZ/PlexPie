@@ -131,6 +131,9 @@ ENABLE_APPLE_MUSIC_WEB="$ENABLE_APPLE_MUSIC_WEB"
 ENABLE_MUSIC_ASSISTANT="$ENABLE_MUSIC_ASSISTANT"
 ENABLE_SPOTIFY="$ENABLE_SPOTIFY"
 ENABLE_SPOTIFY_WEB="$ENABLE_SPOTIFY_WEB"
+# A push button between pins 5 and 6 (GPIO3 and ground) shuts the Pi down and starts it again
+# (leave "no" if a DAC HAT or other add-on board uses those pins)
+POWER_BUTTON="${POWER_BUTTON:-no}"
 # Workout timer tile on the launcher
 ENABLE_TIMER="${ENABLE_TIMER:-yes}"
 # Settings from a phone browser at http://<pi>:8080/settings (PIN shown on the player)
