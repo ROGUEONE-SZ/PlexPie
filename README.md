@@ -5,7 +5,7 @@ A Raspberry Pi 4 music endpoint with a 7" touchscreen and a USB DAC. One launche
 | Source | What it is |
 |---|---|
 | **Plexamp** | Plexamp headless, your Plex library on SZVAULT |
-| **Apple Music** | music.apple.com running on the Pi's screen (Chromium + Widevine) |
+| **Apple Music** | music.apple.com on the Pi's screen (Chromium + Widevine), zoomed to 75% so it shows the full desktop layout (`APPLE_MUSIC_ZOOM`) |
 | **AirPlay** | AirPlay 2 receiver; the Pi shows cover art and track info |
 | **Music Assistant** | Squeezelite player for Music Assistant, plus MA's own interface on screen |
 | **Home** | The launcher itself, with now playing, volume, pause all and screen off |

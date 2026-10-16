@@ -37,6 +37,27 @@ while x_alive; do
     sed -i 's/"exited_cleanly":false/"exited_cleanly":true/; s/"exit_type":"[^"]*"/"exit_type":"Normal"/' \
       "$PROFILE/Default/Preferences"
   fi
+  # Per-site zoom (Chromium's own page zoom, remembered in the profile):
+  # Apple Music at ${APPLE_MUSIC_ZOOM:-75}% shows its full desktop layout with the sidebar.
+  python3 - "$PROFILE/Default/Preferences" "${APPLE_MUSIC_ZOOM:-75}" <<'PY' || log "could not set Apple Music zoom"
+import json, math, os, sys, time
+path, pct = sys.argv[1], float(sys.argv[2])
+os.makedirs(os.path.dirname(path), exist_ok=True)
+try:
+    with open(path) as f:
+        prefs = json.load(f)
+except (OSError, ValueError):
+    prefs = {}
+levels = prefs.setdefault("partition", {}).setdefault("per_host_zoom_levels", {}).setdefault("x", {})
+stamp = str(int((time.time() + 11644473600) * 1e6))   # Chromium time (microseconds since 1601)
+for host in ("music.apple.com", "beta.music.apple.com"):
+    if pct and pct != 100:
+        levels[host] = {"last_modified": stamp, "zoom_level": math.log(pct / 100) / math.log(1.2)}
+    else:
+        levels.pop(host, None)
+with open(path, "w") as f:
+    json.dump(prefs, f)
+PY
   log "starting chromium"
   chromium \
     --kiosk \

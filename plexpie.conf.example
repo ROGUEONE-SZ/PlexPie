@@ -32,6 +32,8 @@ SCREEN_OFF_AFTER_SECS="60"
 SCREEN_BRIGHTNESS="100"
 # Browser zoom for the apps (1 = normal, 0.9 fits more on the 800x480 screen)
 CHROMIUM_SCALE="1"
+# Apple Music web player zoom in percent (75 shows the full desktop layout; 100 = normal)
+APPLE_MUSIC_ZOOM="75"
 
 # Starting one source pauses the others
 PAUSE_OTHERS="yes"
