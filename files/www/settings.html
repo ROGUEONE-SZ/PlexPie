@@ -8,7 +8,7 @@
 <link rel="apple-touch-icon" href="/icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="PlexPie">
 <meta name="theme-color" content="#0b0b0f">
 <style>
@@ -17,6 +17,7 @@
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; background: var(--bg); color: var(--text);
     font-family: "Inter", "Noto Sans", "DejaVu Sans", system-ui, -apple-system, sans-serif; }
+  .topfade { position: fixed; top: 0; left: 0; right: 0; height: env(safe-area-inset-top); background: var(--bg); z-index: 5; }
   .wrap { max-width: 720px; margin: 0 auto; padding: calc(18px + env(safe-area-inset-top)) 16px 110px; }
   h1 { font-size: 24px; margin: 4px 0 2px; }
   .sub { color: var(--muted); font-size: 14px; margin-bottom: 18px; }
@@ -61,6 +62,7 @@
 </style>
 </head>
 <body>
+<div class="topfade"></div>
 <div id="toast"></div>
 
 <div id="login" class="hidden">

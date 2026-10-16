@@ -1347,7 +1347,7 @@ def accounts():
         out.append({"id": "apple", "name": "Apple Music",
                     "status": "Signed in" if auth else ("Not signed in" if auth is False
                                                         else "Open Apple Music to check"),
-                    "ok": bool(auth), "action": "Sign out"})
+                    "ok": None if auth is None else bool(auth), "action": "Sign out"})
     if "spotify" in SOURCES:
         with ST.lock:
             user = ST.spotify_user
@@ -1366,7 +1366,7 @@ def accounts():
     return out
 
 
-def settings_json(local):
+def settings_json(local, host=None):
     vals = {}
     for k, kind in EDITABLE.items():
         if kind == "secret":
@@ -1377,6 +1377,7 @@ def settings_json(local):
                                   "PHONE_ACCESS": "yes"}.get(k, "yes"))
         else:
             vals[k] = cfg(k)
+    vals["MA_HOST"] = vals.get("MA_HOST") or cfg("HA_HOST")
     if not local:
         vals["PHONE_PIN"] = ""                  # the PIN is only shown on the player itself
     vals["AUTO_SHOW"] = bool(cfg("AUTO_SHOW_SOURCES", "plexamp airplay ma spotify").strip())
@@ -1384,7 +1385,8 @@ def settings_json(local):
                  for flag, unit in OPTIONAL_UNITS.items()}
     addr = lan_address()
     return {"values": vals, "installed": installed, "accounts": accounts(), "player_name": PLAYER_NAME,
-            "version": VERSION, "phone_url": f"http://{addr}:{HTTP_PORT}/settings" if addr else "",
+            "version": VERSION,
+            "phone_url": f"http://{host}/settings" if host else (f"http://{addr}:{HTTP_PORT}/settings" if addr else ""),
             "local": local}
 
 
@@ -1494,7 +1496,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if path == "/icon.png":
             return self._file("icon.png", "image/png")
         if path == "/api/settings":
-            return self._send(200, json.dumps(settings_json(self._local())).encode())
+            host = None if self._local() else self.headers.get("Host")
+            return self._send(200, json.dumps(settings_json(self._local(), host)).encode())
         if path == "/api/state":
             return self._send(200, json.dumps(state_json()).encode())
         if path == "/api/art":
