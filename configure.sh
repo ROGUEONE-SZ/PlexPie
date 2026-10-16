@@ -131,6 +131,8 @@ ENABLE_APPLE_MUSIC_WEB="$ENABLE_APPLE_MUSIC_WEB"
 ENABLE_MUSIC_ASSISTANT="$ENABLE_MUSIC_ASSISTANT"
 ENABLE_SPOTIFY="$ENABLE_SPOTIFY"
 ENABLE_SPOTIFY_WEB="$ENABLE_SPOTIFY_WEB"
+# Workout timer tile on the launcher
+ENABLE_TIMER="${ENABLE_TIMER:-yes}"
 # Settings from a phone browser at http://<pi>:8080/settings (PIN shown on the player)
 PHONE_ACCESS="${PHONE_ACCESS:-yes}"
 
@@ -144,6 +146,10 @@ MQTT_HOST="$MQTT_HOST"
 MQTT_PORT="$MQTT_PORT"
 MQTT_USER="$MQTT_USER"
 MQTT_PASS="$MQTT_PASS"
+# Launcher buttons, comma separated (e.g. "Gym lights"): each becomes a switch in Home Assistant
+SHORTCUTS="${SHORTCUTS:-}"
+# Home Assistant web address, for camera pictures in screen alerts (empty = http://HA_HOST:8123)
+HA_URL="${HA_URL:-}"
 # Extra topic with payload playing / idle, for older automations (empty = off)
 MQTT_LEGACY_TOPIC="${MQTT_LEGACY_TOPIC:-}"
 

@@ -107,6 +107,8 @@
     <div class="row"><div class="t"><b>Username</b></div><input id="MQTT_USER" type="text" autocapitalize="off"></div>
     <div class="row"><div class="t"><b>Password</b><small id="passnote"></small></div>
       <input id="MQTT_PASS" type="password" autocomplete="new-password"></div>
+    <div class="row"><div class="t"><b>Launcher buttons</b><small>Names, separated by commas (e.g. Gym lights). Each one becomes a switch in Home Assistant for your automations.</small></div>
+      <input id="SHORTCUTS" type="text" placeholder="Gym lights"></div>
   </div>
 
   <h2>Music Assistant</h2>
@@ -162,9 +164,10 @@ const APPS = [
   ["ENABLE_SPOTIFY", "Spotify Connect", "Play from the Spotify app (Premium)"],
   ["ENABLE_SPOTIFY_WEB", "Spotify web player", "Browse Spotify on the screen"],
   ["ENABLE_MUSIC_ASSISTANT", "Music Assistant", "Player and interface for Music Assistant"],
+  ["ENABLE_TIMER", "Workout timer", "Intervals, countdown and stopwatch"],
 ];
 const FIELDS = ["SCREEN_OFF_AFTER_SECS", "SCREEN_BRIGHTNESS", "AUTO_SHOW", "SWIPE_HOME", "MQTT_HOST", "MQTT_PORT",
-  "MQTT_USER", "MQTT_PASS", "MA_HOST", "MA_URL", "PHONE_ACCESS"];
+  "MQTT_USER", "MQTT_PASS", "SHORTCUTS", "MA_HOST", "MA_URL", "PHONE_ACCESS"];
 let data = null;
 
 function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("on");

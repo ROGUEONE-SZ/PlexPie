@@ -7,7 +7,7 @@
 <style>
   :root {
     --bg: #0b0b0f; --panel: #16161c; --line: #26262e; --text: #f4f4f7; --muted: #8e8e99;
-    --plexamp: #f5a524; --apple: #fa3c5a; --airplay: #3b8cf6; --ma: #19c2a8; --spotify: #1ed760;
+    --plexamp: #f5a524; --apple: #fa3c5a; --airplay: #3b8cf6; --ma: #19c2a8; --spotify: #1ed760; --timer: #ff5a4f; --lamp: #ffd166;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden;
@@ -60,6 +60,10 @@
   .vol { flex: 1; display: flex; align-items: center; gap: 10px; }
   .bar { flex: 1; height: 10px; border-radius: 999px; background: var(--panel); overflow: hidden; }
   .bar b { display: block; height: 100%; width: 0; background: var(--text); border-radius: inherit; transition: width .2s; }
+  .sc { display: none; }
+  .sc.on { background: color-mix(in srgb, var(--lamp) 28%, var(--panel)); color: var(--lamp);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--lamp) 50%, transparent); }
+  .sc span { max-width: 9em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .volnum { width: 38px; font-size: 15px; text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
 </style>
 </head>
@@ -105,6 +109,11 @@
       <path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M14 13v4"/><circle cx="12.5" cy="17" r="1.5"/></svg>
     <div><div class="label">Music Assistant</div><div class="sub">Checking…</div></div>
   </button>
+  <button class="tile" data-src="timer" style="--c: var(--timer)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9.5 2h5M12 2v3"/></svg>
+    <div><div class="label">Timer</div><div class="sub">Intervals · countdown</div></div>
+  </button>
 </main>
 
 <footer>
@@ -120,6 +129,7 @@
     <button class="btn" id="volup" aria-label="Volume up">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 12h12M12 6v12"/></svg></button>
   </div>
+  <span id="shortcuts" style="display:contents"></span>
   <button class="btn" id="screenoff" title="Screen off">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>
@@ -131,7 +141,19 @@ const $ = (id) => document.getElementById(id);
 const post = (path, body) => fetch(path, {method: "POST", headers: {"Content-Type": "application/json"},
   body: JSON.stringify(body || {})}).then(r => r.json()).then(j => j.state && render(j.state)).catch(() => {});
 const SUBS = {plexamp: "Your library", apple: "On this screen", airplay: "From your phone",
-              spotify: "Spotify Connect", ma: "Your speakers"};
+              spotify: "Spotify Connect", ma: "Your speakers", timer: "Intervals · countdown"};
+const BULB = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg>';
+let scKey = "";
+function renderShortcuts(list) {
+  const key = list.map(x => x.id).join(",");
+  if (key !== scKey) {
+    scKey = key;
+    $("shortcuts").innerHTML = list.map(x => `<button class="btn sc" data-sc="${x.id}" style="display:inline-flex">${BULB}<span></span></button>`).join("");
+    $("shortcuts").querySelectorAll(".sc").forEach(b => b.onclick = () => post("/api/shortcut", {id: b.dataset.sc}));
+  }
+  list.forEach(x => { const b = $("shortcuts").querySelector(`[data-sc="${x.id}"]`);
+    b.classList.toggle("on", !!x.on); b.querySelector("span").textContent = x.name; });
+}
 
 function render(s) {
   $("name").textContent = s.player_name || "PlexPie";
@@ -154,6 +176,7 @@ function render(s) {
     t.querySelector(".sub").textContent = sub;
   });
   fit(Math.max(shown, 1));
+  renderShortcuts(s.shortcuts || []);
 
   if (s.playing) {
     $("npchip").textContent = s.now_source_name;

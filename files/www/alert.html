@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Alert</title>
+<style>
+  :root { --bg: #0b0b0f; --text: #f4f4f7; --muted: #8e8e99; --accent: #f5a524; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden;
+    font-family: "Inter", "Noto Sans", "DejaVu Sans", system-ui, sans-serif; }
+  body { display: flex; gap: 4vmin; padding: 4vmin; align-items: center; }
+  body.portrait { flex-direction: column; justify-content: center; }
+  #pic { flex: 1.4; min-width: 0; height: 100%; object-fit: contain; border-radius: 18px; background: #000; display: none; }
+  body.portrait #pic { flex: 1; width: 100%; height: auto; min-height: 0; }
+  .txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2vmin; }
+  body.noimg .txt { text-align: center; align-items: center; }
+  .ico { width: 13vmin; height: 13vmin; color: var(--accent); animation: ring 1.2s ease-in-out 3; }
+  @keyframes ring { 0%,100% { transform: rotate(0) } 20% { transform: rotate(14deg) } 40% { transform: rotate(-12deg) } 60% { transform: rotate(8deg) } }
+  #title { font-size: 8vmin; font-weight: 800; line-height: 1.1; }
+  #msg { font-size: 4.6vmin; color: var(--muted); line-height: 1.3; }
+  .hint { font-size: 3vmin; color: var(--muted); opacity: .7; margin-top: 2vmin; }
+  .bar { position: fixed; left: 0; bottom: 0; height: 5px; background: var(--accent); transition: width 1s linear; }
+</style>
+</head>
+<body class="noimg">
+<img id="pic" alt="">
+<div class="txt">
+  <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg>
+  <div id="title"></div>
+  <div id="msg"></div>
+  <div class="hint">Tap to close</div>
+</div>
+<div class="bar" id="bar"></div>
+<script>
+const $ = (id) => document.getElementById(id);
+let cur = null, total = 1, lastPic = 0;
+function layout() { document.body.classList.toggle("portrait", innerHeight > innerWidth * 1.05); }
+function show(a) {
+  if (!a.id) { cur = null; $("title").textContent = ""; $("msg").textContent = ""; $("pic").style.display = "none"; return; }
+  const left = Math.max(0, a.until - Date.now() / 1000);
+  if (!cur || cur.id !== a.id) { total = Math.max(left, 1); lastPic = 0; }
+  cur = a;
+  $("title").textContent = a.title || (a.message ? "" : "Alert");
+  $("msg").textContent = a.message || "";
+  document.body.classList.toggle("noimg", !a.image);
+  $("pic").style.display = a.image ? "block" : "none";
+  if (a.image && (lastPic === 0 || (a.refresh && Date.now() - lastPic > 2000))) {
+    lastPic = Date.now();
+    $("pic").src = a.image + (a.image.includes("?") ? "&" : "?") + "_=" + lastPic;
+  }
+  $("bar").style.width = (100 * left / total) + "%";
+}
+function poll() { fetch("/api/alert").then(r => r.json()).then(show).catch(() => {}); }
+document.body.addEventListener("click", () => fetch("/api/alert/dismiss", {method: "POST", body: "{}"}));
+addEventListener("resize", layout); layout();
+poll(); setInterval(poll, 1000);
+</script>
+</body>
+</html>

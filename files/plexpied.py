@@ -25,7 +25,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 
-VERSION = "2.3.0"
+VERSION = "2.4.0"
 CONF_PATH = os.environ.get("PLEXPIE_CONF", "/etc/plexpie/plexpie.conf")
 WWW = os.path.join(os.path.dirname(os.path.abspath(__file__)), "www")
 HTTP_PORT = int(os.environ.get("PLEXPIE_HTTP_PORT", "8080"))
@@ -62,7 +62,7 @@ SETTINGS_ENV = os.path.join(SETTINGS_DIR, "settings.env")      # read by the sys
 # What the Settings page may change, and how
 EDITABLE = {
     "ENABLE_APPLE_MUSIC_WEB": "bool", "ENABLE_AIRPLAY": "bool", "ENABLE_SPOTIFY": "bool",
-    "ENABLE_SPOTIFY_WEB": "bool", "ENABLE_MUSIC_ASSISTANT": "bool",
+    "ENABLE_SPOTIFY_WEB": "bool", "ENABLE_MUSIC_ASSISTANT": "bool", "ENABLE_TIMER": "bool", "SHORTCUTS": "str",
     "SCREEN_OFF_AFTER_SECS": "int", "SCREEN_BRIGHTNESS": "int", "AUTO_SHOW_SOURCES": "str",
     "SWIPE_HOME": "bool", "MA_HOST": "str", "MA_URL": "str",
     "MQTT_HOST": "str", "MQTT_PORT": "int", "MQTT_USER": "str", "MQTT_PASS": "secret",
@@ -123,11 +123,13 @@ SOURCES = {
     "spotify": {"name": "Spotify", "url": f"http://127.0.0.1:{HTTP_PORT}/spotify"},
     "spotify_web": {"name": "Spotify web", "url": "https://open.spotify.com/", "hidden": True},
     "ma": {"name": "Music Assistant", "url": MA_URL + "/"},
+    "timer": {"name": "Timer", "url": f"http://127.0.0.1:{HTTP_PORT}/timer"},
+    "alert": {"name": "Alert", "url": f"http://127.0.0.1:{HTTP_PORT}/alert", "hidden": True},
     "settings": {"name": "Settings", "url": f"http://127.0.0.1:{HTTP_PORT}/settings", "hidden": True},
 }
 for key, flag, default in (("airplay", "ENABLE_AIRPLAY", "yes"), ("ma", "ENABLE_MUSIC_ASSISTANT", "yes"),
                            ("apple", "ENABLE_APPLE_MUSIC_WEB", "yes"), ("spotify", "ENABLE_SPOTIFY", "no"),
-                           ("spotify_web", "ENABLE_SPOTIFY_WEB", "no")):
+                           ("spotify_web", "ENABLE_SPOTIFY_WEB", "no"), ("timer", "ENABLE_TIMER", "yes")):
     if not cfg_yes(flag, default):
         SOURCES.pop(key)
 if "spotify" not in SOURCES:
@@ -136,6 +138,13 @@ WEB_APPS = ("plexamp", "apple", "ma", "spotify_web", "settings")     # pages tha
 SPOTIFY_API = "http://127.0.0.1:3678"
 
 NAME_TO_KEY = {v["name"]: k for k, v in SOURCES.items()}
+# Home Assistant buttons on the launcher ("Gym lights, Fan"): each is a switch in Home Assistant
+SHORTCUTS = {}
+for _n in cfg("SHORTCUTS").split(","):
+    _n = _n.strip()[:40]
+    _id = re.sub(r"[^a-z0-9]+", "_", _n.lower()).strip("_")
+    if _id and _id not in SHORTCUTS and len(SHORTCUTS) < 6:
+        SHORTCUTS[_id] = {"name": _n, "on": False}
 MA_NETLOC = urllib.parse.urlparse(MA_URL).netloc
 
 
@@ -146,7 +155,7 @@ def source_for_url(url):
         return None
     host = (u.hostname or "").lower()
     if u.netloc == f"127.0.0.1:{HTTP_PORT}":
-        for key in ("airplay", "spotify", "settings"):
+        for key in ("airplay", "spotify", "settings", "timer", "alert"):
             if u.path.startswith("/" + key):
                 return key
         return "home"
@@ -216,6 +225,9 @@ class State:
         self.spotify_user = ""
         self.text_focus = False
         self.text_y = None
+        self.quiet_until = 0.0          # during an alert: no auto-pause, no auto-show
+        self.alert = {}
+        self.alert_n = 0
         self.changed = threading.Event()
 
     def now_source(self):
@@ -261,6 +273,8 @@ def state_json():
             "home_autohide": cfg_int("HOME_BUTTON_AUTOHIDE_SECS", 5),
             "text_focus": ST.text_focus,
             "text_y": ST.text_y,
+            "shortcuts": [{"id": k, **v} for k, v in SHORTCUTS.items()],
+            "alert": bool(ST.alert),
         }
 
 
@@ -646,6 +660,9 @@ def set_playing(src, value):
 
 def on_started(src):
     SCREEN.wake(f"{src} started")
+    if time.time() < ST.quiet_until:          # e.g. a doorbell announcement over the music
+        log.info("%s started during an alert: leaving the rest alone", src)
+        return
     if cfg_yes("PAUSE_OTHERS"):
         with ST.lock:
             others = [s for s, p in ST.playing.items() if p and s != src]
@@ -702,6 +719,88 @@ def switch_source(src):
         mark_changed()
     SCREEN.wake("source change")
     return ok
+
+
+# ------------------------------------------------------------------------ alerts
+CHIME = "/tmp/plexpie-chime.wav"
+HA_BASE = (cfg("HA_URL") or (f"http://{cfg('HA_HOST')}:8123" if cfg("HA_HOST") else "")).rstrip("/")
+
+
+def make_chime():
+    import math, struct, wave
+    rate, frames = 48000, bytearray()
+    for freq, dur in ((784, 0.55), (622, 0.9)):          # ding-dong
+        for i in range(int(rate * dur)):
+            t = i / rate
+            v = math.exp(-3.2 * t) * (math.sin(2 * math.pi * freq * t) + 0.3 * math.sin(4 * math.pi * freq * t))
+            frames += struct.pack("<h", int(max(-1, min(1, v * 0.6)) * 32767))
+    with wave.open(CHIME, "wb") as w:
+        w.setnchannels(1); w.setsampwidth(2); w.setframerate(rate); w.writeframes(bytes(frames))
+
+
+def play_chime():
+    try:
+        if not os.path.exists(CHIME):
+            make_chime()
+        for cmd in (["pw-play", CHIME], ["aplay", "-q", CHIME]):
+            try:
+                if subprocess.run(cmd, timeout=10, capture_output=True).returncode == 0:
+                    return
+            except FileNotFoundError:
+                continue
+    except Exception as e:
+        log.warning("chime failed: %s", e)
+
+
+def show_alert(data):
+    """Put a message (and a picture, e.g. a doorbell camera) on the screen for a while."""
+    if isinstance(data, str):
+        data = {"message": data}
+    secs = max(5, min(600, int(data.get("seconds") or 30)))
+    image = str(data.get("image") or "")
+    if image.startswith("/") and HA_BASE:
+        image = HA_BASE + image                  # a Home Assistant entity_picture path
+    with ST.lock:
+        ST.alert_n += 1
+        n = ST.alert_n
+        prev = ST.alert.get("prev") if ST.alert else ST.source
+        ST.alert = {"id": n, "title": str(data.get("title") or "")[:80],
+                    "message": str(data.get("message") or "")[:300], "image": image,
+                    "refresh": bool(data.get("refresh", True)), "until": time.time() + secs, "prev": prev}
+        ST.quiet_until = time.time() + secs + 15
+    log.info("alert: %s", ST.alert["title"] or ST.alert["message"])
+    if data.get("sound", True) not in (False, "no", "off", 0):
+        spawn(play_chime)
+    switch_source("alert")
+    time.sleep(secs)
+    with ST.lock:
+        mine = ST.alert.get("id") == n
+    if mine:
+        end_alert()
+
+
+def end_alert():
+    with ST.lock:
+        a, ST.alert = ST.alert, {}
+        on_screen = ST.source
+        ST.quiet_until = min(ST.quiet_until, time.time() + 5)
+    mark_changed()
+    if a and on_screen == "alert":
+        back = a.get("prev")
+        switch_source(back if back in SOURCES and back != "alert" else "home")
+
+
+def set_shortcut(sid, on, publish=True):
+    sc = SHORTCUTS.get(sid)
+    if not sc:
+        return
+    on = bool(on)
+    if sc["on"] != on:
+        sc["on"] = on
+        log.info("shortcut %s %s", sc["name"], "on" if on else "off")
+        mark_changed()
+    if publish:
+        HA.pub(f"{HA.base}/shortcut/{sid}", "ON" if on else "OFF")
 
 
 def get_volume():
@@ -1535,6 +1634,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return self._file("nowplaying.html")
         if path == "/settings":
             return self._file("settings.html")
+        if path == "/timer":
+            return self._file("timer.html")
+        if path == "/alert":
+            return self._file("alert.html")
+        if path == "/api/alert":
+            with ST.lock:
+                a = {k: v for k, v in ST.alert.items() if k != "prev"}
+            return self._send(200, json.dumps(a).encode())
         if path == "/manifest.json":
             return self._send(200, json.dumps({
                 "name": f"{PLAYER_NAME} settings", "short_name": PLAYER_NAME, "start_url": "/settings",
@@ -1637,6 +1744,15 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 spawn(VIEWPORT.restore)
         elif path == "/api/pause_all":
             spawn(pause_all)
+        elif path == "/api/alert":
+            spawn(show_alert, data)
+        elif path == "/api/alert/dismiss":
+            spawn(end_alert)
+        elif path == "/api/shortcut":
+            sid = str(data.get("id", ""))
+            ok = sid in SHORTCUTS
+            if ok:
+                set_shortcut(sid, data.get("on", not SHORTCUTS[sid]["on"]))
         else:
             return self._send(404, b'{"error":"not found"}')
         self._send(200 if ok else 503, json.dumps({"ok": ok, "state": state_json()}).encode())
@@ -1737,8 +1853,15 @@ class HomeAssistant:
         self.disc("sensor", "cpu_temp", {"name": "CPU temperature", "device_class": "temperature",
                                          "unit_of_measurement": "°C", "entity_category": "diagnostic",
                                          "state_topic": f"{b}/cpu_temp"})
+        self.disc("notify", "alert", {"name": "Screen alert", "icon": "mdi:message-alert",
+                                      "command_topic": f"{b}/alert/set"})
+        for sid, sc in SHORTCUTS.items():
+            self.disc("switch", f"shortcut_{sid}", {"name": sc["name"], "icon": "mdi:gesture-tap-button",
+                                                   "state_topic": f"{b}/shortcut/{sid}",
+                                                   "command_topic": f"{b}/shortcut/{sid}/set"})
         client.publish(f"{b}/status", "online", retain=True)
         client.subscribe(f"{b}/+/set")
+        client.subscribe(f"{b}/shortcut/#")   # commands, and the retained state from before a restart
         self.last = {}
         self.art_sent = -1
         self.publish_state()
@@ -1748,10 +1871,26 @@ class HomeAssistant:
         log.warning("MQTT disconnected")
 
     def on_message(self, client, userdata, msg):
-        key = msg.topic[len(self.base) + 1:].rsplit("/set", 1)[0]
+        rel = msg.topic[len(self.base) + 1:]
         val = msg.payload.decode("utf-8", "replace").strip()
-        log.info("HA command %s=%s", key, val)
+        if rel.startswith("shortcut/"):
+            parts = rel.split("/")
+            if len(parts) == 3 and parts[2] == "set":
+                log.info("HA command shortcut %s=%s", parts[1], val)
+                set_shortcut(parts[1], val.upper() == "ON")
+            elif len(parts) == 2 and msg.retain and parts[1] in SHORTCUTS:
+                set_shortcut(parts[1], val.upper() == "ON", publish=False)   # state from before a restart
+            return
+        key = rel.rsplit("/set", 1)[0]
+        log.info("HA command %s=%s", key, val[:120])
         try:
+            if key == "alert":
+                try:
+                    payload = json.loads(val)
+                except ValueError:
+                    payload = val
+                spawn(show_alert, payload if isinstance(payload, (dict, str)) else str(payload))
+                return
             if key == "source":
                 spawn(switch_source, NAME_TO_KEY.get(val, val))
             elif key == "screen":

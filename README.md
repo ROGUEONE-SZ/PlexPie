@@ -16,7 +16,8 @@ on one launcher and all controllable from **Home Assistant**.
 | **Spotify** | Spotify Connect receiver (go-librespot): pick the Pi in the Spotify app (Premium). Optional Spotify web player on the screen |
 | **Apple Music** | music.apple.com on the screen (Chromium + Widevine), zoomed so it shows the full desktop layout |
 | **Music Assistant** | The Pi becomes a Music Assistant player (Squeezelite), and MA's own interface opens on the screen |
-| **Home** | The launcher: now playing, volume, pause all, screen off |
+| **Timer** | Workout timer: intervals (work / rest / rounds), countdown and stopwatch, with big digits and beeps |
+| **Home** | The launcher: now playing, volume, pause all, screen off, and your Home Assistant buttons |
 
 How it behaves:
 
@@ -123,6 +124,23 @@ With MQTT set up, the Pi appears automatically under **Settings → Devices** wi
 - **Buttons:** **Pause all**, **Restart screen**, **Reboot**.
 - **AirPlay artwork:** an image entity.
 - **Diagnostics:** CPU temperature, and whether Music Assistant is reachable.
+- **Screen alert:** a notify entity that puts a message on the screen with a chime.
+- **Launcher buttons:** one switch per name in **Settings → Home Assistant → Launcher buttons** (for example `Gym lights`). Tapping the button flips the switch; your automations do the rest, and can flip it back to keep it in sync.
+
+### Screen alerts (doorbell, timers, anything)
+
+Publish to `plexpie/<hostname>/alert/set` to show a message for a while, with a chime, over whatever is playing (music keeps playing and isn't paused). A picture can be any URL, or a Home Assistant camera:
+
+```yaml
+action: mqtt.publish
+data:
+  topic: plexpie/szplexpie/alert/set
+  payload: >
+    {{ {"title": "Front door", "message": "Someone is at the door", "seconds": 30,
+        "image": state_attr("camera.front_door", "entity_picture")} | tojson }}
+```
+
+`image` paths starting with `/` are loaded from Home Assistant (`HA_URL`, or `http://HA_HOST:8123`). Tap the alert to close it; it goes back to the app that was on screen.
 
 Example: turn your amplifier on when anything plays.
 

@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Timer</title>
+<style>
+  :root { --bg: #0b0b0f; --panel: #16161c; --line: #26262e; --text: #f4f4f7; --muted: #8e8e99;
+    --work: #ff5a4f; --rest: #3b8cf6; --prep: #f5a524; --done: #19c2a8; --c: var(--prep); }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden;
+    font-family: "Inter", "Noto Sans", "DejaVu Sans", system-ui, sans-serif; }
+  body { display: grid; grid-template-rows: auto 1fr auto; height: 100vh; padding: 2.5vmin 3vmin; gap: 2vmin; }
+  .tabs { display: flex; gap: 1.5vmin; justify-content: center; }
+  .tab { border: 0; border-radius: 999px; padding: 1.6vmin 3.6vmin; background: var(--panel); color: var(--muted);
+    font: inherit; font-size: 3.4vmin; font-weight: 700; }
+  .tab.on { background: var(--text); color: var(--bg); }
+  body.running .tabs { visibility: hidden; }
+
+  .mid { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 0; gap: 1vmin; }
+  .phase { font-size: 5vmin; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--c); min-height: 1.2em; }
+  .clock { font-size: 31vmin; font-weight: 800; line-height: .95; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+  body.running .clock { color: var(--c); }
+  .info { font-size: 4vmin; color: var(--muted); min-height: 1.3em; font-variant-numeric: tabular-nums; }
+  .ring { position: fixed; left: 0; top: 0; height: 1.2vmin; background: var(--c); width: 0; transition: width .25s linear; }
+
+  .setup { display: flex; gap: 2vmin; justify-content: center; flex-wrap: wrap; }
+  body.running .setup, body.paused .setup { display: none; }
+  .step { background: var(--panel); border-radius: 18px; padding: 1.4vmin 1.6vmin; display: flex; align-items: center; gap: 1.4vmin; }
+  .step b { font-size: 2.8vmin; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; min-width: 9vmin; text-align: center; }
+  .step span { font-size: 5vmin; font-weight: 700; font-variant-numeric: tabular-nums; min-width: 13vmin; text-align: center; }
+  .pm { width: 8.5vmin; height: 8.5vmin; border: 0; border-radius: 14px; background: var(--line); color: var(--text);
+    font: inherit; font-size: 5vmin; font-weight: 700; line-height: 1; }
+  .pm:active, .tab:active, .big:active { filter: brightness(1.4); }
+
+  .ctl { display: flex; gap: 2vmin; justify-content: center; }
+  .big { border: 0; border-radius: 20px; height: 13vmin; min-width: 28vmin; padding: 0 4vmin; font: inherit;
+    font-size: 4.6vmin; font-weight: 800; background: var(--panel); color: var(--text); }
+  .big.go { background: var(--done); color: #04201b; }
+  body.running .big.go { background: var(--text); color: var(--bg); }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div class="ring" id="ring"></div>
+<div class="tabs">
+  <button class="tab" data-mode="intervals">Intervals</button>
+  <button class="tab" data-mode="countdown">Countdown</button>
+  <button class="tab" data-mode="stopwatch">Stopwatch</button>
+</div>
+<div class="mid">
+  <div class="phase" id="phase"></div>
+  <div class="clock" id="clock">0:00</div>
+  <div class="info" id="info"></div>
+  <div class="setup" id="setup"></div>
+</div>
+<div class="ctl">
+  <button class="big" id="reset">Reset</button>
+  <button class="big go" id="go">Start</button>
+</div>
+<script>
+const $ = (id) => document.getElementById(id);
+const DEF = {mode: "intervals", work: 40, rest: 20, rounds: 8, prep: 10, count: 300};
+let cfg = Object.assign({}, DEF);
+try { Object.assign(cfg, JSON.parse(localStorage.getItem("plexpie-timer") || "{}")); } catch (e) {}
+const save = () => { try { localStorage.setItem("plexpie-timer", JSON.stringify(cfg)); } catch (e) {} };
+
+// ---- sound
+let ac = null;
+function beep(freq = 880, dur = 0.12, vol = 0.5) {
+  try {
+    ac = ac || new AudioContext();
+    const o = ac.createOscillator(), g = ac.createGain(), t = ac.currentTime;
+    o.frequency.value = freq; o.type = "square";
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    o.connect(g).connect(ac.destination); o.start(t); o.stop(t + dur + 0.02);
+  } catch (e) {}
+}
+const longBeep = () => beep(1320, 0.5, 0.6);
+const finish = () => { longBeep(); setTimeout(longBeep, 650); setTimeout(longBeep, 1300); };
+
+// ---- model
+// phases: [{name, kind, secs}] ; run: {start, pausedAt, offset}
+let phases = [], run = null, lastSec = null, lastIdx = -1, doneUntil = 0;
+const fmt = (s) => { s = Math.max(0, Math.ceil(s)); const m = Math.floor(s / 60), r = s % 60;
+  return m >= 60 ? `${Math.floor(m / 60)}:${String(m % 60).padStart(2, "0")}:${String(r).padStart(2, "0")}` : `${m}:${String(r).padStart(2, "0")}`; };
+const fmtUp = (s) => { const t = Math.floor(s * 10) / 10, m = Math.floor(t / 60);
+  return `${m}:${(t % 60).toFixed(1).padStart(4, "0")}`; };
+
+function build() {
+  if (cfg.mode === "intervals") {
+    phases = cfg.prep ? [{name: "Get ready", kind: "prep", secs: cfg.prep}] : [];
+    for (let r = 1; r <= cfg.rounds; r++) {
+      phases.push({name: "Work", kind: "work", secs: cfg.work, round: r});
+      if (r < cfg.rounds && cfg.rest) phases.push({name: "Rest", kind: "rest", secs: cfg.rest, round: r});
+    }
+  } else if (cfg.mode === "countdown") {
+    phases = [{name: "", kind: "work", secs: cfg.count}];
+  } else phases = [];
+}
+const total = () => phases.reduce((a, p) => a + p.secs, 0);
+const elapsed = () => !run ? 0 : ((run.pausedAt ?? Date.now()) - run.start) / 1000;
+
+function where(t) {          // -> {idx, left}
+  let acc = 0;
+  for (let i = 0; i < phases.length; i++) {
+    if (t < acc + phases[i].secs) return {idx: i, left: acc + phases[i].secs - t};
+    acc += phases[i].secs;
+  }
+  return {idx: phases.length, left: 0};
+}
+
+// ---- setup UI
+const STEPS = {
+  intervals: [["work", "Work", 5, 5, 3600, true], ["rest", "Rest", 5, 0, 3600, true], ["rounds", "Rounds", 1, 1, 99], ["prep", "Ready", 5, 0, 60, true]],
+  countdown: [["count", "Time", 30, 10, 5940, true]],
+  stopwatch: [],
+};
+function renderSetup() {
+  $("setup").innerHTML = STEPS[cfg.mode].map(([k, label, , , , time]) =>
+    `<div class="step"><b>${label}</b><button class="pm" data-k="${k}" data-d="-1">−</button>
+     <span id="v_${k}">${time ? fmt(cfg[k]) : cfg[k]}</span><button class="pm" data-k="${k}" data-d="1">+</button></div>`).join("");
+  document.querySelectorAll(".tab").forEach(t => t.classList.toggle("on", t.dataset.mode === cfg.mode));
+}
+function stepBy(k, d) {
+  const s = STEPS[cfg.mode].find(x => x[0] === k); if (!s) return;
+  const [, , inc, min, max, time] = s;
+  let step = inc; if (time && k === "count" && cfg[k] + d * inc > 600) step = 60;   // minutes past 10:00
+  cfg[k] = Math.max(min, Math.min(max, cfg[k] + d * step));
+  $("v_" + k).textContent = time ? fmt(cfg[k]) : cfg[k];
+  save(); if (!run) draw();
+}
+let holdT = null;
+$("setup").addEventListener("pointerdown", e => {
+  const b = e.target.closest(".pm"); if (!b) return;
+  const go = () => stepBy(b.dataset.k, +b.dataset.d);
+  go(); let n = 0;
+  holdT = setTimeout(function rep() { go(); holdT = setTimeout(rep, ++n > 6 ? 60 : 140); }, 450);
+});
+["pointerup", "pointercancel", "pointerleave"].forEach(ev => $("setup").addEventListener(ev, () => clearTimeout(holdT)));
+
+// ---- run control
+let awake = null;
+function setBody() {
+  document.body.classList.toggle("running", !!run && run.pausedAt == null);
+  document.body.classList.toggle("paused", !!run && run.pausedAt != null);
+  $("go").textContent = !run ? "Start" : run.pausedAt == null ? "Pause" : "Resume";
+  clearInterval(awake);
+  if (run && run.pausedAt == null) {      // keep the screen on while the timer runs
+    const ping = () => fetch("/api/wake", {method: "POST", body: "{}"}).catch(() => {});
+    ping(); awake = setInterval(ping, 20000);
+  }
+}
+$("go").onclick = () => {
+  beep(660, 0.05, 0.2);     // also unlocks audio
+  if (!run) { build(); run = {start: Date.now(), pausedAt: null}; lastSec = null; lastIdx = -1; doneUntil = 0; }
+  else if (run.pausedAt == null) run.pausedAt = Date.now();
+  else { run.start += Date.now() - run.pausedAt; run.pausedAt = null; }
+  setBody(); draw();
+};
+$("reset").onclick = () => { run = null; doneUntil = 0; setBody(); draw(); };
+document.querySelectorAll(".tab").forEach(t => t.onclick = () => {
+  if (run) return; cfg.mode = t.dataset.mode; save(); renderSetup(); draw();
+});
+
+function draw() {
+  const root = document.documentElement.style;
+  if (cfg.mode === "stopwatch") {
+    $("clock").textContent = fmtUp(elapsed());
+    $("phase").textContent = run ? (run.pausedAt == null ? "Running" : "Paused") : "";
+    $("info").textContent = ""; root.setProperty("--c", "var(--done)");
+    $("ring").style.width = "0"; return;
+  }
+  if (!run && Date.now() < doneUntil) {
+    $("clock").textContent = "0:00"; $("phase").textContent = "Done"; $("info").textContent = "Nice work";
+    root.setProperty("--c", "var(--done)"); $("ring").style.width = "100%"; return;
+  }
+  if (!run) {
+    build();
+    $("clock").textContent = fmt(cfg.mode === "intervals" ? cfg.work : cfg.count);
+    $("phase").textContent = "";
+    $("info").textContent = cfg.mode === "intervals" ? `${cfg.rounds} rounds · ${fmt(total())} total` : "";
+    root.setProperty("--c", "var(--prep)"); $("ring").style.width = "0"; return;
+  }
+  const t = elapsed(), w = where(t);
+  if (w.idx >= phases.length) {
+    $("clock").textContent = "0:00"; $("phase").textContent = "Done"; $("info").textContent = "Nice work";
+    root.setProperty("--c", "var(--done)"); $("ring").style.width = "100%";
+    if (run.pausedAt == null) { finish(); doneUntil = Date.now() + 8000; run = null; setBody(); }
+    return;
+  }
+  const p = phases[w.idx];
+  $("clock").textContent = fmt(w.left);
+  $("phase").textContent = p.name;
+  root.setProperty("--c", `var(--${p.kind})`);
+  $("info").textContent = cfg.mode === "intervals"
+    ? `Round ${p.round || 1} of ${cfg.rounds} · ${fmt(total() - t)} left` : "";
+  $("ring").style.width = (100 * t / total()) + "%";
+  if (run.pausedAt == null) {
+    const sec = Math.ceil(w.left);
+    if (w.idx !== lastIdx) { if (lastIdx !== -1 || w.idx > 0) longBeep(); lastIdx = w.idx; }
+    else if (sec !== lastSec && sec <= 3 && sec >= 1) beep();
+    lastSec = sec;
+  }
+}
+renderSetup(); setBody(); draw();
+setInterval(draw, 100);
+</script>
+</body>
+</html>
