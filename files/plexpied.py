@@ -1243,7 +1243,30 @@ def watchdog():
 OPTIONAL_UNITS = {"ENABLE_AIRPLAY": "plexpie-airplay", "ENABLE_SPOTIFY": "plexpie-spotify",
                   "ENABLE_MUSIC_ASSISTANT": "plexpie-squeezelite"}
 OPTIONAL_DEFAULTS = {"ENABLE_AIRPLAY": "yes", "ENABLE_SPOTIFY": "no", "ENABLE_MUSIC_ASSISTANT": "yes"}
-SESSIONS = {}                     # phone-browser session token -> expiry
+SESSIONS_FILE = os.path.join(SETTINGS_DIR, "sessions.json")
+SESSION_DAYS = 365                # a phone stays signed in for a year (renewed on every visit)
+
+
+def _load_sessions():
+    try:
+        with open(SESSIONS_FILE) as f:
+            return {k: v for k, v in json.load(f).items() if v > time.time()}
+    except (OSError, ValueError):
+        return {}
+
+
+def save_sessions():
+    try:
+        os.makedirs(SETTINGS_DIR, exist_ok=True)
+        with open(SESSIONS_FILE + ".tmp", "w") as f:
+            json.dump(SESSIONS, f)
+        os.chmod(SESSIONS_FILE + ".tmp", 0o600)
+        os.replace(SESSIONS_FILE + ".tmp", SESSIONS_FILE)
+    except OSError as e:
+        log.warning("could not save phone sessions: %s", e)
+
+
+SESSIONS = _load_sessions()       # phone-browser session token -> expiry (survives restarts)
 LOGIN_FAILS = {"n": 0, "until": 0.0}
 
 
@@ -1386,6 +1409,8 @@ def apply_settings(data):
     if clean.get("PHONE_PIN") == "new":
         import secrets
         clean["PHONE_PIN"] = f"{secrets.randbelow(1000000):06d}"
+        SESSIONS.clear()                  # a new PIN signs every phone out
+        save_sessions()
     save_overrides(clean)
     log.info("settings saved: %s", ", ".join(k for k in clean if k != "MQTT_PASS"))
 
@@ -1421,7 +1446,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self._send(404, b"not found", "text/plain")
 
     # Phone browsers reach only the Settings page, and only with the PIN.
-    REMOTE_OPEN = ("/settings", "/api/login")
+    REMOTE_OPEN = ("/settings", "/api/login", "/manifest.json", "/icon.png")
     REMOTE_AUTH = ("/api/settings", "/api/account", "/api/system")
 
     def _local(self):
@@ -1433,6 +1458,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
         for part in (self.headers.get("Cookie") or "").split(";"):
             k, _, v = part.strip().partition("=")
             if k == "plexpie" and SESSIONS.get(v, 0) > time.time():
+                if SESSIONS[v] - time.time() < (SESSION_DAYS - 1) * 86400:
+                    SESSIONS[v] = time.time() + SESSION_DAYS * 86400
+                    save_sessions()
                 return True
         return False
 
@@ -1457,6 +1485,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return self._file("nowplaying.html")
         if path == "/settings":
             return self._file("settings.html")
+        if path == "/manifest.json":
+            return self._send(200, json.dumps({
+                "name": f"{PLAYER_NAME} settings", "short_name": PLAYER_NAME, "start_url": "/settings",
+                "scope": "/", "display": "standalone", "background_color": "#0b0b0f", "theme_color": "#0b0b0f",
+                "icons": [{"src": "/icon.png", "sizes": "512x512", "type": "image/png"}]}).encode(),
+                "application/manifest+json")
+        if path == "/icon.png":
+            return self._file("icon.png", "image/png")
         if path == "/api/settings":
             return self._send(200, json.dumps(settings_json(self._local())).encode())
         if path == "/api/state":
@@ -1485,12 +1521,13 @@ class Handler(http.server.BaseHTTPRequestHandler):
             if str(data.get("pin", "")) == cfg("PHONE_PIN") and cfg("PHONE_PIN"):
                 import secrets
                 token = secrets.token_urlsafe(24)
-                SESSIONS[token] = time.time() + 30 * 86400
+                SESSIONS[token] = time.time() + SESSION_DAYS * 86400
+                save_sessions()
                 LOGIN_FAILS["n"] = 0
                 body = b'{"ok":true}'
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
-                self.send_header("Set-Cookie", f"plexpie={token}; Max-Age=2592000; HttpOnly; SameSite=Strict; Path=/")
+                self.send_header("Set-Cookie", f"plexpie={token}; Max-Age={SESSION_DAYS * 86400}; HttpOnly; SameSite=Lax; Path=/")
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
                 return self.wfile.write(body)

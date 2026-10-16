@@ -277,7 +277,7 @@ fi
 step "Installing PlexPie"
 install -d -m 755 /opt/plexpie /opt/plexpie/www
 install -m 755 "$REPO/files/plexpied.py" "$REPO/files/plexpie-overlay.py" "$REPO/files/plexpie-session" /opt/plexpie/
-install -m 644 "$REPO/files/www/"*.html /opt/plexpie/www/
+install -m 644 "$REPO/files/www/"*.html "$REPO/files/www/"*.png /opt/plexpie/www/
 if [ -f /etc/plexpie/plexpie.conf ] && ! cmp -s "$REPO/plexpie.conf" /etc/plexpie/plexpie.conf; then
   cp -p /etc/plexpie/plexpie.conf /etc/plexpie/plexpie.conf.prev
 fi

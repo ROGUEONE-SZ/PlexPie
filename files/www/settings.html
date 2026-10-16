@@ -4,13 +4,20 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>PlexPie settings</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="PlexPie">
+<meta name="theme-color" content="#0b0b0f">
 <style>
   :root { --bg: #0b0b0f; --panel: #16161c; --line: #26262e; --text: #f4f4f7; --muted: #8e8e99; --accent: #0a84ff;
     --ok: #30d158; --warn: #ff9f0a; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; background: var(--bg); color: var(--text);
     font-family: "Inter", "Noto Sans", "DejaVu Sans", system-ui, -apple-system, sans-serif; }
-  .wrap { max-width: 720px; margin: 0 auto; padding: 18px 16px 110px; }
+  .wrap { max-width: 720px; margin: 0 auto; padding: calc(18px + env(safe-area-inset-top)) 16px 110px; }
   h1 { font-size: 24px; margin: 4px 0 2px; }
   .sub { color: var(--muted); font-size: 14px; margin-bottom: 18px; }
   h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin: 22px 4px 8px; }

@@ -85,7 +85,9 @@ Tap the gear on the launcher, or open `http://<pi-address>:8080/settings` on you
 - **Accounts:** shows whether each service is linked, with sign-out for the web players. PlexPie never stores your passwords; each service signs in on its own page and keeps a token.
 - **Screen, Home Assistant, Music Assistant, phone access, restart and reboot.**
 
-From a phone, only the Settings page is reachable, and only with the PIN. Five wrong tries pause logins for a minute.
+From a phone, only the Settings page is reachable, and only with the PIN. Five wrong tries pause logins for a minute. A phone stays signed in for a year (renewed each visit); **New PIN** signs every phone out.
+
+To keep it on your home screen: open the page, then **Share → Add to Home Screen** (iPhone) or **⋮ → Add to Home screen** (Android). It opens like an app.
 
 ## Change settings, update, uninstall
 
