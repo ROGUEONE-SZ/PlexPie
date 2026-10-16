@@ -10,7 +10,7 @@ A Raspberry Pi 4 music endpoint with a 7" touchscreen and a USB DAC. One launche
 | **Music Assistant** | Squeezelite player for Music Assistant, plus MA's own interface on screen |
 | **Home** | The launcher itself, with now playing, volume, pause all and screen off |
 
-Starting any source pauses the others. Inside an app, a small Home pill appears when you touch the screen and fades out after 5 seconds. A full keyboard pops up by itself when you tap a text field (including the Apple ID pop-up) and moves to the top if the field is low on the screen. The screen turns off after a minute with no touch and nothing playing. The first tap only wakes it, so it never presses a button by accident.
+Starting any source pauses the others. Inside an app, a small Home pill appears in the top-left corner when you touch the screen and fades out after 5 seconds. A full keyboard pops up at the bottom when you tap a text field (including the Apple ID pop-up), and the app shrinks to the space above it, like on a phone. The screen turns off after a minute with no touch and nothing playing. The first tap only wakes it, so it never presses a button by accident.
 
 ## Install or update
 

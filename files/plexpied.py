@@ -25,7 +25,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 CONF_PATH = os.environ.get("PLEXPIE_CONF", "/etc/plexpie/plexpie.conf")
 WWW = os.path.join(os.path.dirname(os.path.abspath(__file__)), "www")
 HTTP_PORT = int(os.environ.get("PLEXPIE_HTTP_PORT", "8080"))
@@ -200,7 +200,7 @@ def state_json():
             "brightness": ST.brightness,
             "volume": ST.volume,
             "ma_up": ST.ma_up,
-            "home_button": cfg("HOME_BUTTON_POSITION", "bottom-left"),
+            "home_button": cfg("HOME_BUTTON_POSITION", "top-left"),
             "home_autohide": cfg_int("HOME_BUTTON_AUTOHIDE_SECS", 5),
             "text_focus": ST.text_focus,
             "text_y": ST.text_y,
@@ -322,6 +322,99 @@ class Browser:
 
 
 BROWSER = Browser()
+
+REVEAL_JS = """(() => {
+  let e = document.activeElement;
+  while (e && e.shadowRoot && e.shadowRoot.activeElement) e = e.shadowRoot.activeElement;
+  if (e && e !== document.body) { e.scrollIntoView({block: 'center', inline: 'nearest'}); return true; }
+  return false;
+})()"""
+
+
+class Viewport:
+    """Shrinks the app above the on-screen keyboard, like a phone does.
+
+    Uses a DevTools device-metrics override, which only lasts while our session
+    stays attached, so closing the session restores the full screen by itself.
+    """
+
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.ws = None
+        self.tab_id = None
+        self.msg_id = 0
+
+    def _send(self, method, params=None, want_reply=False):
+        self.msg_id += 1
+        mid = self.msg_id
+        self.ws.send(json.dumps({"id": mid, "method": method, "params": params or {}}))
+        if not want_reply:
+            return None
+        deadline = time.time() + 3
+        while time.time() < deadline:
+            msg = json.loads(self.ws.recv())
+            if msg.get("id") == mid:
+                return msg.get("result", {})
+        return None
+
+    def _close(self):
+        if self.ws is not None:
+            try:
+                self.ws.close()
+            except Exception:
+                pass
+        self.ws, self.tab_id = None, None
+
+    def shrink(self, height_px):
+        with self.lock:
+            try:
+                import websocket
+                with ST.lock:
+                    src = ST.source
+                tabs = BROWSER.tabs() or []
+                tab = Browser.find(src, tabs)
+                if not tab or "webSocketDebuggerUrl" not in tab:
+                    return False
+                if self.ws is not None and self.tab_id != tab["id"]:
+                    self._close()
+                if self.ws is None:
+                    self.ws = websocket.create_connection(tab["webSocketDebuggerUrl"], timeout=4,
+                                                          suppress_origin=True)
+                    self.tab_id = tab["id"]
+                scale = float(cfg("CHROMIUM_SCALE", "1") or 1)
+                r = self._send("Runtime.evaluate", {"expression": "window.screen.width", "returnByValue": True},
+                               want_reply=True) or {}
+                width = int(r.get("result", {}).get("value") or 800 / scale)
+                self._send("Emulation.setDeviceMetricsOverride",
+                           {"width": width, "height": max(120, int(height_px / scale)),
+                            "deviceScaleFactor": 0, "mobile": False}, want_reply=True)
+                time.sleep(0.15)
+                self._send("Runtime.evaluate", {"expression": REVEAL_JS}, want_reply=True)
+                # sign-in pop-ups in cross-site iframes scroll on their own target
+                try:
+                    for t in json.loads(http_get(CDP + "/json/list", 2)):
+                        if t.get("type") == "iframe" and t.get("parentId") in (None, tab["id"]) \
+                                and "webSocketDebuggerUrl" in t:
+                            Browser.eval_target(t["webSocketDebuggerUrl"], REVEAL_JS, 2)
+                except Exception:
+                    pass
+                return True
+            except Exception as e:
+                log.warning("viewport shrink failed: %s", e)
+                self._close()
+                return False
+
+    def restore(self):
+        with self.lock:
+            if self.ws is not None:
+                try:
+                    self._send("Emulation.clearDeviceMetricsOverride", want_reply=True)
+                except Exception:
+                    pass
+            self._close()
+
+
+VIEWPORT = Viewport()
 
 FOCUS_JS = """(() => {
   const TEXT = ['', 'text', 'email', 'password', 'search', 'tel', 'url', 'number'];
@@ -510,6 +603,7 @@ def pause_all():
 def switch_source(src):
     if src not in SOURCES:
         return False
+    VIEWPORT.restore()
     ok = BROWSER.show(src)
     if ok:
         with ST.lock:
@@ -925,6 +1019,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 set_volume(cur + int(data["delta"]))
             elif "value" in data:
                 set_volume(data["value"])
+        elif path == "/api/keyboard":
+            if data.get("open"):
+                spawn(VIEWPORT.shrink, int(data.get("height") or 228))
+            else:
+                spawn(VIEWPORT.restore)
         elif path == "/api/pause_all":
             spawn(pause_all)
         else:

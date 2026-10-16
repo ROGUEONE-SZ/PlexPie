@@ -28,7 +28,13 @@ journalctl -u nqptp -n 15 --no-pager 2>&1
 sec PLEXPIE LOG
 journalctl -u plexpie -n 80 --no-pager 2>&1 | grep -v "GET /api"
 sec PLEXAMP LOG
-journalctl -u plexamp -n 15 --no-pager 2>&1
+journalctl -u plexamp -n 120 --no-pager 2>&1
+sec PLEXAMP AUDIO SETTINGS
+for f in "$HOME"/.local/share/Plexamp/Settings/*; do
+  case "$f" in *udio*|*utput*|*evice*|*xclusive*|*ample*|*layback*) echo "$(basename "$f") = $(head -c 300 "$f")";; esac
+done
+ls "$HOME/.local/share/Plexamp/Settings/" | tr '\n' ' '; echo
+fuser -v /dev/snd/* 2>&1 | head -20
 sec SHAIRPORT CONFIG
 cat /etc/plexpie/shairport-sync.conf
 sec AIRPLAY NOW-PLAYING DATA

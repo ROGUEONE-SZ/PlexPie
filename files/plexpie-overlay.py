@@ -6,15 +6,17 @@ Small always-on-top X windows drawn over Chromium:
                    inside an app and fades out again after a few seconds idle.
                    It has a small keyboard button as a manual fallback.
   * Keyboard     - pops up by itself when a text field is focused (the daemon
-                   watches the page), moves to the top if the field is low on
-                   the screen, and types with real key presses (xdotool), so it
-                   works in sign-in pop-ups too.
+                   watches the page). It always sits at the bottom and the app
+                   shrinks to the space above it with the field scrolled into
+                   view. Types with real key presses (xdotool), so it works in
+                   sign-in pop-ups too.
   * Wake shield  - black full-screen window while the backlight is off, so the
                    first tap only wakes the screen.
 """
 import json
 import math
 import subprocess
+import threading
 import time
 import tkinter as tk
 import urllib.request
@@ -320,11 +322,12 @@ kc.bind("<ButtonRelease-1>", kb_release)
 
 
 def place_keyboard(field_y=None):
-    if field_y is not None:
-        kb_state["top"] = field_y > sh - KB_H - 24      # field would be hidden: keyboard on top
-    y = 0 if kb_state["top"] else sh - KB_H
-    kb.geometry(f"{sw}x{KB_H}+0+{y}")
+    kb.geometry(f"{sw}x{KB_H}+0+{sh - KB_H}")         # always at the bottom, like a phone
     place_pill()
+
+
+def api_async(path, data):
+    threading.Thread(target=call, args=(path, data), daemon=True).start()
 
 
 def show_keyboard(auto=True, field_y=None):
@@ -335,6 +338,7 @@ def show_keyboard(auto=True, field_y=None):
     place_keyboard(field_y)
     if not was_open:
         kb.deiconify()
+        api_async("/api/keyboard", {"open": True, "height": sh - KB_H})   # app shrinks above the keys
     kb.lift()
     pill.lift()
     focus_app()
@@ -343,6 +347,7 @@ def show_keyboard(auto=True, field_y=None):
 def hide_keyboard(user=False):
     if state["kb"]:
         kb.withdraw()
+        api_async("/api/keyboard", {"open": False})
     state["kb"] = False
     if user:
         state["dismissed"] = True        # stay closed until the field loses focus
@@ -357,7 +362,7 @@ shield.geometry(f"{sw}x{sh}+0+0")
 shield.bind("<ButtonPress-1>", lambda e: call("/api/wake", {}))
 shield.withdraw()
 
-state = {"pos": "bottom-left", "pill": False, "shield": False, "kb": False, "kb_auto": False,
+state = {"pos": "top-left", "pill": False, "shield": False, "kb": False, "kb_auto": False,
          "dismissed": False, "misses": 0, "no_focus": 0, "autohide": 5, "shown_at": 0.0}
 
 
