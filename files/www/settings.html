@@ -54,6 +54,7 @@
     font-weight: 700; background: var(--accent); color: #fff; }
   .save:disabled { opacity: .5; }
   .note { color: var(--muted); font-size: 13px; padding: 8px 4px; }
+  .banner { background: #2a2210; color: #f5c451; border-radius: 12px; padding: 12px 14px; margin: 12px 0 0; font-size: 14px; line-height: 1.4; }
   code { background: #0f0f14; padding: 2px 6px; border-radius: 6px; }
   #login { max-width: 360px; margin: 18vh auto 0; text-align: center; padding: 0 16px; }
   #login input { width: 100%; max-width: none; text-align: center; font-size: 28px; letter-spacing: .3em; margin: 18px 0; }
@@ -79,6 +80,8 @@
   <button class="btn local-only" id="home" style="float:right;margin-top:2px">Done</button>
   <h1>Settings</h1>
   <div class="sub" id="who"></div>
+  <div class="banner hidden" id="protbanner">Power-cut protection is on. Changes you make last until the next restart.
+    To keep changes or install updates, turn it off under System.</div>
 
   <h2>Apps on the screen</h2>
   <div class="card" id="apps"></div>
@@ -148,8 +151,19 @@
       <button class="btn" id="newpin">New PIN</button></div>
   </div>
 
+  <h2>Backup</h2>
+  <div class="note hidden" id="backupnote">Open Settings on your phone or computer to download or restore a backup (see Phone access).</div>
+  <div class="card" id="backupcard">
+    <div class="row"><div class="t"><b>Download a backup</b><small>All your PlexPie settings in one small file, including your Home Assistant password. Keep it somewhere safe.</small></div>
+      <a class="btn" id="backup" href="/api/backup" download style="text-decoration:none">Download</a></div>
+    <div class="row"><div class="t"><b>Restore from a backup</b><small>On a new or reinstalled player. Takes about a minute; music stops meanwhile. Sign in to your apps again afterwards.</small></div>
+      <label class="btn" style="cursor:pointer">Choose file<input type="file" id="restore" accept=".json,application/json" data-noform hidden></label></div>
+  </div>
+
   <h2>System</h2>
   <div class="card">
+    <div class="row hidden" id="protrow"><div class="t"><b>Power-cut protection</b><small id="protsub">Makes the memory card read-only, so pulling the plug can't damage it. Settings changes and updates need it off. Restarts the player.</small></div>
+      <label class="sw"><input type="checkbox" id="protect" data-noform><span></span></label></div>
     <div class="row"><div class="t"><b>Restart PlexPie</b><small>Reloads the screen and the apps</small></div>
       <button class="btn" data-sys="restart">Restart</button></div>
     <div class="row"><div class="t"><b>Reboot the Pi</b></div><button class="btn danger" data-sys="reboot">Reboot</button></div>
@@ -187,6 +201,13 @@ function esc(s) { return String(s ?? "").replace(/[&<>"]/g, c => ({"&": "&amp;",
 
 function render() {
   const v = data.values;
+  const pr = data.protect || {};
+  $("protrow").classList.toggle("hidden", !pr.available);
+  $("protect").checked = !!pr.active;
+  $("protbanner").classList.toggle("hidden", !pr.active);
+  $("updrun").disabled = !!pr.active;
+  $("backupcard").classList.toggle("hidden", !!data.local);
+  $("backupnote").classList.toggle("hidden", !data.local);
   $("who").textContent = `${data.player_name} · changes apply in a few seconds`;
   $("apps").innerHTML = row("Plexamp", "Always on", `<label class="sw"><input type="checkbox" checked disabled><span></span></label>`) +
     APPS.map(([k, name, desc]) => {
@@ -351,6 +372,30 @@ $("pinbtn").onclick = async () => {
 };
 $("pin").addEventListener("keydown", e => { if (e.key === "Enter") $("pinbtn").click(); });
 load();
+
+// ---- backup, restore, power-cut protection
+$("restore").onchange = async (e) => {
+  const f = e.target.files[0]; e.target.value = "";
+  if (!f) return;
+  let backup;
+  try { backup = JSON.parse(await f.text()); } catch (err) { toast("That file isn't a PlexPie backup"); return; }
+  const who = backup.player_name ? ` from “${backup.player_name}”` : "";
+  if (!confirm(`Restore the settings${who}${backup.created ? " (" + backup.created + ")" : ""}? The player reinstalls itself with them, which takes about a minute.`)) return;
+  const r = await api("/api/restore", backup); const j = await r.json().catch(() => ({}));
+  if (!r.ok) { toast(j.error || "Restore failed"); return; }
+  toast("Restoring… the screen restarts when it's done");
+  $("updtitle").textContent = "Restoring settings…"; setTimeout(pollUpdate, 3000);
+};
+$("protect").onchange = async (e) => {
+  const on = e.target.checked;
+  const msg = on ? "Turn on power-cut protection? The player restarts, and after that settings changes and updates only last until the next restart."
+                 : "Turn off power-cut protection? The player restarts so you can change settings and install updates.";
+  if (!confirm(msg)) { e.target.checked = !on; return; }
+  toast(on ? "Turning on protection… this can take a minute" : "Turning off protection…");
+  const r = await api("/api/system", {action: on ? "protect-on" : "protect-off"});
+  if (!r.ok) { const j = await r.json().catch(() => ({})); toast(j.error || "Didn't work"); e.target.checked = !on; return; }
+  toast("Restarting…");
+};
 </script>
 </body>
 </html>

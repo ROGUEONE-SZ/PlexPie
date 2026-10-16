@@ -30,6 +30,8 @@ apt_progress() {  # reads apt's Status-Fd and reports an overall percent between
   done
 }
 
+protect_active() { grep -Eq 'boot=overlay|overlayroot=tmpfs' /proc/cmdline; }
+
 case "${1:-}" in
   wifi-status)
     radio=$(nmcli -t -f WIFI g 2>/dev/null || echo unknown)
@@ -81,6 +83,7 @@ print(json.dumps(sorted(seen.values(), key=lambda n: -n["signal"])[:20]))' ;;
     printf '{"checked":%s,"os":%s,"plexpie":%s,"reboot":%s}\n' "$(date +%s)" "$os" "$pp" "$reboot" > "$STATE/update.json"
     cat "$STATE/update.json" ;;
   update-run)       # start the update in its own unit, so it survives PlexPie restarting
+    protect_active && { echo "Power-cut protection is on: turn it off to install updates" >&2; exit 3; }
     systemctl is-active --quiet plexpie-update && { echo "already running"; exit 0; }
     systemctl reset-failed plexpie-update 2>/dev/null
     systemd-run --quiet --unit=plexpie-update --collect /opt/plexpie/plexpie-admin update-do ;;
@@ -109,9 +112,30 @@ print(json.dumps(sorted(seen.values(), key=lambda n: -n["signal"])[:20]))' ;;
     reboot=false; [ -f /var/run/reboot-required ] && reboot=true
     json_status "Up to date" false ",\"percent\":100,\"reboot\":$reboot"
     echo "=== update finished $(date)" ;;
+  apply-run)        # reinstall with the current plexpie.conf (after restoring a backup)
+    systemctl is-active --quiet plexpie-update && { echo "an update is running, try again in a few minutes" >&2; exit 1; }
+    systemctl reset-failed plexpie-update 2>/dev/null
+    systemd-run --quiet --unit=plexpie-update --collect /opt/plexpie/plexpie-admin apply-do ;;
+  apply-do)
+    exec >>"$LOG" 2>&1
+    echo "=== restore started $(date)"
+    date +%s > "$STATE/update-started"
+    json_status "Applying restored settings" true ',"percent":20'
+    bash "$REPO/install.sh" --no-restart-ui </dev/null || { json_status "Restore failed (see $LOG)" false; exit 1; }
+    json_status "Settings restored" false ',"percent":100'
+    pkill -u "$U" -f plexpie-chromium || true   # reload the screen with the restored settings
+    echo "=== restore finished $(date)" ;;
+  protect-status)
+    avail=false; command -v raspi-config >/dev/null && avail=true
+    active=false; protect_active && active=true
+    printf '{"available":%s,"active":%s}\n' "$avail" "$active" ;;
+  protect-on|protect-off)
+    command -v raspi-config >/dev/null || { echo "raspi-config is not installed" >&2; exit 2; }
+    [ "$1" = protect-on ] && v=0 || v=1          # raspi-config: 0 = enable
+    raspi-config nonint do_overlayfs "$v" ;;     # takes effect after a reboot
   update-status)
     cat "$STATE/update.json" 2>/dev/null || echo '{}'
     cat "$STATE/update-run.json" 2>/dev/null || echo '{}' ;;
-  *) echo "usage: plexpie-admin wifi-status|wifi-on|wifi-off|wifi-scan|wifi-connect SSID|update-check|update-run|update-status" >&2
+  *) echo "usage: plexpie-admin wifi-status|wifi-on|wifi-off|wifi-scan|wifi-connect SSID|update-check|update-run|update-status|apply-run|protect-status|protect-on|protect-off" >&2
      exit 2 ;;
 esac

@@ -25,7 +25,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 
-VERSION = "2.5.0"
+VERSION = "2.6.0"
 CONF_PATH = os.environ.get("PLEXPIE_CONF", "/etc/plexpie/plexpie.conf")
 WWW = os.path.join(os.path.dirname(os.path.abspath(__file__)), "www")
 HTTP_PORT = int(os.environ.get("PLEXPIE_HTTP_PORT", "8080"))
@@ -228,6 +228,7 @@ class State:
         self.quiet_until = 0.0          # during an alert: no auto-pause, no auto-show
         self.alert = {}
         self.alert_n = 0
+        self.sleep_until = 0.0          # sleep timer: pause everything at this time (0 = off)
         self.changed = threading.Event()
 
     def now_source(self):
@@ -275,6 +276,7 @@ def state_json():
             "text_y": ST.text_y,
             "shortcuts": [{"id": k, **v} for k, v in SHORTCUTS.items()],
             "alert": bool(ST.alert),
+            "sleep_left": max(0, round(ST.sleep_until - time.time())) if ST.sleep_until else 0,
         }
 
 
@@ -793,6 +795,111 @@ def shutdown():
     HA.pub(f"{HA.base}/status", "offline")
     time.sleep(4)
     sudo("/usr/sbin/poweroff")
+
+
+SLEEP_STEPS = (15, 30, 45, 60, 90)
+SLEEP_FADE = 60                       # the last minute fades the volume down
+
+
+def set_sleep(minutes):
+    minutes = max(0, min(600, int(minutes)))
+    with ST.lock:
+        ST.sleep_until = time.time() + minutes * 60 if minutes else 0.0
+    log.info("sleep timer %s", f"{minutes} min" if minutes else "off")
+    mark_changed()
+
+
+def cycle_sleep():
+    with ST.lock:
+        left = (ST.sleep_until - time.time()) / 60 if ST.sleep_until else 0
+    nxt = next((m for m in SLEEP_STEPS if m > left + 1), 0)
+    set_sleep(nxt)
+
+
+def sleep_loop():
+    fade_from = None
+    last_min = None
+    while True:
+        time.sleep(1)
+        try:
+            with ST.lock:
+                until = ST.sleep_until
+            if not until:
+                if fade_from is not None:            # cancelled during the fade
+                    set_volume(fade_from)
+                    fade_from = None
+                continue
+            left = until - time.time()
+            if round(left / 60) != last_min:          # keep Home Assistant's minutes current
+                last_min = round(left / 60)
+                mark_changed()
+            if 0 < left <= SLEEP_FADE:
+                if fade_from is None:
+                    fade_from = ST.volume if ST.volume is not None else (get_volume() or 50)
+                set_volume(round(fade_from * (0.25 + 0.75 * left / SLEEP_FADE)))
+            elif left <= 0:
+                log.info("sleep timer: stopping the music")
+                with ST.lock:
+                    ST.sleep_until = 0.0
+                pause_all()
+                time.sleep(1.5)
+                if fade_from is not None:
+                    set_volume(fade_from)
+                    fade_from = None
+                SCREEN.set(False, "sleep timer")
+        except Exception as e:
+            log.warning("sleep loop: %s", e)
+
+
+# ---------------------------------------------------------------- backup/restore
+REPO_DIR = read_file("/etc/plexpie/repo_dir", "") or os.path.expanduser("~/plexpie")
+NOT_RESTORED = {"APPLIANCE_USER"}     # differs per Pi
+
+
+def conf_keys():
+    keys = []
+    for line in (read_file(os.path.join(REPO_DIR, "plexpie.conf.example"), "") or "").splitlines():
+        m = re.match(r"^([A-Z][A-Z0-9_]*)=", line)
+        if m and m.group(1) not in keys:
+            keys.append(m.group(1))
+    return keys or sorted(k for k in C if re.match(r"^[A-Z][A-Z0-9_]*$", k))
+
+
+def backup_json():
+    keys = [k for k in conf_keys() if k not in NOT_RESTORED]
+    return {"plexpie_backup": 1, "version": VERSION, "player_name": PLAYER_NAME,
+            "created": time.strftime("%Y-%m-%d %H:%M"),
+            "settings": {k: cfg(k) for k in keys if cfg(k) != "" or k in C}}
+
+
+def restore_backup(data):
+    if not isinstance(data, dict) or data.get("plexpie_backup") != 1 or not isinstance(data.get("settings"), dict):
+        return False, "This isn't a PlexPie backup file."
+    allowed = set(conf_keys()) - NOT_RESTORED
+    new = {k: str(v) for k, v in data["settings"].items()
+           if k in allowed and "\n" not in str(v) and len(str(v)) < 500}
+    if not new:
+        return False, "The backup has no settings in it."
+    path = os.path.join(REPO_DIR, "plexpie.conf")
+    cur = load_conf(path) if os.path.exists(path) else dict(C)
+    cur.update(new)
+    order = conf_keys() + [k for k in cur if k not in conf_keys()]
+    lines = ["# PlexPie settings, restored from a backup on " + time.strftime("%Y-%m-%d %H:%M")]
+    lines += [f'{k}="{cur[k].replace(chr(34), "")}"' for k in order if k in cur]
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
+        f.write("\n".join(lines) + "\n")
+    os.chmod(tmp, 0o600)
+    os.replace(tmp, path)
+    for f in (SETTINGS_JSON, SETTINGS_ENV):    # the restored file is now the source of truth
+        try:
+            os.remove(f)
+        except OSError:
+            pass
+    save_overrides({k: v for k, v in new.items() if k in EDITABLE})
+    log.info("restored %d settings from a backup, reinstalling", len(new))
+    ok, out = admin("apply-run", timeout=20)
+    return ok, "" if ok else (out.strip() or "Could not start the installer.")
 
 
 def end_alert():
@@ -1547,7 +1654,12 @@ def settings_json(local, host=None):
         wifi = json.loads(wifi) if ok else {}
     except ValueError:
         wifi = {}
-    return {"values": vals, "wifi": wifi, "updates": update_info(), "installed": installed, "accounts": accounts(), "player_name": PLAYER_NAME,
+    ok, prot = admin("protect-status", timeout=10)
+    try:
+        prot = json.loads(prot) if ok else {}
+    except ValueError:
+        prot = {}
+    return {"values": vals, "wifi": wifi, "protect": prot, "updates": update_info(), "installed": installed, "accounts": accounts(), "player_name": PLAYER_NAME,
             "version": VERSION,
             "phone_url": f"http://{host}/settings" if host else (f"http://{addr}:{HTTP_PORT}/settings" if addr else ""),
             "local": local}
@@ -1612,7 +1724,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     # Phone browsers reach only the Settings page, and only with the PIN.
     REMOTE_OPEN = ("/settings", "/api/login", "/manifest.json", "/icon.png")
-    REMOTE_AUTH = ("/api/settings", "/api/account", "/api/system")
+    REMOTE_AUTH = ("/api/settings", "/api/account", "/api/system", "/api/backup", "/api/restore")
 
     def _local(self):
         return self.client_address[0] in ("127.0.0.1", "::1", "::ffff:127.0.0.1")
@@ -1671,6 +1783,15 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return self._send(200, json.dumps(settings_json(self._local(), host)).encode())
         if path == "/api/state":
             return self._send(200, json.dumps(state_json()).encode())
+        if path == "/api/backup":
+            body = json.dumps(backup_json(), indent=1).encode()
+            name = re.sub(r"[^A-Za-z0-9_-]+", "-", PLAYER_NAME).strip("-") or "plexpie"
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Disposition", f'attachment; filename="plexpie-{name}-{time.strftime("%Y%m%d")}.json"')
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            return self.wfile.write(body)
         if path == "/api/art":
             with ST.lock:
                 art, typ = ST.art, ST.art_type
@@ -1712,6 +1833,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if path == "/api/settings":
             saved = apply_settings(data)
             return self._send(200, json.dumps({"ok": True, "saved": sorted(saved)}).encode())
+        if path == "/api/restore":
+            ok, msg = restore_backup(data)
+            return self._send(200 if ok else 400, json.dumps({"ok": ok, "error": msg}).encode())
         if path == "/api/account":
             if data.get("action") == "signout" and data.get("id") in SIGN_OUT_ORIGINS:
                 spawn(sign_out, data["id"])
@@ -1724,6 +1848,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 spawn(lambda: (time.sleep(0.5), sudo("/usr/sbin/reboot")))
             elif what == "shutdown":
                 spawn(shutdown)
+            elif what in ("protect-on", "protect-off"):
+                ok, out = admin(what, timeout=180)
+                if ok:
+                    spawn(lambda: (time.sleep(1), sudo("/usr/sbin/reboot")))
+                return self._send(200 if ok else 500, json.dumps({"ok": ok, "error": out.strip()[-200:]}).encode())
             elif what in ("wifi-on", "wifi-off"):
                 ok, _ = admin(what, timeout=20)
                 return self._send(200 if ok else 500, json.dumps({"ok": ok}).encode())
@@ -1764,6 +1893,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
             spawn(pause_all)
         elif path == "/api/alert":
             spawn(show_alert, data)
+        elif path == "/api/sleep":
+            if "minutes" in data:
+                set_sleep(data["minutes"])
+            else:
+                cycle_sleep()
         elif path == "/api/alert/dismiss":
             spawn(end_alert)
         elif path == "/api/shortcut":
@@ -1874,6 +2008,9 @@ class HomeAssistant:
                                          "state_topic": f"{b}/cpu_temp"})
         self.disc("notify", "alert", {"name": "Screen alert", "icon": "mdi:message-alert",
                                       "command_topic": f"{b}/alert/set"})
+        self.disc("number", "sleep_timer", {"name": "Sleep timer", "icon": "mdi:sleep", "min": 0, "max": 180,
+                                            "step": 5, "unit_of_measurement": "min", "mode": "box",
+                                            "state_topic": f"{b}/sleep", "command_topic": f"{b}/sleep/set"})
         for sid, sc in SHORTCUTS.items():
             self.disc("switch", f"shortcut_{sid}", {"name": sc["name"], "icon": "mdi:gesture-tap-button",
                                                    "state_topic": f"{b}/shortcut/{sid}",
@@ -1928,6 +2065,8 @@ class HomeAssistant:
                 sudo("/usr/sbin/reboot")
             elif key == "shutdown":
                 spawn(shutdown)
+            elif key == "sleep":
+                set_sleep(float(val))
         except ValueError:
             log.warning("bad value for %s: %s", key, val)
 
@@ -1953,6 +2092,7 @@ class HomeAssistant:
             "volume": "" if s["volume"] is None else str(s["volume"]),
             "ma_up": "ON" if s["ma_up"] else "OFF",
             "cpu_temp": "" if ST.cpu_temp is None else str(ST.cpu_temp),
+            "sleep": str(-(-s["sleep_left"] // 60)),
         }
         for k, v in values.items():
             if v != "" and self.last.get(k) != v:
@@ -2002,7 +2142,8 @@ def main():
     SCREEN.apply()
     if "airplay" in SOURCES:
         spawn(airplay_reader)
-    for fn in (fast_poller, slow_poller, focus_poller, gesture_reader, screen_loop, watchdog, update_checker):
+    for fn in (fast_poller, slow_poller, focus_poller, gesture_reader, screen_loop, watchdog, update_checker,
+               sleep_loop):
         spawn(fn)
     HA.start()
     while True:

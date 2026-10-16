@@ -176,6 +176,8 @@ Good to know:
 - **The screen sleeps** when nothing is playing. The first tap only wakes it, so you don't press
   anything by accident.
 - **Volume:** use the − and + buttons on the home screen, or your receiver's knob.
+- **Sleep timer:** tap the **zᶻ** button next to the clock: 15, 30, 45, 60 or 90 minutes, then off.
+  In the last minute the music fades out, then everything stops and the screen goes to sleep.
 
 ## 8. Set up your receiver or speakers
 
@@ -249,6 +251,17 @@ rings. The [main README](../README.md#home-assistant) has the details and exampl
   itself twice a day.
 - **Change your wizard answers:** connect to the Pi (step 4) and run
   `bash ~/plexpie/configure.sh && sudo bash ~/plexpie/install.sh`.
+- **Back up your settings:** open Settings **on your phone or computer** (see section 9), then
+  **Backup → Download**. You get one small file with all your PlexPie settings. Keep it safe: it
+  includes your Home Assistant password.
+- **Restore on a new memory card:** install PlexPie on the new card (sections 3 to 6; you can accept
+  the wizard's suggested answers), open Settings on your phone, then **Backup → Choose file** and pick
+  your backup. The player reinstalls itself with your settings in about a minute. Sign in to Apple
+  Music again afterwards; for safety, account sign-ins are not part of the backup.
+- **Power-cut protection:** **Settings → System → Power-cut protection** makes the memory card
+  read-only, so pulling the plug can never damage it. While it's on, settings changes only last
+  until the next restart and updates can't be installed: turn it off, make your changes or update,
+  then turn it back on. Each switch restarts the player.
 - **Turn it off:** **Settings → System → Shut down**. Wait about 15 seconds, until the green light on
   the Pi stops blinking, then unplug it. (Some screens stay lit after the Pi is off; that's normal.) Plug it back in to start it. Don't just pull the plug while
   it's running: that can damage the memory card.

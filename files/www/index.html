@@ -25,7 +25,11 @@
   .clock { font-size: 20px; font-variant-numeric: tabular-nums; font-weight: 600; }
   .gear { width: 40px; height: 40px; border: 0; border-radius: 12px; background: transparent; color: var(--muted);
     display: grid; place-items: center; margin-right: -6px; }
-  .gear:active { background: var(--panel); }
+  .gear:active, .sleep:active { background: var(--panel); }
+  .sleep { height: 40px; min-width: 40px; padding: 0 8px; border: 0; border-radius: 12px; background: transparent; color: var(--muted);
+    display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .sleep svg { width: 21px; height: 21px; }
+  .sleep.on { color: #b79cff; background: color-mix(in srgb, #b79cff 16%, transparent); }
   .gear svg { width: 22px; height: 22px; }
 
 
@@ -71,6 +75,9 @@
 <header>
   <div class="name" id="name">PlexPie</div>
   <div class="np"><span class="chip" id="npchip">Idle</span><span class="track" id="nptrack"></span></div>
+  <button class="sleep" id="sleep" aria-label="Sleep timer" title="Sleep timer: tap for 15, 30, 45, 60, 90 minutes, off">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M2 14h6l-6 6h6M12 4h5l-5 5h5M16 13h4l-4 4h4"/></svg><span id="sleepleft"></span></button>
   <div class="clock" id="clock">--:--</div>
   <button class="gear" id="gear" aria-label="Settings">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -189,6 +196,9 @@ function render(s) {
   const v = s.volume;
   $("volbar").style.width = (v == null ? 0 : v) + "%";
   $("volnum").textContent = v == null ? "–" : v;
+  const sl = s.sleep_left || 0;
+  $("sleep").classList.toggle("on", sl > 0);
+  $("sleepleft").textContent = sl > 0 ? (sl >= 60 ? Math.ceil(sl / 60) + "m" : sl + "s") : "";
 }
 
 // Pick the grid that gives the most comfortable tiles for this screen: one row on a wide
@@ -231,6 +241,7 @@ $("pause").onclick = () => post("/api/pause_all");
 $("volup").onclick = () => post("/api/volume", {delta: 5});
 $("voldown").onclick = () => post("/api/volume", {delta: -5});
 $("screenoff").onclick = () => post("/api/screen", {on: false});
+$("sleep").onclick = () => post("/api/sleep");
 $("gear").onclick = () => post("/api/source", {source: "settings"});
 
 clock(); poll();

@@ -34,6 +34,9 @@ How it behaves:
 - **On-screen keyboard.** A keyboard slides up when you tap a text field (sign-ins, search), and the app shrinks to fit above it.
 - **Screen sleep.** The screen sleeps when nothing is playing. The first tap only wakes it.
 - **Self-healing.** A crashed app is restarted automatically.
+- **Sleep timer.** The zᶻ button next to the clock stops the music after 15 to 90 minutes, fading out over the last minute.
+- **Backup and restore.** Download all your settings as one file from your phone, and restore them on a new memory card.
+- **Power-cut protection.** An optional read-only mode, so pulling the plug can't damage the memory card.
 - **Settings screen.** The gear on the launcher opens Settings: switch apps on and off, see which accounts are signed in, set the screen sleep, Home Assistant and Music Assistant. The same page opens on your phone at `http://<pi-address>:8080/settings`, protected by a PIN shown on the player.
 
 ## What you need
@@ -131,6 +134,7 @@ With MQTT set up, the Pi appears automatically under **Settings → Devices** wi
 - **Screen:** an on/off switch, plus **Screen brightness**.
 - **Volume.**
 - **Buttons:** **Pause all**, **Restart screen**, **Reboot**, **Shut down**.
+- **Sleep timer:** minutes left; set a number to start it, 0 to cancel.
 - **AirPlay artwork:** an image entity.
 - **Diagnostics:** CPU temperature, and whether Music Assistant is reachable.
 - **Screen alert:** a notify entity that puts a message on the screen with a chime.
