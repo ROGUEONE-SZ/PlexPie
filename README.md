@@ -216,4 +216,13 @@ affiliated with Plex, Apple or Spotify.
 
 ## License
 
-PolyForm Noncommercial 1.0.0: free for personal use; commercial use needs permission. See [LICENSE.md](LICENSE.md).
+**Free for personal, non-commercial use** under the [PolyForm Noncommercial License 1.0.0](LICENSE.md):
+use it at home, change it, share it with friends, learn from it.
+
+**Commercial use is not allowed without permission.** That includes selling devices or kits
+with PlexPie on them, offering it as a paid service, or building it into a product. If you'd
+like to do that, open an issue to ask about a commercial license.
+
+
+PlexPie installs other projects (Plexamp, shairport-sync, go-librespot, Squeezelite, Chromium
+and more) from their official sources. Those keep their own licenses and terms.
