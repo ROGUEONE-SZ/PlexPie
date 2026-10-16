@@ -7,7 +7,7 @@
 <style>
   :root {
     --bg: #0b0b0f; --panel: #16161c; --line: #26262e; --text: #f4f4f7; --muted: #8e8e99;
-    --plexamp: #f5a524; --apple: #fa3c5a; --airplay: #3b8cf6; --ma: #19c2a8; --spotify: #1ed760; --timer: #ff5a4f; --lamp: #ffd166;
+    --plexamp: #f5a524; --apple: #fa3c5a; --airplay: #3b8cf6; --ma: #19c2a8; --spotify: #1ed760; --timer: #ff5a4f; --bt: #7b8cff; --lamp: #ffd166;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden;
@@ -110,6 +110,12 @@
       <circle cx="12" cy="12" r="9.5"/><path d="M7 9.3c3.2-1 7-.7 9.8.9M7.6 12.6c2.7-.8 5.8-.5 8.1.8M8.3 15.7c2.1-.6 4.3-.4 6.2.6"/></svg>
     <div><div class="label">Spotify</div><div class="sub">From your phone</div></div>
   </button>
+  <button class="tile" data-src="bluetooth" style="--c: var(--bt)">
+    <span class="eq"><i></i><i></i><i></i></span>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M7 7l10 10-5 5V2l5 5L7 17"/></svg>
+    <div><div class="label">Bluetooth</div><div class="sub">Any phone</div></div>
+  </button>
   <button class="tile" data-src="ma" style="--c: var(--ma)">
     <span class="eq"><i></i><i></i><i></i></span>
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -148,7 +154,7 @@ const $ = (id) => document.getElementById(id);
 const post = (path, body) => fetch(path, {method: "POST", headers: {"Content-Type": "application/json"},
   body: JSON.stringify(body || {})}).then(r => r.json()).then(j => j.state && render(j.state)).catch(() => {});
 const SUBS = {plexamp: "Your library", apple: "On this screen", airplay: "From your phone",
-              spotify: "Spotify Connect", ma: "Your speakers", timer: "Intervals · countdown"};
+              spotify: "Spotify Connect", ma: "Your speakers", timer: "Intervals · countdown", bluetooth: "Any phone"};
 const BULB = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg>';
 let scKey = "";
 function renderShortcuts(list) {
@@ -180,6 +186,7 @@ function render(s) {
     if (playing) sub = "Playing";
     else if (off) sub = "Off — start it in Home Assistant";
     else if (src === "airplay") sub = `Pick “${s.player_name}”`;
+    else if (src === "bluetooth" && s.bluetooth && s.bluetooth.connected) sub = s.bluetooth.connected;
     t.querySelector(".sub").textContent = sub;
   });
   fit(Math.max(shown, 1));

@@ -34,6 +34,13 @@
     width: 46%; max-width: 280px; background: #0f0f14; color: var(--text); border: 1px solid var(--line);
     border-radius: 10px; padding: 10px 12px; font: inherit; font-size: 15px; }
   input[type=range] { width: 46%; max-width: 280px; accent-color: var(--accent); }
+  .bands { display: flex; justify-content: space-between; gap: 6px; padding: 8px 16px 14px; }
+  .band { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+  .band input[type=range] { writing-mode: vertical-lr; direction: rtl; width: 28px; height: 120px; max-width: none; }
+  .band b { color: var(--text); font-size: 13px; font-variant-numeric: tabular-nums; }
+  textarea { width: 100%; min-height: 110px; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 10px;
+    padding: 10px; font: 13px/1.4 ui-monospace, Menlo, monospace; }
+  canvas#eqcurve { display: block; width: 100%; height: 120px; }
   .sw { position: relative; width: 52px; height: 32px; flex: none; }
   .sw input { opacity: 0; width: 0; height: 0; }
   .sw span { position: absolute; inset: 0; background: #3a3a3d; border-radius: 999px; transition: .2s; }
@@ -104,6 +111,21 @@
       <label class="sw"><input type="checkbox" id="SWIPE_HOME"><span></span></label></div>
   </div>
 
+  <h2>Sound</h2>
+  <div class="card">
+    <div class="row"><div class="t"><b>Equalizer</b><small>Shapes the sound for your room, speakers or headphones. Off plays lossless music untouched.</small></div>
+      <label class="sw"><input type="checkbox" id="EQ_ENABLED"><span></span></label></div>
+    <div id="eqbody">
+      <div class="row"><div class="t"><b>Preset</b></div><select id="EQ_PRESET"></select></div>
+      <div class="bands hidden" id="bands"></div>
+      <input type="hidden" id="EQ_BANDS">
+      <div class="row hidden" id="apo" style="display:block">
+        <div class="t" style="margin-bottom:8px"><b>Paste a correction</b><small>From <a href="https://autoeq.app" style="color:var(--accent)">autoeq.app</a> (pick your headphones, choose "Equalizer APO" and copy the parametric EQ), or any Equalizer APO filter list.</small></div>
+        <textarea id="EQ_CUSTOM_TEXT" placeholder="Filter 1: ON PK Fc 105 Hz Gain -3.4 dB Q 0.70"></textarea></div>
+      <div class="row" style="display:block"><canvas id="eqcurve"></canvas></div>
+    </div>
+  </div>
+
   <h2>Home Assistant</h2>
   <div class="card">
     <div class="row"><div class="t"><b>MQTT broker</b><small>Empty turns Home Assistant off</small></div>
@@ -122,6 +144,15 @@
       <input id="MA_HOST" type="text" placeholder="homeassistant.local" autocapitalize="off"></div>
     <div class="row"><div class="t"><b>Web address</b><small>Opened by the Music Assistant tile</small></div>
       <input id="MA_URL" type="text" placeholder="http://homeassistant.local:8095" autocapitalize="off"></div>
+  </div>
+
+  <div id="btsection" class="hidden">
+  <h2>Bluetooth</h2>
+  <div class="card">
+    <div class="row"><div class="t"><b>Pair a phone</b><small id="btsub">Makes the player visible for 2 minutes. Then pick it in your phone's Bluetooth settings.</small></div>
+      <button class="btn" id="btpair" data-noform>Pair</button></div>
+    <div id="btdevices"></div>
+  </div>
   </div>
 
   <h2>Updates</h2>
@@ -183,10 +214,12 @@ const APPS = [
   ["ENABLE_SPOTIFY", "Spotify Connect", "Play from the Spotify app (Premium)"],
   ["ENABLE_SPOTIFY_WEB", "Spotify web player", "Browse Spotify on the screen"],
   ["ENABLE_MUSIC_ASSISTANT", "Music Assistant", "Player and interface for Music Assistant"],
+  ["ENABLE_BLUETOOTH", "Bluetooth", "Any phone can play to it"],
   ["ENABLE_TIMER", "Workout timer", "Intervals, countdown and stopwatch"],
 ];
 const FIELDS = ["SCREEN_OFF_AFTER_SECS", "SCREEN_BRIGHTNESS", "AUTO_SHOW", "SWIPE_HOME", "MQTT_HOST", "MQTT_PORT",
-  "MQTT_USER", "MQTT_PASS", "SHORTCUTS", "MA_HOST", "MA_URL", "PHONE_ACCESS"];
+  "MQTT_USER", "MQTT_PASS", "SHORTCUTS", "MA_HOST", "MA_URL", "PHONE_ACCESS",
+  "EQ_ENABLED", "EQ_PRESET", "EQ_BANDS", "EQ_CUSTOM_TEXT"];
 let data = null;
 
 function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("on");
@@ -201,6 +234,8 @@ function esc(s) { return String(s ?? "").replace(/[&<>"]/g, c => ({"&": "&amp;",
 
 function render() {
   const v = data.values;
+  $("EQ_PRESET").innerHTML = Object.entries(data.eq_presets || {}).map(([k, p]) => `<option value="${k}">${esc(p.name)}</option>`).join("");
+  renderBt(data.bluetooth);
   const pr = data.protect || {};
   $("protrow").classList.toggle("hidden", !pr.available);
   $("protect").checked = !!pr.active;
@@ -230,6 +265,7 @@ function render() {
   document.querySelectorAll(".local-only").forEach(e => e.classList.toggle("hidden", !data.local));
   $("ver").textContent = `PlexPie ${data.version}`;
   renderUpdates(data.updates); renderWifi(data.wifi);
+  buildBands(); eqUi(); requestAnimationFrame(() => setTimeout(drawEq, 30));
   $("main").classList.remove("hidden"); $("bar").classList.remove("hidden");
   $("save").disabled = true;
 }
@@ -396,6 +432,90 @@ $("protect").onchange = async (e) => {
   if (!r.ok) { const j = await r.json().catch(() => ({})); toast(j.error || "Didn't work"); e.target.checked = !on; return; }
   toast("Restarting…");
 };
+
+// ---- equalizer
+const BANDS = [["LS", 60, 0.7, "60 Hz"], ["PK", 250, 1, "250 Hz"], ["PK", 1000, 1, "1 kHz"], ["PK", 4000, 1, "4 kHz"], ["HS", 10000, 0.7, "10 kHz"]];
+function bandGains() { return ($("EQ_BANDS").value || "").split(",").map(Number).concat([0, 0, 0, 0, 0]).slice(0, 5).map(x => isFinite(x) ? x : 0); }
+function buildBands() {
+  const g = bandGains();
+  $("bands").innerHTML = BANDS.map((b, i) => `<label class="band"><b id="bv${i}">${g[i] > 0 ? "+" : ""}${g[i]}</b>
+    <input type="range" min="-12" max="12" step="1" value="${g[i]}" data-band="${i}"><span>${b[3]}</span></label>`).join("");
+}
+$("bands").addEventListener("input", e => {
+  const i = +e.target.dataset.band; if (isNaN(i)) return;
+  const g = bandGains(); g[i] = +e.target.value; $("EQ_BANDS").value = g.join(",");
+  $("bv" + i).textContent = (g[i] > 0 ? "+" : "") + g[i]; drawEq();
+});
+function parseApo(t) {
+  const out = []; const re = /Filter\s*\d*\s*:\s*ON\s+(PK|PEQ|LSC?|HSC?)\s+Fc\s+([\d.]+)\s*Hz\s+Gain\s+(-?[\d.]+)\s*dB(?:\s+Q\s+([\d.]+))?/gi;
+  let m; while ((m = re.exec(t || ""))) { const ty = m[1].toUpperCase(); out.push([/^P/.test(ty) ? "PK" : ty.slice(0, 2), +m[2], +m[3], +(m[4] || 0.7)]); }
+  return out;
+}
+function currentFilters() {
+  const p = $("EQ_PRESET").value;
+  if (p === "custom") return BANDS.map((b, i) => [b[0], b[1], bandGains()[i], b[2]]).filter(f => f[2]);
+  if (p === "headphones") return parseApo($("EQ_CUSTOM_TEXT").value);
+  return ((data.eq_presets || {})[p] || {}).filters || [];
+}
+function biquadDb(f, [type, f0, gain, q], fs = 48000) {     // RBJ cookbook magnitude
+  const A = Math.pow(10, gain / 40), w0 = 2 * Math.PI * f0 / fs, cs = Math.cos(w0), al = Math.sin(w0) / (2 * q);
+  let b0, b1, b2, a0, a1, a2;
+  if (type === "PK") { b0 = 1 + al * A; b1 = -2 * cs; b2 = 1 - al * A; a0 = 1 + al / A; a1 = -2 * cs; a2 = 1 - al / A; }
+  else { const s = type === "LS" ? 1 : -1, sq = 2 * Math.sqrt(A) * al;
+    b0 = A * ((A + 1) - s * (A - 1) * cs + sq); b1 = s * 2 * A * ((A - 1) - s * (A + 1) * cs); b2 = A * ((A + 1) - s * (A - 1) * cs - sq);
+    a0 = (A + 1) + s * (A - 1) * cs + sq; a1 = -s * 2 * ((A - 1) + s * (A + 1) * cs); a2 = (A + 1) + s * (A - 1) * cs - sq; }
+  const w = 2 * Math.PI * f / fs, c1 = Math.cos(w), c2 = Math.cos(2 * w), s1 = Math.sin(w), s2 = Math.sin(2 * w);
+  const nr = b0 + b1 * c1 + b2 * c2, ni = -(b1 * s1 + b2 * s2), dr = a0 + a1 * c1 + a2 * c2, di = -(a1 * s1 + a2 * s2);
+  return 10 * Math.log10((nr * nr + ni * ni) / (dr * dr + di * di));
+}
+function drawEq() {
+  const c = $("eqcurve"), dpr = devicePixelRatio || 1, W = c.clientWidth, H = c.clientHeight;
+  if (!W) return;
+  c.width = W * dpr; c.height = H * dpr; const x = c.getContext("2d"); x.scale(dpr, dpr);
+  const fl = currentFilters(), on = $("EQ_ENABLED").checked, R = 12;
+  const fx = f => W * Math.log(f / 20) / Math.log(1000), gy = g => H / 2 - (g / R) * (H / 2 - 8);
+  x.strokeStyle = "#26262e"; x.fillStyle = "#8e8e99"; x.font = "11px system-ui"; x.lineWidth = 1;
+  for (const f of [50, 100, 200, 500, 1000, 2000, 5000, 10000]) { x.beginPath(); x.moveTo(fx(f), 0); x.lineTo(fx(f), H); x.stroke();
+    x.fillText(f >= 1000 ? f / 1000 + "k" : f, fx(f) + 3, H - 4); }
+  for (const g of [-6, 0, 6]) { x.beginPath(); x.moveTo(0, gy(g)); x.lineTo(W, gy(g)); x.stroke(); x.fillText((g > 0 ? "+" : "") + g + " dB", 4, gy(g) - 3); }
+  x.strokeStyle = on ? "#0a84ff" : "#5b5b66"; x.lineWidth = 2.5; x.beginPath();
+  for (let px = 0; px <= W; px += 2) { const f = 20 * Math.pow(1000, px / W);
+    const g = fl.reduce((a, flt) => a + biquadDb(f, flt), 0); const y = gy(Math.max(-R, Math.min(R, g)));
+    px ? x.lineTo(px, y) : x.moveTo(px, y); }
+  x.stroke();
+}
+function eqUi() {
+  const p = $("EQ_PRESET").value;
+  $("bands").classList.toggle("hidden", p !== "custom"); $("apo").classList.toggle("hidden", p !== "headphones");
+  $("eqbody").style.opacity = $("EQ_ENABLED").checked ? 1 : .5;
+  drawEq();
+}
+["EQ_PRESET", "EQ_ENABLED", "EQ_CUSTOM_TEXT"].forEach(id => $(id).addEventListener("input", eqUi));
+$("EQ_PRESET").addEventListener("change", eqUi); $("EQ_ENABLED").addEventListener("change", eqUi);
+addEventListener("resize", drawEq);
+
+// ---- bluetooth
+function renderBt(b) {
+  $("btsection").classList.toggle("hidden", !b || !data.values.ENABLE_BLUETOOTH);
+  if (!b) return;
+  const left = b.pairing_left || 0;
+  $("btpair").textContent = left ? "Stop" : "Pair";
+  $("btsub").innerHTML = b.available === false ? "Bluetooth isn't ready. Try rebooting the player."
+    : left ? `Visible as <b>${esc(data.player_name)}</b> for ${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}. Pick it in your phone's Bluetooth settings.`
+    : "Makes the player visible for 2 minutes. Then pick it in your phone's Bluetooth settings.";
+  $("btdevices").innerHTML = (b.devices || []).map(d => `<div class="row"><span class="dot ${d.connected ? "ok" : ""}"></span>
+    <div class="t"><b>${esc(d.name)}</b><small>${d.connected ? "Connected" : "Paired"}</small></div>
+    <button class="btn" data-btforget="${esc(d.address)}">Forget</button></div>`).join("");
+  clearTimeout(renderBt.t);
+  if (left || (b.devices || []).some(d => d.connected)) renderBt.t = setTimeout(btRefresh, 2000);
+}
+async function btRefresh(action, address) {
+  const r = action ? await api("/api/bluetooth", {action, address}) : await api("/api/settings");
+  const j = await r.json(); data.bluetooth = j.bluetooth; renderBt(j.bluetooth);
+}
+$("btpair").onclick = () => btRefresh((data.bluetooth || {}).pairing_left ? "stop" : "pair");
+$("btdevices").addEventListener("click", e => { const a = e.target.dataset.btforget;
+  if (a && confirm("Forget this phone? It will need to pair again.")) btRefresh("forget", a); });
 </script>
 </body>
 </html>

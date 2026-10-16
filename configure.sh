@@ -82,6 +82,7 @@ yesno ENABLE_APPLE_MUSIC_WEB "Add the Apple Music web player on the screen? (nee
 yesno ENABLE_SPOTIFY "Add a Spotify Connect receiver? (needs Spotify Premium)" "${ENABLE_SPOTIFY:-no}"
 ENABLE_SPOTIFY_WEB="${ENABLE_SPOTIFY_WEB:-no}"
 [ "$ENABLE_SPOTIFY" = yes ] && yesno ENABLE_SPOTIFY_WEB "Also add the Spotify web player on the screen?" "$ENABLE_SPOTIFY_WEB"
+yesno ENABLE_BLUETOOTH "Let any phone play to it over Bluetooth?" "${ENABLE_BLUETOOTH:-yes}"
 yesno ENABLE_MUSIC_ASSISTANT "Add Music Assistant (needs a Music Assistant server)?" "${ENABLE_MUSIC_ASSISTANT:-no}"
 if [ "$ENABLE_MUSIC_ASSISTANT" = yes ]; then
   ask MA_HOST "Music Assistant server address (IP or hostname)" "${MA_HOST:-${HA_HOST:-homeassistant.local}}"
@@ -134,6 +135,13 @@ ENABLE_SPOTIFY_WEB="$ENABLE_SPOTIFY_WEB"
 # A push button between pins 5 and 6 (GPIO3 and ground) shuts the Pi down and starts it again
 # (leave "no" if a DAC HAT or other add-on board uses those pins)
 POWER_BUTTON="${POWER_BUTTON:-no}"
+# Bluetooth receiver: phones pair from the Bluetooth screen ("Pair a phone")
+ENABLE_BLUETOOTH="$ENABLE_BLUETOOTH"
+# Equalizer (Settings -> Sound): off plays music untouched
+EQ_ENABLED="${EQ_ENABLED:-no}"
+EQ_PRESET="${EQ_PRESET:-flat}"
+EQ_BANDS="${EQ_BANDS:-}"
+EQ_CUSTOM="${EQ_CUSTOM:-}"
 # Workout timer tile on the launcher
 ENABLE_TIMER="${ENABLE_TIMER:-yes}"
 # Settings from a phone browser at http://<pi>:8080/settings (PIN shown on the player)

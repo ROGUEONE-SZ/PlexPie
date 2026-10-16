@@ -22,6 +22,7 @@ on one launcher and all controllable from **Home Assistant**.
 | **Plexamp** | Plexamp headless with its full touch interface; also controllable from the Plexamp app on your phone. Lossless (FLAC/hi-res) to your DAC |
 | **AirPlay** | AirPlay 2 receiver (shairport-sync). The screen shows cover art, track and the stream format |
 | **Spotify** | Spotify Connect receiver (go-librespot): pick the Pi in the Spotify app (Premium). Optional Spotify web player on the screen |
+| **Bluetooth** | Any phone can play to it: tap **Pair a phone**, then pick the player in the phone's Bluetooth settings |
 | **Apple Music** | music.apple.com on the screen (Chromium + Widevine), zoomed so it shows the full desktop layout |
 | **Music Assistant** | The Pi becomes a Music Assistant player (Squeezelite), and MA's own interface opens on the screen |
 | **Timer** | Workout timer: intervals (work / rest / rounds), countdown and stopwatch, with big digits and beeps |
@@ -34,6 +35,7 @@ How it behaves:
 - **On-screen keyboard.** A keyboard slides up when you tap a text field (sign-ins, search), and the app shrinks to fit above it.
 - **Screen sleep.** The screen sleeps when nothing is playing. The first tap only wakes it.
 - **Self-healing.** A crashed app is restarted automatically.
+- **Equalizer.** Presets (less boomy bass, loudness, clearer voices…), a 5-band custom EQ, or paste a headphone correction from AutoEQ. Off by default, so lossless music plays untouched.
 - **Sleep timer.** The zᶻ button next to the clock stops the music after 15 to 90 minutes, fading out over the last minute.
 - **Backup and restore.** Download all your settings as one file from your phone, and restore them on a new memory card.
 - **Power-cut protection.** An optional read-only mode, so pulling the plug can't damage the memory card.
@@ -93,8 +95,16 @@ Tap the gear on the launcher, or open `http://<pi-address>:8080/settings` on you
 
 <img src="docs/settings.png" width="60%" alt="Settings page"> <img src="docs/phone-settings.png" width="22%" alt="Settings on a phone">
 
+<p>
+  <img src="docs/bluetooth.png" width="49%" alt="Playing from a phone over Bluetooth">
+  <img src="docs/phone-eq-custom.png" width="22%" alt="Equalizer with five bands and the resulting curve">
+  <img src="docs/phone-bluetooth.png" width="22%" alt="Bluetooth pairing and paired phones">
+</p>
+
 - **Apps:** turn Apple Music, AirPlay, Spotify Connect, the Spotify web player and Music Assistant on or off. The change is instant: everything is installed, and players that are off are stopped.
 - **Accounts:** shows whether each service is linked, with sign-out for the web players. PlexPie never stores your passwords; each service signs in on its own page and keeps a token.
+- **Sound:** the equalizer, with a live curve of what it does.
+- **Bluetooth:** pair a phone, see paired phones, forget one.
 - **Updates:** checks twice a day for Raspberry Pi OS and PlexPie updates; **Update now** installs both, and tells you if a restart is needed. Home Assistant also gets an update entity with an Install button.
 - **Network:** Wi-Fi on/off, current network, scan and join (the password goes to NetworkManager, not PlexPie).
 - **Screen, Home Assistant, Music Assistant, phone access, restart and reboot.**

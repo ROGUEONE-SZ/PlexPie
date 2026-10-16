@@ -117,6 +117,8 @@ apt-get update -q
 PKGS=(pipewire pipewire-pulse pipewire-alsa wireplumber pipewire-bin python3 python3-paho-mqtt
       python3-websocket python3-tk python3-evdev xprintidle xdotool curl git avahi-daemon xserver-xorg xinit
       x11-xserver-utils alsa-utils nodejs fonts-dejavu-core)
+# Bluetooth receiver: BlueZ, PipeWire's Bluetooth plugin, and D-Bus bindings for the pairing helper
+yes_ "${ENABLE_BLUETOOTH:-yes}" && PKGS+=(bluez libspa-0.2-bluetooth python3-dbus python3-gi)
 # Chromium is "chromium" on Trixie and "chromium-browser" on older Raspberry Pi OS;
 # Widevine (needed by the Apple Music web player) comes from Raspberry Pi's repository.
 for alts in "chromium chromium-browser" "libwidevinecdm0"; do
@@ -154,6 +156,7 @@ as_user mkdir -p "$UHOME/.config/wireplumber/wireplumber.conf.d" "$UHOME/.config
 render "$REPO/files/audio/51-plexpie-dac.conf" > "$UHOME/.config/wireplumber/wireplumber.conf.d/51-plexpie-dac.conf"
 chown "$U:$U" "$UHOME/.config/wireplumber/wireplumber.conf.d/51-plexpie-dac.conf"
 install -o "$U" -g "$U" -m 644 "$REPO/files/audio/10-plexpie-rates.conf" "$UHOME/.config/pipewire/pipewire.conf.d/"
+install -o "$U" -g "$U" -m 644 "$REPO/files/audio/52-plexpie-bluetooth.conf" "$UHOME/.config/wireplumber/wireplumber.conf.d/"
 as_user systemctl --user enable pipewire.socket pipewire-pulse.socket wireplumber.service >/dev/null 2>&1 || true
 if as_user systemctl --user restart pipewire pipewire-pulse wireplumber; then
   ok "PipeWire restarted"
@@ -278,6 +281,7 @@ step "Installing PlexPie"
 install -d -m 755 /opt/plexpie /opt/plexpie/www
 install -m 755 "$REPO/files/plexpied.py" "$REPO/files/plexpie-overlay.py" "$REPO/files/plexpie-session" /opt/plexpie/
 install -m 755 -o root -g root "$REPO/files/plexpie-admin" /opt/plexpie/plexpie-admin
+install -m 755 -o root -g root "$REPO/files/plexpie-bt.py" /opt/plexpie/plexpie-bt.py
 install -d -m 755 /var/lib/plexpie
 echo "$REPO" > /etc/plexpie/repo_dir
 install -m 644 "$REPO/files/www/"*.html "$REPO/files/www/"*.png /opt/plexpie/www/
@@ -285,7 +289,7 @@ if [ -f /etc/plexpie/plexpie.conf ] && ! cmp -s "$REPO/plexpie.conf" /etc/plexpi
   cp -p /etc/plexpie/plexpie.conf /etc/plexpie/plexpie.conf.prev
 fi
 install -m 640 -o root -g "$U" "$REPO/plexpie.conf" /etc/plexpie/plexpie.conf
-for unit in plexpie plexpie-airplay plexpie-squeezelite plexpie-spotify; do
+for unit in plexpie plexpie-airplay plexpie-squeezelite plexpie-spotify plexpie-bluetooth; do
   render "$REPO/files/systemd/$unit.service" > "/etc/systemd/system/$unit.service"
 done
 
@@ -306,6 +310,7 @@ $U ALL=(root) NOPASSWD: /opt/plexpie/plexpie-admin
 $U ALL=(root) NOPASSWD: /usr/bin/systemctl start plexpie-airplay, /usr/bin/systemctl stop plexpie-airplay, /usr/bin/systemctl restart plexpie-airplay
 $U ALL=(root) NOPASSWD: /usr/bin/systemctl start plexpie-squeezelite, /usr/bin/systemctl stop plexpie-squeezelite, /usr/bin/systemctl restart plexpie-squeezelite
 $U ALL=(root) NOPASSWD: /usr/bin/systemctl start plexpie-spotify, /usr/bin/systemctl stop plexpie-spotify, /usr/bin/systemctl restart plexpie-spotify
+$U ALL=(root) NOPASSWD: /usr/bin/systemctl start plexpie-bluetooth, /usr/bin/systemctl stop plexpie-bluetooth, /usr/bin/systemctl restart plexpie-bluetooth
 EOF
 chmod 440 /etc/sudoers.d/plexpie
 visudo -cf /etc/sudoers.d/plexpie >/dev/null
@@ -316,6 +321,7 @@ cat > /etc/udev/rules.d/99-plexpie-backlight.rules <<'EOF'
 SUBSYSTEM=="backlight", ACTION=="add", RUN+="/bin/chgrp video /sys%p/brightness /sys%p/bl_power", RUN+="/bin/chmod g+w /sys%p/brightness /sys%p/bl_power"
 EOF
 usermod -aG video,input "$U"   # backlight + touchscreen gestures
+getent group bluetooth >/dev/null && usermod -aG bluetooth "$U"   # PipeWire receives Bluetooth audio
 for d in /sys/class/backlight/*; do
   [ -e "$d/brightness" ] || continue
   chgrp video "$d/brightness" "$d/bl_power" 2>/dev/null || true
@@ -365,12 +371,24 @@ else systemctl disable --now plexpie-airplay >/dev/null 2>&1 || true; fi
 # Optional players are enabled at boot; the plexpie daemon stops the ones switched off in Settings.
 systemctl enable plexpie-squeezelite >/dev/null 2>&1
 [ -x /usr/local/bin/go-librespot ] && systemctl enable plexpie-spotify >/dev/null 2>&1
+if [ -x /usr/sbin/bluetoothd ] || [ -x /usr/libexec/bluetooth/bluetoothd ]; then
+  # Show up as a speaker; reconnecting phones that were already paired needs no confirmation
+  BTCONF=/etc/bluetooth/main.conf
+  if [ -f "$BTCONF" ]; then
+    grep -q '^Class *=' "$BTCONF" || sed -i '/^\[General\]/a Class = 0x240414' "$BTCONF"
+    grep -q '^JustWorksRepairing *=' "$BTCONF" || sed -i '/^\[General\]/a JustWorksRepairing = always' "$BTCONF"
+  fi
+  command -v rfkill >/dev/null && rfkill unblock bluetooth 2>/dev/null || true
+  systemctl enable bluetooth >/dev/null 2>&1 || true
+  systemctl enable plexpie-bluetooth >/dev/null 2>&1
+fi
 
 [ -f /opt/plexamp/js/index.js ] && systemctl restart plexamp
 systemctl restart plexpie
 yes_ "${ENABLE_AIRPLAY:-yes}" && systemctl restart plexpie-airplay
 yes_ "${ENABLE_MUSIC_ASSISTANT:-yes}" && systemctl restart plexpie-squeezelite
 yes_ "${ENABLE_SPOTIFY:-no}" && [ -x /usr/local/bin/go-librespot ] && systemctl restart plexpie-spotify
+yes_ "${ENABLE_BLUETOOTH:-yes}" && systemctl is-enabled --quiet plexpie-bluetooth 2>/dev/null && systemctl restart bluetooth plexpie-bluetooth
 
 if [ "$RESTART_UI" = yes ]; then
   # End the current screen session; autologin starts the new one.

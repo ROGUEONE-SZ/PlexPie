@@ -129,6 +129,7 @@ shown in brackets, or type your own:
 | Add an AirPlay 2 receiver? | `yes` if you have an iPhone, iPad or Mac |
 | Add the Apple Music web player? | `yes` if you have Apple Music |
 | Add a Spotify Connect receiver? | `yes` if you have Spotify Premium |
+| Let any phone play to it over Bluetooth? | `yes` (it's only visible when you tap "Pair a phone") |
 | Add Music Assistant? | `no`, unless you already run a Music Assistant server |
 | Connect to Home Assistant? | `no`, unless you use Home Assistant (you can add it later) |
 | Turn the screen off after how many idle seconds? | `60` is a good start |
@@ -164,10 +165,15 @@ from any app, **swipe right from the left edge** of the screen, or **swipe down 
 - **Spotify:** in the Spotify app, tap the speaker icon and choose your player name.
 - **Apple Music:** tap the tile and sign in to Apple Music on the screen. A keyboard slides up when
   you tap a text box.
+- **Bluetooth:** any phone, including Android and guests' phones. Tap the tile, tap **Pair a phone**,
+  then on the phone open **Settings → Bluetooth** and tap your player's name. Next time the phone
+  connects by itself; just pick the player in its Bluetooth list. Sound quality is below AirPlay or
+  Plexamp, but it works with everything.
 - **Timer:** an interval timer for workouts, plus countdown and stopwatch. Big numbers and beeps,
   and the screen stays on while it runs.
 
 <img src="spotify.png" width="49%" alt="Spotify Connect now playing"> <img src="timer.png" width="49%" alt="Workout timer">
+<img src="bluetooth-pair.png" width="49%" alt="Pairing a phone over Bluetooth"> <img src="bluetooth.png" width="49%" alt="Playing from a phone over Bluetooth">
 
 Good to know:
 
@@ -197,6 +203,16 @@ PlexPie's − and + buttons for everyday volume.
 default output. If the sound comes out of the wrong one, connect to the Pi (step 4), run
 `wpctl status`, note the number next to the output you want under "Sinks", and run
 `wpctl set-default <number>`.
+
+**Too much bass, or too little?** Open **Settings → Sound** and turn on the **Equalizer**. Pick a
+preset like **Less boomy bass** (great for basements) or **Loudness** (for quiet listening), or choose
+**Custom** and drag the five sliders while music plays. The curve shows what it does. With headphones,
+pick **Headphones (paste AutoEQ)**, find your model on [autoeq.app](https://autoeq.app), choose
+"Equalizer APO", and paste the result. If your receiver has its own room calibration (Onkyo AccuEQ,
+Denon/Marantz Audyssey, Yamaha YPAO…), run that first; it measures your actual room. Leave the
+equalizer off if you want lossless music to reach your DAC untouched.
+
+<img src="phone-eq.png" width="30%" alt="Equalizer preset with its curve"> <img src="phone-eq-custom.png" width="30%" alt="Custom 5-band equalizer"> <img src="phone-bluetooth.png" width="30%" alt="Bluetooth settings">
 
 **A subwoofer that never turns off?** Plug it into a smart plug and let Home Assistant switch it
 with the receiver.
@@ -276,6 +292,8 @@ rings. The [main README](../README.md#home-assistant) has the details and exampl
 | Problem | Try this |
 |---|---|
 | No sound | Check the receiver's input and volume. In Settings, make sure the app is on. Then run `bash ~/plexpie/tools/diagnose.sh`, which also plays a test tone |
+| A phone can't find the player over Bluetooth | Tap **Pair a phone** first: the player is only visible for 2 minutes after that. On the phone, turn Bluetooth off and on |
+| Bluetooth sound stutters | On a Pi 4, Bluetooth and Wi-Fi share one radio. Use a network cable, or keep the phone closer |
 | AirPlay or Spotify doesn't show the player | Phone and Pi must be on the same network. Some routers block this between Wi-Fi and wired devices; turn on "mDNS" or "Bonjour" forwarding in the router |
 | The screen is upside down or touches land in the wrong place | Set `TOUCH_ROTATE` in `~/plexpie/plexpie.conf`, then run `sudo bash ~/plexpie/install.sh` |
 | Plexamp keeps spinning | Settings → System → **Restart PlexPie** |

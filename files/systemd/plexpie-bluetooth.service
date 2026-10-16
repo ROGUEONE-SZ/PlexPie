@@ -1,0 +1,15 @@
+[Unit]
+Description=PlexPie Bluetooth receiver (pairing and now playing)
+After=bluetooth.service
+Requires=bluetooth.service
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/plexpie/plexpie.conf
+EnvironmentFile=-@HOME@/.config/plexpie/settings.env
+ExecStart=/usr/bin/python3 /opt/plexpie/plexpie-bt.py ${PLAYER_NAME}
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

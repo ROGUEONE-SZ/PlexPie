@@ -51,6 +51,9 @@
   .btn { margin-top: 18px; display: none; border: 0; border-radius: 999px; padding: 11px 18px; font: inherit;
     font-size: 15px; font-weight: 700; color: #0b0b0f; background: var(--accent); }
   .btn.on { display: inline-block; }
+  body.bluetooth { --accent: #7b8cff; }
+  body.bluetooth .art { background: linear-gradient(145deg, #2a3170, #101018); }
+  .btn.ghost { background: rgba(255,255,255,.1); color: var(--text); margin-left: 8px; }
 </style>
 </head>
 <body>
@@ -69,18 +72,48 @@
     <div class="fmt" id="fmt"></div>
     <div class="hint" id="hint"></div>
     <button class="btn" id="browse">Browse Spotify on this screen</button>
+    <button class="btn" id="pair">Pair a phone</button><button class="btn ghost" id="stoppair">Stop</button>
   </div>
 </div>
 <script>
 const $ = (id) => document.getElementById(id);
-const SRC = location.pathname.startsWith("/spotify") ? "spotify" : "airplay";
+const SRC = location.pathname.startsWith("/spotify") ? "spotify" : location.pathname.startsWith("/bluetooth") ? "bluetooth" : "airplay";
 document.body.classList.add(SRC);
 let artKey = null;
 
 const ICON_SPOTIFY = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M7.5 9.5c3-1 6.5-.7 9 .8M8 12.6c2.5-.8 5.3-.5 7.4.7M8.6 15.4c2-.6 4-.4 5.7.5"/></svg>';
+const ICON_BT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7l10 10-5 5V2l5 5L7 17"/></svg>';
 if (SRC === "spotify") document.querySelector(".art svg").outerHTML = ICON_SPOTIFY;
+if (SRC === "bluetooth") document.querySelector(".art svg").outerHTML = ICON_BT;
+const btPost = (action) => fetch("/api/bluetooth", {method: "POST", headers: {"Content-Type": "application/json"},
+  body: JSON.stringify({action})}).then(poll);
+$("pair").onclick = () => btPost("pair");
+$("stoppair").onclick = () => btPost("stop");
+const mmss = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+function renderBt(s) {
+  const b = s.bluetooth || {};
+  const has = !!(b.title || b.artist);
+  $("info").classList.toggle("playing", !!b.playing);
+  $("status").textContent = b.playing ? "Playing via Bluetooth" : b.connected ? `Connected: ${b.connected}` : "Bluetooth";
+  $("title").textContent = has ? (b.title || "Unknown track") : (b.connected ? "Play something on your phone" : s.player_name);
+  $("artist").textContent = b.artist || "";
+  $("album").textContent = b.album || "";
+  const f = b.connected && b.codec ? `${b.codec} · Bluetooth · lossy` : "";
+  $("fmt").textContent = f; $("fmt").className = "fmt" + (f ? " on" : "");
+  const pairing = (b.pairing_left || 0) > 0;
+  let hint = "";
+  if (b.available === false) hint = "Bluetooth isn't ready on this player. Try <b>Settings → System → Reboot</b>.";
+  else if (pairing) hint = `Now visible as <b>${s.player_name}</b>. On your phone, open <b>Settings → Bluetooth</b> and tap <b>${s.player_name}</b>. (${mmss(b.pairing_left)})`;
+  else if (!b.connected) hint = (b.devices || []).length
+    ? `Open <b>Settings → Bluetooth</b> on a paired phone and tap <b>${s.player_name}</b>, or pair a new phone.`
+    : "Tap <b>Pair a phone</b>, then pick this player in your phone's Bluetooth settings.";
+  $("hint").innerHTML = has ? "" : hint;
+  $("pair").classList.toggle("on", b.available !== false && !pairing && !b.playing);
+  $("stoppair").classList.toggle("on", pairing);
+}
 
 function render(s) {
+  if (SRC === "bluetooth") return renderBt(s);
   const a = (SRC === "spotify" ? s.spotify : s.airplay) || {};
   const has = !!(a.title || a.artist);
   const via = SRC === "spotify" ? "Spotify Connect" : "AirPlay";

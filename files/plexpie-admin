@@ -133,6 +133,32 @@ print(json.dumps(sorted(seen.values(), key=lambda n: -n["signal"])[:20]))' ;;
     command -v raspi-config >/dev/null || { echo "raspi-config is not installed" >&2; exit 2; }
     [ "$1" = protect-on ] && v=0 || v=1          # raspi-config: 0 = enable
     raspi-config nonint do_overlayfs "$v" ;;     # takes effect after a reboot
+  bt-pair)          # open pairing for two minutes (the helper makes the Pi discoverable)
+    install -d -m 755 /run/plexpie
+    echo $(( $(date +%s) + ${2:-120} )) > /run/plexpie/bt-pair-until ;;
+  bt-stop) rm -f /run/plexpie/bt-pair-until ;;
+  bt-forget)
+    [[ "${2:-}" =~ ^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$ ]] || { echo "bad address" >&2; exit 2; }
+    bluetoothctl remove "$2" ;;
+  bt-pause)         # pause the phone that's playing (AVRCP), or disconnect it if it can't be paused
+    python3 - <<'PY'
+import dbus
+bus = dbus.SystemBus()
+objs = dbus.Interface(bus.get_object("org.bluez", "/"), "org.freedesktop.DBus.ObjectManager").GetManagedObjects()
+done = False
+for path, ifaces in objs.items():
+    if "org.bluez.MediaPlayer1" in ifaces:
+        try:
+            dbus.Interface(bus.get_object("org.bluez", path), "org.bluez.MediaPlayer1").Pause(); done = True
+        except dbus.DBusException:
+            pass
+if not done:
+    for path, ifaces in objs.items():
+        d = ifaces.get("org.bluez.Device1")
+        if d and d.get("Connected"):
+            dbus.Interface(bus.get_object("org.bluez", path), "org.bluez.Device1").Disconnect()
+PY
+    ;;
   update-status)
     cat "$STATE/update.json" 2>/dev/null || echo '{}'
     cat "$STATE/update-run.json" 2>/dev/null || echo '{}' ;;

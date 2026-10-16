@@ -25,7 +25,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 
-VERSION = "2.6.0"
+VERSION = "2.7.0"
 CONF_PATH = os.environ.get("PLEXPIE_CONF", "/etc/plexpie/plexpie.conf")
 WWW = os.path.join(os.path.dirname(os.path.abspath(__file__)), "www")
 HTTP_PORT = int(os.environ.get("PLEXPIE_HTTP_PORT", "8080"))
@@ -63,6 +63,7 @@ SETTINGS_ENV = os.path.join(SETTINGS_DIR, "settings.env")      # read by the sys
 EDITABLE = {
     "ENABLE_APPLE_MUSIC_WEB": "bool", "ENABLE_AIRPLAY": "bool", "ENABLE_SPOTIFY": "bool",
     "ENABLE_SPOTIFY_WEB": "bool", "ENABLE_MUSIC_ASSISTANT": "bool", "ENABLE_TIMER": "bool", "SHORTCUTS": "str",
+    "ENABLE_BLUETOOTH": "bool", "EQ_ENABLED": "bool", "EQ_PRESET": "str", "EQ_BANDS": "str", "EQ_CUSTOM": "str",
     "SCREEN_OFF_AFTER_SECS": "int", "SCREEN_BRIGHTNESS": "int", "AUTO_SHOW_SOURCES": "str",
     "SWIPE_HOME": "bool", "MA_HOST": "str", "MA_URL": "str",
     "MQTT_HOST": "str", "MQTT_PORT": "int", "MQTT_USER": "str", "MQTT_PASS": "secret",
@@ -122,6 +123,7 @@ SOURCES = {
     "airplay": {"name": "AirPlay", "url": f"http://127.0.0.1:{HTTP_PORT}/airplay"},
     "spotify": {"name": "Spotify", "url": f"http://127.0.0.1:{HTTP_PORT}/spotify"},
     "spotify_web": {"name": "Spotify web", "url": "https://open.spotify.com/", "hidden": True},
+    "bluetooth": {"name": "Bluetooth", "url": f"http://127.0.0.1:{HTTP_PORT}/bluetooth"},
     "ma": {"name": "Music Assistant", "url": MA_URL + "/"},
     "timer": {"name": "Timer", "url": f"http://127.0.0.1:{HTTP_PORT}/timer"},
     "alert": {"name": "Alert", "url": f"http://127.0.0.1:{HTTP_PORT}/alert", "hidden": True},
@@ -129,7 +131,8 @@ SOURCES = {
 }
 for key, flag, default in (("airplay", "ENABLE_AIRPLAY", "yes"), ("ma", "ENABLE_MUSIC_ASSISTANT", "yes"),
                            ("apple", "ENABLE_APPLE_MUSIC_WEB", "yes"), ("spotify", "ENABLE_SPOTIFY", "no"),
-                           ("spotify_web", "ENABLE_SPOTIFY_WEB", "no"), ("timer", "ENABLE_TIMER", "yes")):
+                           ("spotify_web", "ENABLE_SPOTIFY_WEB", "no"), ("timer", "ENABLE_TIMER", "yes"),
+                           ("bluetooth", "ENABLE_BLUETOOTH", "yes")):
     if not cfg_yes(flag, default):
         SOURCES.pop(key)
 if "spotify" not in SOURCES:
@@ -155,7 +158,7 @@ def source_for_url(url):
         return None
     host = (u.hostname or "").lower()
     if u.netloc == f"127.0.0.1:{HTTP_PORT}":
-        for key in ("airplay", "spotify", "settings", "timer", "alert"):
+        for key in ("airplay", "spotify", "settings", "timer", "alert", "bluetooth"):
             if u.path.startswith("/" + key):
                 return key
         return "home"
@@ -228,6 +231,7 @@ class State:
         self.quiet_until = 0.0          # during an alert: no auto-pause, no auto-show
         self.alert = {}
         self.alert_n = 0
+        self.bt = {}                    # Bluetooth: connected phone, pairing, codec
         self.sleep_until = 0.0          # sleep timer: pause everything at this time (0 = off)
         self.changed = threading.Event()
 
@@ -276,6 +280,9 @@ def state_json():
             "text_y": ST.text_y,
             "shortcuts": [{"id": k, **v} for k, v in SHORTCUTS.items()],
             "alert": bool(ST.alert),
+            "bluetooth": dict({k: v for k, v in ST.bt.items() if k != "player"},
+                              playing=bool(ST.playing.get("bluetooth"))),
+            "eq": cfg_yes("EQ_ENABLED", "no"),
             "sleep_left": max(0, round(ST.sleep_until - time.time())) if ST.sleep_until else 0,
         }
 
@@ -671,7 +678,9 @@ def on_started(src):
         for other in others:
             pause_source(other)
     # Show the app that just started playing (e.g. Plexamp started from the phone).
-    auto = cfg("AUTO_SHOW_SOURCES", "plexamp airplay ma").replace(",", " ").split()
+    auto = cfg("AUTO_SHOW_SOURCES", "plexamp airplay ma spotify bluetooth").replace(",", " ").split()
+    if auto and src == "bluetooth":
+        auto.append("bluetooth")
     if src == "airplay" and not cfg_yes("AUTO_SHOW_AIRPLAY"):
         auto = [a for a in auto if a != "airplay"]
     with ST.lock:
@@ -698,6 +707,8 @@ def pause_source(src):
             http_get(SPOTIFY_API + "/player/pause", 3, method="POST")
         except Exception as e:
             log.warning("spotify pause failed: %s", e)
+    elif src == "bluetooth":
+        admin("bt-pause", timeout=10)
     elif src == "spotify_web":
         BROWSER.evaluate("spotify_web", WEB_PAUSE_JS)
 
@@ -849,6 +860,234 @@ def sleep_loop():
                 SCREEN.set(False, "sleep timer")
         except Exception as e:
             log.warning("sleep loop: %s", e)
+
+
+# -------------------------------------------------------------------- Bluetooth
+BT_STATE = "/run/plexpie/bt.json"
+BT_LOOP = {"proc": None, "node": None}
+
+
+def read_bt():
+    try:
+        with open(BT_STATE) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {"available": False}
+
+
+def poll_bluetooth(n):
+    bt = read_bt()
+    md = {k: bt.get(k, "") for k in ("title", "artist", "album")}
+    with ST.lock:
+        changed = bt != ST.bt
+        ST.bt = bt
+        if md["title"] or md["artist"]:
+            ST.np["bluetooth"] = md
+    if changed:
+        mark_changed()
+    set_playing("bluetooth", bool(bt.get("playing")))
+    if bt.get("connected") and n % 3 == 0:
+        ensure_bt_loopback()
+    elif not bt.get("connected") and BT_LOOP["proc"]:
+        stop_bt_loopback()
+
+
+def ensure_bt_loopback():
+    """Most systems play a phone's Bluetooth audio by themselves. If this one only offers it
+    as an input, connect that input to the speakers."""
+    try:
+        objs = json.loads(run(["pw-dump"], 6) or "[]")
+    except ValueError:
+        return
+    node = None
+    for o in objs:
+        props = ((o.get("info") or {}).get("props") or {})
+        if o.get("type") == "PipeWire:Interface:Node" and str(props.get("node.name", "")).startswith("bluez_input.") \
+                and props.get("media.class") == "Audio/Source":
+            node = props["node.name"]
+    p = BT_LOOP["proc"]
+    if node and (p is None or p.poll() is not None or BT_LOOP["node"] != node):
+        stop_bt_loopback()
+        log.info("bluetooth: connecting %s to the speakers", node)
+        BT_LOOP["proc"] = subprocess.Popen(
+            ["pw-loopback", "-n", "plexpie-bluetooth", "--capture-props", f"target.object={node} node.passive=true",
+             "--playback-props", "media.role=Music node.description=Bluetooth"],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        BT_LOOP["node"] = node
+    elif not node and p:
+        stop_bt_loopback()
+
+
+def stop_bt_loopback():
+    p, BT_LOOP["proc"], BT_LOOP["node"] = BT_LOOP["proc"], None, None
+    if p and p.poll() is None:
+        p.terminate()
+
+
+# ------------------------------------------------------------------- equalizer
+# Filters are (type, frequency Hz, gain dB, Q). Types: PK peaking, LS low shelf, HS high shelf.
+EQ_PRESETS = {
+    "flat": {"name": "Flat (no change)", "filters": []},
+    "less_bass": {"name": "Less boomy bass", "filters": [["LS", 80, -4, 0.7], ["PK", 125, -3, 1.0]]},
+    "more_bass": {"name": "More bass", "filters": [["LS", 90, 4, 0.7]]},
+    "loudness": {"name": "Loudness", "filters": [["LS", 100, 5, 0.7], ["HS", 8000, 3, 0.7]]},
+    "vocal": {"name": "Clearer voices", "filters": [["PK", 250, -2, 1.0], ["PK", 3000, 3, 1.0]]},
+    "soft_treble": {"name": "Softer treble", "filters": [["HS", 6000, -3, 0.7]]},
+    "custom": {"name": "Custom", "filters": []},
+    "headphones": {"name": "Headphones (paste AutoEQ)", "filters": []},
+}
+EQ_BAND_DEF = [("LS", 60, 0.7), ("PK", 250, 1.0), ("PK", 1000, 1.0), ("PK", 4000, 1.0), ("HS", 10000, 0.7)]
+EQ_LABEL = {"PK": "bq_peaking", "LS": "bq_lowshelf", "HS": "bq_highshelf"}
+APO_RE = re.compile(r"Filter\s*\d*\s*:\s*ON\s+(PK|PEQ|LSC?|HSC?)\s+Fc\s+([\d.]+)\s*Hz\s+Gain\s+(-?[\d.]+)\s*dB"
+                    r"(?:\s+Q\s+([\d.]+))?", re.I)
+
+
+def parse_apo(text):
+    out = []
+    for m in APO_RE.finditer(text or ""):
+        t = m.group(1).upper()
+        t = "PK" if t in ("PK", "PEQ") else t[:2]
+        try:
+            f, g, q = float(m.group(2)), float(m.group(3)), float(m.group(4) or 0.7)
+        except ValueError:
+            continue
+        if 10 <= f <= 22000 and -24 <= g <= 24 and 0.05 <= q <= 20:
+            out.append([t, f, g, q])
+    return out[:20]
+
+
+def to_compact(filters):
+    return ";".join(f"{t},{f:g},{g:g},{q:g}" for t, f, g, q in filters)
+
+
+def parse_compact(s):
+    out = []
+    for part in (s or "").split(";"):
+        bits = part.split(",")
+        if len(bits) == 4 and bits[0] in EQ_LABEL:
+            try:
+                out.append([bits[0], float(bits[1]), float(bits[2]), float(bits[3])])
+            except ValueError:
+                pass
+    return out
+
+
+def filters_to_apo(filters):
+    names = {"PK": "PK", "LS": "LSC", "HS": "HSC"}
+    return "\n".join(f"Filter {i}: ON {names[t]} Fc {f:g} Hz Gain {g:g} dB Q {q:g}"
+                     for i, (t, f, g, q) in enumerate(filters, 1))
+
+
+def eq_filters():
+    preset = cfg("EQ_PRESET", "flat")
+    if preset == "custom":
+        gains = []
+        for x in (cfg("EQ_BANDS") or "").split(","):
+            try:
+                gains.append(max(-12.0, min(12.0, float(x))))
+            except ValueError:
+                gains.append(0.0)
+        gains = (gains + [0.0] * 5)[:5]
+        return [[t, f, g, q] for (t, f, q), g in zip(EQ_BAND_DEF, gains) if g]
+    if preset == "headphones":
+        return parse_compact(cfg("EQ_CUSTOM"))
+    return [list(x) for x in EQ_PRESETS.get(preset, EQ_PRESETS["flat"])["filters"]]
+
+
+def pw_nodes():
+    try:
+        objs = json.loads(run(["pw-dump"], 6) or "[]")
+    except ValueError:
+        return []
+    return [(o.get("id"), (o.get("info") or {}).get("props") or {}) for o in objs
+            if o.get("type") == "PipeWire:Interface:Node"]
+
+
+def dac_node(nodes):
+    pat = re.compile(cfg("DAC_MATCH", "alsa_output.usb-.*"))
+    sinks = [(i, p) for i, p in nodes if p.get("media.class") == "Audio/Sink"
+             and not str(p.get("node.name", "")).startswith("plexpie_eq")]
+    for i, p in sinks:
+        if pat.match(str(p.get("node.name", ""))):
+            return i, p.get("node.name")
+    sinks.sort(key=lambda x: -int(x[1].get("priority.session", 0) or 0))
+    return (sinks[0][0], sinks[0][1].get("node.name")) if sinks else (None, None)
+
+
+def eq_conf(filters, target):
+    gains = [g for t, f, g, q in filters if g > 0]
+    pre = 10 ** (-(max(gains) if gains else 0) / 20)        # headroom so boosts don't clip
+    nodes = [f'{{ type = builtin name = pre label = mixer control = {{ "Gain 1" = {pre:.4f} }} }}']
+    for i, (t, f, g, q) in enumerate(filters):
+        nodes.append(f'{{ type = builtin name = f{i} label = {EQ_LABEL[t]} control = {{ "Freq" = {f:g} "Q" = {q:g} "Gain" = {g:g} }} }}')
+    names = ["pre"] + [f"f{i}" for i in range(len(filters))]
+    links = [f'{{ output = "{a}:Out" input = "{b}:In" }}' for a, b in zip(names, names[1:])]
+    target_line = f'target.object = "{target}"' if target else ""
+    return f"""# Written by PlexPie: the sound equalizer (Settings -> Sound)
+context.properties = {{ log.level = 0 }}
+context.spa-libs = {{ audio.convert.* = audioconvert/libspa-audioconvert support.* = support/libspa-support }}
+context.modules = [
+  {{ name = libpipewire-module-rt flags = [ ifexists nofail ] }}
+  {{ name = libpipewire-module-protocol-native }}
+  {{ name = libpipewire-module-client-node }}
+  {{ name = libpipewire-module-adapter }}
+  {{ name = libpipewire-module-filter-chain
+    args = {{
+      node.description = "PlexPie EQ"
+      media.name = "PlexPie EQ"
+      filter.graph = {{
+        nodes = [
+          {chr(10).join("          " + n for n in nodes).strip()}
+        ]
+        links = [ {" ".join(links)} ]
+      }}
+      audio.channels = 2
+      audio.position = [ FL FR ]
+      capture.props = {{ node.name = "plexpie_eq" media.class = Audio/Sink priority.session = 3000 }}
+      playback.props = {{ node.name = "plexpie_eq.out" node.passive = true {target_line} }}
+    }}
+  }}
+]
+"""
+
+
+def eq_manager():
+    """Run the equalizer as its own small PipeWire filter, and make it the default output."""
+    if not cfg_yes("EQ_ENABLED", "no") or not eq_filters():
+        for _ in range(10):                      # EQ off: make sure the DAC is the default again
+            nodes = pw_nodes()
+            if nodes:
+                did, _ = dac_node(nodes)
+                cur = [p for i, p in nodes if str(p.get("node.name")) == "plexpie_eq"]
+                if did is not None and not cur:
+                    run(["wpctl", "set-default", str(did)])
+                break
+            time.sleep(3)
+        return
+    path = os.path.join(SETTINGS_DIR, "eq.conf")
+    proc = None
+    while True:
+        try:
+            if proc is None or proc.poll() is not None:
+                nodes = pw_nodes()
+                _, target = dac_node(nodes)
+                os.makedirs(SETTINGS_DIR, exist_ok=True)
+                with open(path, "w") as f:
+                    f.write(eq_conf(eq_filters(), target))
+                log.info("equalizer: %s -> %s", cfg("EQ_PRESET", "flat"), target)
+                proc = subprocess.Popen(["pipewire", "-c", path], stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+                for _ in range(20):
+                    time.sleep(0.5)
+                    eq = [i for i, p in pw_nodes() if p.get("node.name") == "plexpie_eq"]
+                    if eq:
+                        run(["wpctl", "set-default", str(eq[0])])
+                        break
+                else:
+                    err = proc.stderr.read(400).decode(errors="replace") if proc.poll() is not None else ""
+                    log.warning("equalizer did not start %s", err.strip())
+        except Exception as e:
+            log.warning("equalizer: %s", e)
+        time.sleep(10)
 
 
 # ---------------------------------------------------------------- backup/restore
@@ -1206,6 +1445,8 @@ def fast_poller():
                 set_playing("ma", pw_streams().get("squeezelite", False))
             if "spotify" in SOURCES:
                 poll_spotify()
+            if "bluetooth" in SOURCES:
+                poll_bluetooth(n)
             if "spotify_web" in SOURCES and n % 2 == 1:
                 exists, val = BROWSER.evaluate("spotify_web", WEB_STATE_JS)
                 if exists is False:
@@ -1463,8 +1704,10 @@ def watchdog():
 # ------------------------------------------------------------------- web server
 # --------------------------------------------------------------------- settings
 OPTIONAL_UNITS = {"ENABLE_AIRPLAY": "plexpie-airplay", "ENABLE_SPOTIFY": "plexpie-spotify",
+                  "ENABLE_BLUETOOTH": "plexpie-bluetooth",
                   "ENABLE_MUSIC_ASSISTANT": "plexpie-squeezelite"}
-OPTIONAL_DEFAULTS = {"ENABLE_AIRPLAY": "yes", "ENABLE_SPOTIFY": "no", "ENABLE_MUSIC_ASSISTANT": "yes"}
+OPTIONAL_DEFAULTS = {"ENABLE_AIRPLAY": "yes", "ENABLE_SPOTIFY": "no", "ENABLE_MUSIC_ASSISTANT": "yes",
+                     "ENABLE_BLUETOOTH": "yes"}
 SESSIONS_FILE = os.path.join(SETTINGS_DIR, "sessions.json")
 SESSION_DAYS = 365                # a phone stays signed in for a year (renewed on every visit)
 
@@ -1638,14 +1881,16 @@ def settings_json(local, host=None):
             vals[k] = ""
             vals[k + "_SET"] = bool(cfg(k))
         elif kind == "bool":
-            vals[k] = cfg_yes(k, {"ENABLE_SPOTIFY": "no", "ENABLE_SPOTIFY_WEB": "no",
+            vals[k] = cfg_yes(k, {"ENABLE_SPOTIFY": "no", "ENABLE_SPOTIFY_WEB": "no", "EQ_ENABLED": "no",
                                   "PHONE_ACCESS": "yes"}.get(k, "yes"))
         else:
             vals[k] = cfg(k)
     vals["MA_HOST"] = vals.get("MA_HOST") or cfg("HA_HOST")
     if not local:
         vals["PHONE_PIN"] = ""                  # the PIN is only shown on the player itself
-    vals["AUTO_SHOW"] = bool(cfg("AUTO_SHOW_SOURCES", "plexamp airplay ma spotify").strip())
+    vals["AUTO_SHOW"] = bool(cfg("AUTO_SHOW_SOURCES", "plexamp airplay ma spotify bluetooth").strip())
+    vals["EQ_PRESET"] = vals.get("EQ_PRESET") or "flat"
+    vals["EQ_CUSTOM_TEXT"] = filters_to_apo(parse_compact(cfg("EQ_CUSTOM")))
     installed = {flag: subprocess.run(["systemctl", "cat", unit], capture_output=True).returncode == 0
                  for flag, unit in OPTIONAL_UNITS.items()}
     addr = lan_address()
@@ -1659,7 +1904,8 @@ def settings_json(local, host=None):
         prot = json.loads(prot) if ok else {}
     except ValueError:
         prot = {}
-    return {"values": vals, "wifi": wifi, "protect": prot, "updates": update_info(), "installed": installed, "accounts": accounts(), "player_name": PLAYER_NAME,
+    return {"values": vals, "wifi": wifi, "protect": prot, "bluetooth": read_bt() if "bluetooth" in SOURCES else None,
+            "eq_presets": {k: {"name": v["name"], "filters": v["filters"]} for k, v in EQ_PRESETS.items()}, "updates": update_info(), "installed": installed, "accounts": accounts(), "player_name": PLAYER_NAME,
             "version": VERSION,
             "phone_url": f"http://{host}/settings" if host else (f"http://{addr}:{HTTP_PORT}/settings" if addr else ""),
             "local": local}
@@ -1669,7 +1915,10 @@ def apply_settings(data):
     clean = {}
     for k, v in data.items():
         if k == "AUTO_SHOW":
-            clean["AUTO_SHOW_SOURCES"] = "plexamp airplay ma spotify" if v else ""
+            clean["AUTO_SHOW_SOURCES"] = "plexamp airplay ma spotify bluetooth" if v else ""
+            continue
+        if k == "EQ_CUSTOM_TEXT":
+            clean["EQ_CUSTOM"] = to_compact(parse_apo(str(v)))
             continue
         kind = EDITABLE.get(k)
         if not kind or (kind == "secret" and not v):
@@ -1724,7 +1973,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     # Phone browsers reach only the Settings page, and only with the PIN.
     REMOTE_OPEN = ("/settings", "/api/login", "/manifest.json", "/icon.png")
-    REMOTE_AUTH = ("/api/settings", "/api/account", "/api/system", "/api/backup", "/api/restore")
+    REMOTE_AUTH = ("/api/settings", "/api/account", "/api/system", "/api/backup", "/api/restore", "/api/bluetooth")
 
     def _local(self):
         return self.client_address[0] in ("127.0.0.1", "::1", "::ffff:127.0.0.1")
@@ -1758,7 +2007,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return
         if path in ("/", "/index.html"):
             return self._file("index.html")
-        if path in ("/airplay", "/spotify"):
+        if path in ("/airplay", "/spotify", "/bluetooth"):
             return self._file("nowplaying.html")
         if path == "/settings":
             return self._file("settings.html")
@@ -1833,6 +2082,17 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if path == "/api/settings":
             saved = apply_settings(data)
             return self._send(200, json.dumps({"ok": True, "saved": sorted(saved)}).encode())
+        if path == "/api/bluetooth":
+            what = data.get("action")
+            if what == "pair":
+                ok, _ = admin("bt-pair", "120", timeout=10)
+            elif what == "stop":
+                ok, _ = admin("bt-stop", timeout=10)
+            elif what == "forget":
+                ok, _ = admin("bt-forget", str(data.get("address", ""))[:17], timeout=15)
+            else:
+                ok = False
+            return self._send(200 if ok else 400, json.dumps({"ok": ok, "bluetooth": read_bt()}).encode())
         if path == "/api/restore":
             ok, msg = restore_backup(data)
             return self._send(200 if ok else 400, json.dumps({"ok": ok, "error": msg}).encode())
@@ -2143,7 +2403,7 @@ def main():
     if "airplay" in SOURCES:
         spawn(airplay_reader)
     for fn in (fast_poller, slow_poller, focus_poller, gesture_reader, screen_loop, watchdog, update_checker,
-               sleep_loop):
+               sleep_loop, eq_manager):
         spawn(fn)
     HA.start()
     while True:
