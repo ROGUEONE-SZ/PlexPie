@@ -1,0 +1,94 @@
+#!/bin/bash
+# PlexPie admin helper: the only root actions the Settings page can trigger.
+# Called by the plexpie daemon through sudo (see /etc/sudoers.d/plexpie).
+set -uo pipefail
+STATE=/var/lib/plexpie
+LOG=/var/log/plexpie-update.log
+REPO=$(cat /etc/plexpie/repo_dir 2>/dev/null || true)
+U=$(stat -c %U "$REPO" 2>/dev/null || echo root)
+mkdir -p "$STATE"
+
+json_status() {   # step running(true/false) [extra json]
+  printf '{"step":"%s","running":%s,"time":%s%s}\n' "$1" "$2" "$(date +%s)" "${3:-}" > "$STATE/update-run.json"
+}
+
+case "${1:-}" in
+  wifi-status)
+    radio=$(nmcli -t -f WIFI g 2>/dev/null || echo unknown)
+    ssid=$(nmcli -t -f ACTIVE,SSID dev wifi 2>/dev/null | awk -F: '$1=="yes"{print $2; exit}')
+    ip=$(ip -4 -o addr show wlan0 2>/dev/null | awk '{print $4}' | cut -d/ -f1)
+    eth=$(ip -4 -o addr show eth0 2>/dev/null | awk '{print $4}' | cut -d/ -f1)
+    python3 -c 'import json,sys; print(json.dumps(dict(zip(["radio","ssid","ip","eth_ip"], sys.argv[1:]))))' \
+      "$radio" "$ssid" "$ip" "$eth" ;;
+  wifi-on)  nmcli radio wifi on ;;
+  wifi-off) nmcli radio wifi off ;;
+  wifi-scan)
+    nmcli -t -f IN-USE,SSID,SIGNAL,SECURITY dev wifi list --rescan yes 2>/dev/null | python3 -c '
+import json, sys
+seen = {}
+for line in sys.stdin:
+    parts = line.rstrip("\n").replace("\\:", "\x00").split(":")
+    if len(parts) < 4 or not parts[1]:
+        continue
+    use, ssid, sig, sec = [p.replace("\x00", ":") for p in parts[:4]]
+    if ssid not in seen or int(sig or 0) > seen[ssid]["signal"]:
+        seen[ssid] = {"ssid": ssid, "signal": int(sig or 0), "secure": sec not in ("", "--"), "active": use == "*"}
+print(json.dumps(sorted(seen.values(), key=lambda n: -n["signal"])[:20]))' ;;
+  wifi-connect)
+    ssid=${2:-}
+    [ -n "$ssid" ] && [ ${#ssid} -le 32 ] && [[ "$ssid" != *$'\n'* ]] || { echo "bad network name" >&2; exit 2; }
+    IFS= read -r pw || true          # password arrives on stdin, never on the command line
+    name="plexpie-$(printf '%s' "$ssid" | tr -c 'A-Za-z0-9._-' '_')"
+    f="/etc/NetworkManager/system-connections/$name.nmconnection"
+    umask 077
+    {
+      printf '[connection]\nid=%s\ntype=wifi\ninterface-name=wlan0\nautoconnect=true\n\n' "$name"
+      printf '[wifi]\nmode=infrastructure\nssid=%s\n\n' "$ssid"
+      [ -n "$pw" ] && printf '[wifi-security]\nkey-mgmt=wpa-psk\npsk=%s\n\n' "$pw"
+      printf '[ipv4]\nmethod=auto\n\n[ipv6]\nmethod=auto\n'
+    } > "$f"
+    chmod 600 "$f"
+    nmcli radio wifi on
+    nmcli connection reload
+    nmcli connection up id "$name" ;;
+  update-check)
+    apt-get update -qq >/dev/null 2>&1
+    os=$(apt-get -s -o Debug::NoLocking=1 upgrade 2>/dev/null | grep -c '^Inst ')
+    pp=0
+    if [ -d "$REPO/.git" ]; then
+      sudo -u "$U" git -C "$REPO" fetch -q 2>/dev/null
+      pp=$(sudo -u "$U" git -C "$REPO" rev-list --count HEAD..@{u} 2>/dev/null || echo 0)
+    fi
+    reboot=false; [ -f /var/run/reboot-required ] && reboot=true
+    printf '{"checked":%s,"os":%s,"plexpie":%s,"reboot":%s}\n' "$(date +%s)" "$os" "$pp" "$reboot" > "$STATE/update.json"
+    cat "$STATE/update.json" ;;
+  update-run)       # start the update in its own unit, so it survives PlexPie restarting
+    systemctl is-active --quiet plexpie-update && { echo "already running"; exit 0; }
+    systemctl reset-failed plexpie-update 2>/dev/null
+    systemd-run --quiet --unit=plexpie-update --collect /opt/plexpie/plexpie-admin update-do ;;
+  update-do)
+    exec >>"$LOG" 2>&1
+    echo "=== update started $(date)"
+    export DEBIAN_FRONTEND=noninteractive
+    json_status "Downloading system updates" true
+    apt-get update -q
+    json_status "Installing system updates" true
+    apt-get -y -q -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold upgrade || \
+      { json_status "System update failed (see $LOG)" false; exit 1; }
+    apt-get -y -q autoremove
+    if [ -d "$REPO/.git" ]; then
+      json_status "Updating PlexPie" true
+      sudo -u "$U" git -C "$REPO" pull -q --ff-only || { json_status "PlexPie update failed (see $LOG)" false; exit 1; }
+      json_status "Installing PlexPie" true
+      bash "$REPO/install.sh" --no-restart-ui </dev/null || { json_status "PlexPie install failed (see $LOG)" false; exit 1; }
+    fi
+    "$0" update-check >/dev/null
+    reboot=false; [ -f /var/run/reboot-required ] && reboot=true
+    json_status "Up to date" false ",\"reboot\":$reboot"
+    echo "=== update finished $(date)" ;;
+  update-status)
+    cat "$STATE/update.json" 2>/dev/null || echo '{}'
+    cat "$STATE/update-run.json" 2>/dev/null || echo '{}' ;;
+  *) echo "usage: plexpie-admin wifi-status|wifi-on|wifi-off|wifi-scan|wifi-connect SSID|update-check|update-run|update-status" >&2
+     exit 2 ;;
+esac

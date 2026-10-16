@@ -117,6 +117,23 @@
       <input id="MA_URL" type="text" placeholder="http://homeassistant.local:8095" autocapitalize="off"></div>
   </div>
 
+  <h2>Updates</h2>
+  <div class="card">
+    <div class="row"><div class="t"><b id="updtitle">Checking…</b><small id="updsub"></small></div>
+      <button class="btn" id="updcheck">Check now</button></div>
+    <div class="row hidden" id="updrow"><div class="t"><b id="updwhat"></b><small>System and PlexPie updates install together. Music may stop for a minute.</small></div>
+      <button class="btn" id="updrun" style="background:var(--accent)">Update now</button></div>
+  </div>
+
+  <h2>Network</h2>
+  <div class="card">
+    <div class="row"><div class="t"><b>Wi-Fi</b><small id="wifisub"></small></div>
+      <label class="sw"><input type="checkbox" id="wifi" data-noform><span></span></label></div>
+    <div class="row" id="wifiscanrow"><div class="t"><b>Join a network</b><small>Pick a network, then enter its password</small></div>
+      <button class="btn" id="wifiscan">Scan</button></div>
+    <div id="wifilist"></div>
+  </div>
+
   <h2>Phone access</h2>
   <div class="card">
     <div class="row"><div class="t"><b>Settings from a phone</b><small id="phoneurl"></small></div>
@@ -183,6 +200,7 @@ function render() {
   $("pinshow").textContent = v.PHONE_PIN || "";
   document.querySelectorAll(".local-only").forEach(e => e.classList.toggle("hidden", !data.local));
   $("ver").textContent = `PlexPie ${data.version}`;
+  renderUpdates(data.updates); renderWifi(data.wifi);
   $("main").classList.remove("hidden"); $("bar").classList.remove("hidden");
   $("save").disabled = true;
 }
@@ -209,8 +227,86 @@ async function waitBack() {
   return false;
 }
 
-document.addEventListener("input", e => { if (e.target.closest("#main")) $("save").disabled = false; });
-document.addEventListener("change", e => { if (e.target.closest("#main")) $("save").disabled = false; });
+document.addEventListener("input", e => { if (e.target.closest("#main") && !e.target.closest("[data-noform],#wifilist")) $("save").disabled = false; });
+document.addEventListener("change", e => { if (e.target.closest("#main") && !e.target.closest("[data-noform],#wifilist")) $("save").disabled = false; });
+
+// ---- updates
+const ago = t => { const m = Math.round((Date.now() / 1000 - t) / 60);
+  return m < 2 ? "just now" : m < 120 ? `${m} minutes ago` : `${Math.round(m / 60)} hours ago`; };
+function renderUpdates(u) {
+  u = u || {}; const run = u.run || {};
+  const os = +u.os || 0, pp = +u.plexpie || 0;
+  if (run.running) {
+    $("updtitle").textContent = "Updating…"; $("updsub").textContent = run.step || "";
+    $("updrow").classList.add("hidden"); $("updcheck").disabled = true;
+    clearTimeout(renderUpdates.t); renderUpdates.t = setTimeout(pollUpdate, 3000); return;
+  }
+  $("updcheck").disabled = false;
+  const parts = [];
+  if (os) parts.push(`${os} system update${os > 1 ? "s" : ""}`);
+  if (pp) parts.push("PlexPie update");
+  $("updtitle").textContent = parts.length ? "Updates available" : (u.checked ? "Up to date" : "Not checked yet");
+  let sub = u.checked ? `Checked ${ago(u.checked)}` : "Checks automatically twice a day";
+  if (run.step && run.step !== "Up to date") sub = run.step;
+  if (u.reboot || run.reboot) sub += " · restart needed to finish";
+  $("updsub").textContent = sub;
+  $("updwhat").textContent = parts.join(" · ");
+  $("updrow").classList.toggle("hidden", !parts.length);
+}
+async function pollUpdate() {
+  try { const r = await api("/api/system", {action: "update-status"}); renderUpdates(await r.json()); }
+  catch (e) { renderUpdates.t = setTimeout(pollUpdate, 4000); }   // PlexPie restarts during the update
+}
+$("updcheck").onclick = async () => {
+  $("updtitle").textContent = "Checking…"; $("updcheck").disabled = true;
+  const r = await api("/api/system", {action: "update-check"}); renderUpdates(await r.json());
+};
+$("updrun").onclick = async () => {
+  if (!confirm("Install updates now? Music may stop for a minute.")) return;
+  await api("/api/system", {action: "update-run"}); toast("Updating…"); setTimeout(pollUpdate, 1500);
+};
+
+// ---- wi-fi
+function renderWifi(w) {
+  w = w || {};
+  const on = w.radio === "enabled";
+  $("wifi").checked = on;
+  $("wifisub").textContent = !on ? (w.eth_ip ? `Off · using Ethernet (${w.eth_ip})` : "Off")
+    : w.ssid ? `Connected to ${w.ssid}${w.ip ? " · " + w.ip : ""}` : "On · not connected";
+  $("wifiscanrow").classList.toggle("hidden", !on);
+  if (!on) $("wifilist").innerHTML = "";
+}
+$("wifi").onchange = async e => {
+  const on = e.target.checked;
+  if (!on && !(data.wifi || {}).eth_ip && !confirm("This Pi has no Ethernet connection. Turning Wi-Fi off takes it offline until you turn it back on here on the screen. Continue?")) { e.target.checked = true; return; }
+  if (!on && !data.local && !confirm("If your phone reaches the Pi over Wi-Fi, this page will disconnect. Continue?")) { e.target.checked = true; return; }
+  await api("/api/system", {action: on ? "wifi-on" : "wifi-off"}); toast(on ? "Wi-Fi on" : "Wi-Fi off");
+  setTimeout(load, 2500);
+};
+$("wifiscan").onclick = async () => {
+  $("wifiscan").textContent = "Scanning…";
+  const list = await (await api("/api/system", {action: "wifi-scan"})).json();
+  $("wifiscan").textContent = "Scan";
+  $("wifilist").innerHTML = list.length ? list.map((n, i) => `<div class="row" data-net="${i}">
+      <div class="t"><b>${esc(n.ssid)}${n.active ? " ✓" : ""}</b><small>Signal ${n.signal}%${n.secure ? " · secured" : " · open"}</small></div>
+      <button class="btn" data-join="${i}">${n.active ? "Connected" : "Join"}</button></div>`).join("")
+    : `<div class="row"><div class="t"><small>No networks found</small></div></div>`;
+  $("wifilist").dataset.nets = JSON.stringify(list);
+};
+document.addEventListener("click", async e => {
+  const j = e.target.closest("[data-join]"); if (!j) return;
+  const n = JSON.parse($("wifilist").dataset.nets || "[]")[+j.dataset.join]; if (!n || n.active) return;
+  const row = j.closest(".row");
+  if (n.secure && !row.querySelector("input")) {
+    j.insertAdjacentHTML("beforebegin", '<input type="password" placeholder="Password" autocomplete="off" style="width:40%">');
+    j.textContent = "Connect"; row.querySelector("input").focus(); return;
+  }
+  const pw = n.secure ? row.querySelector("input").value : "";
+  j.textContent = "Connecting…"; j.disabled = true;
+  const r = await api("/api/system", {action: "wifi-connect", ssid: n.ssid, password: pw});
+  toast(r.ok ? `Connected to ${n.ssid}` : "Couldn't connect: check the password");
+  setTimeout(load, 1500);
+});
 $("save").onclick = async () => {
   $("save").disabled = true; $("save").textContent = "Saving…";
   try { await api("/api/settings", collect()); } catch (e) {}

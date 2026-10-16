@@ -83,6 +83,8 @@ Tap the gear on the launcher, or open `http://<pi-address>:8080/settings` on you
 
 - **Apps:** turn Apple Music, AirPlay, Spotify Connect, the Spotify web player and Music Assistant on or off. The change is instant: everything is installed, and players that are off are stopped.
 - **Accounts:** shows whether each service is linked, with sign-out for the web players. PlexPie never stores your passwords; each service signs in on its own page and keeps a token.
+- **Updates:** checks twice a day for Raspberry Pi OS and PlexPie updates; **Update now** installs both, and tells you if a restart is needed. Home Assistant also gets an update entity with an Install button.
+- **Network:** Wi-Fi on/off, current network, scan and join (the password goes to NetworkManager, not PlexPie).
 - **Screen, Home Assistant, Music Assistant, phone access, restart and reboot.**
 
 From a phone, only the Settings page is reachable, and only with the PIN. Five wrong tries pause logins for a minute. A phone stays signed in for a year (renewed each visit); **New PIN** signs every phone out.
@@ -165,6 +167,7 @@ out, and the Pi reconnects by itself when MA comes back.
 | AirPlay | `journalctl -u plexpie-airplay -f` |
 | Music Assistant player | `journalctl -u plexpie-squeezelite -f` |
 | Spotify Connect | `journalctl -u plexpie-spotify -f` |
+| Updates | `/var/log/plexpie-update.log` |
 | Plexamp | `journalctl -u plexamp -f` |
 | Audio devices | `wpctl status` |
 | Plexamp keeps spinning | Remove `~/.local/share/Plexamp/Settings/%40Plexamp%3Adiscovery%3Ahubs` and run `sudo systemctl restart plexamp` |

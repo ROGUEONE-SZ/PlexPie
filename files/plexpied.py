@@ -25,7 +25,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 
-VERSION = "2.2.0"
+VERSION = "2.3.0"
 CONF_PATH = os.environ.get("PLEXPIE_CONF", "/etc/plexpie/plexpie.conf")
 WWW = os.path.join(os.path.dirname(os.path.abspath(__file__)), "www")
 HTTP_PORT = int(os.environ.get("PLEXPIE_HTTP_PORT", "8080"))
@@ -1289,6 +1289,49 @@ def apply_services():
             sudo("/usr/bin/systemctl", "start" if want else "stop", unit)
 
 
+ADMIN = "/opt/plexpie/plexpie-admin"
+
+
+def admin(*args, stdin=None, timeout=60):
+    """Run one of the root helper's actions; returns (ok, stdout)."""
+    try:
+        r = subprocess.run(["sudo", "-n", ADMIN, *args], input=stdin, capture_output=True, text=True,
+                           timeout=timeout)
+        if r.returncode != 0:
+            log.warning("admin %s failed: %s", args[0], (r.stderr or r.stdout).strip()[-300:])
+        return r.returncode == 0, r.stdout
+    except Exception as e:
+        log.warning("admin %s failed: %s", args[0], e)
+        return False, ""
+
+
+def _json_lines(text):
+    out = []
+    for line in (text or "").splitlines():
+        try:
+            out.append(json.loads(line))
+        except ValueError:
+            out.append({})
+    return out
+
+
+def update_info():
+    ok, out = admin("update-status", timeout=10)
+    info, run_state = (_json_lines(out) + [{}, {}])[:2]
+    if run_state.get("running") and time.time() - run_state.get("time", 0) > 3600:
+        run_state["running"] = False               # a stale marker from an interrupted update
+    return {**info, "run": run_state}
+
+
+def update_checker():
+    """Look for system and PlexPie updates twice a day."""
+    time.sleep(120)
+    while True:
+        admin("update-check", timeout=600)
+        mark_changed()
+        time.sleep(12 * 3600)
+
+
 def lan_address():
     out = run(["hostname", "-I"]).split()
     return next((a for a in out if "." in a), "")
@@ -1384,7 +1427,12 @@ def settings_json(local, host=None):
     installed = {flag: subprocess.run(["systemctl", "cat", unit], capture_output=True).returncode == 0
                  for flag, unit in OPTIONAL_UNITS.items()}
     addr = lan_address()
-    return {"values": vals, "installed": installed, "accounts": accounts(), "player_name": PLAYER_NAME,
+    ok, wifi = admin("wifi-status", timeout=10)
+    try:
+        wifi = json.loads(wifi) if ok else {}
+    except ValueError:
+        wifi = {}
+    return {"values": vals, "wifi": wifi, "updates": update_info(), "installed": installed, "accounts": accounts(), "player_name": PLAYER_NAME,
             "version": VERSION,
             "phone_url": f"http://{host}/settings" if host else (f"http://{addr}:{HTTP_PORT}/settings" if addr else ""),
             "local": local}
@@ -1551,6 +1599,24 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 spawn(lambda: (time.sleep(0.5), run(["pkill", "-f", "plexpie-chromium"]), os._exit(0)))
             elif what == "reboot":
                 spawn(lambda: (time.sleep(0.5), sudo("/usr/sbin/reboot")))
+            elif what in ("wifi-on", "wifi-off"):
+                ok, _ = admin(what, timeout=20)
+                return self._send(200 if ok else 500, json.dumps({"ok": ok}).encode())
+            elif what == "wifi-scan":
+                ok, out = admin("wifi-scan", timeout=40)
+                return self._send(200, out.encode() if ok and out.strip() else b"[]")
+            elif what == "wifi-connect":
+                ok, out = admin("wifi-connect", str(data.get("ssid", ""))[:32],
+                                stdin=str(data.get("password", "")) + "\n", timeout=60)
+                return self._send(200 if ok else 500, json.dumps({"ok": ok}).encode())
+            elif what == "update-check":
+                admin("update-check", timeout=600)
+                return self._send(200, json.dumps(update_info()).encode())
+            elif what == "update-run":
+                ok, _ = admin("update-run", timeout=20)
+                return self._send(200 if ok else 500, json.dumps({"ok": ok}).encode())
+            elif what == "update-status":
+                return self._send(200, json.dumps(update_info()).encode())
             return self._send(200, b'{"ok":true}')
         if path == "/api/source":
             ok = switch_source(str(data.get("source", "home")))
@@ -1664,6 +1730,10 @@ class HomeAssistant:
                                                         "device_class": "connectivity",
                                                         "entity_category": "diagnostic",
                                                         "state_topic": f"{b}/ma_up"})
+        self.disc("update", "software", {"name": "Software", "device_class": "firmware",
+                                         "state_topic": f"{b}/update", "command_topic": f"{b}/update/set",
+                                         "payload_install": "install", "title": "PlexPie + Raspberry Pi OS",
+                                         "release_url": "https://github.com/ROGUEONE-SZ/plexamp-raspberry-pi-install"})
         self.disc("sensor", "cpu_temp", {"name": "CPU temperature", "device_class": "temperature",
                                          "unit_of_measurement": "°C", "entity_category": "diagnostic",
                                          "state_topic": f"{b}/cpu_temp"})
@@ -1694,6 +1764,8 @@ class HomeAssistant:
                 spawn(pause_all)
             elif key == "restart_screen":
                 run(["pkill", "-f", "plexpie-chromium"])
+            elif key == "update" and val == "install":
+                spawn(admin, "update-run")
             elif key == "reboot":
                 sudo("/usr/sbin/reboot")
         except ValueError:
@@ -1726,6 +1798,17 @@ class HomeAssistant:
             if v != "" and self.last.get(k) != v:
                 self.pub(f"{self.base}/{k}", v)
                 self.last[k] = v
+        try:
+            u = update_info()
+            pending = int(u.get("os") or 0) + int(u.get("plexpie") or 0)
+            upd = json.dumps({"installed_version": VERSION,
+                              "latest_version": VERSION if not pending else f"{VERSION} + {pending} updates",
+                              "in_progress": bool(u.get("run", {}).get("running"))})
+            if self.last.get("update") != upd:
+                self.pub(f"{self.base}/update", upd)
+                self.last["update"] = upd
+        except Exception:
+            pass
         legacy = cfg("MQTT_LEGACY_TOPIC", "plexamp/state")
         lv = "playing" if s["playing"] else "idle"
         if legacy and self.last.get("_legacy") != lv:
@@ -1757,7 +1840,7 @@ def main():
     SCREEN.apply()
     if "airplay" in SOURCES:
         spawn(airplay_reader)
-    for fn in (fast_poller, slow_poller, focus_poller, gesture_reader, screen_loop, watchdog):
+    for fn in (fast_poller, slow_poller, focus_poller, gesture_reader, screen_loop, watchdog, update_checker):
         spawn(fn)
     HA.start()
     while True:

@@ -277,6 +277,9 @@ fi
 step "Installing PlexPie"
 install -d -m 755 /opt/plexpie /opt/plexpie/www
 install -m 755 "$REPO/files/plexpied.py" "$REPO/files/plexpie-overlay.py" "$REPO/files/plexpie-session" /opt/plexpie/
+install -m 755 -o root -g root "$REPO/files/plexpie-admin" /opt/plexpie/plexpie-admin
+install -d -m 755 /var/lib/plexpie
+echo "$REPO" > /etc/plexpie/repo_dir
 install -m 644 "$REPO/files/www/"*.html "$REPO/files/www/"*.png /opt/plexpie/www/
 if [ -f /etc/plexpie/plexpie.conf ] && ! cmp -s "$REPO/plexpie.conf" /etc/plexpie/plexpie.conf; then
   cp -p /etc/plexpie/plexpie.conf /etc/plexpie/plexpie.conf.prev
@@ -290,6 +293,7 @@ done
 cat > /etc/sudoers.d/plexpie <<EOF
 # PlexPie daemon: restart apps and reboot without a password
 $U ALL=(root) NOPASSWD: /usr/bin/systemctl restart plexamp, /usr/sbin/reboot
+$U ALL=(root) NOPASSWD: /opt/plexpie/plexpie-admin
 $U ALL=(root) NOPASSWD: /usr/bin/systemctl start plexpie-airplay, /usr/bin/systemctl stop plexpie-airplay, /usr/bin/systemctl restart plexpie-airplay
 $U ALL=(root) NOPASSWD: /usr/bin/systemctl start plexpie-squeezelite, /usr/bin/systemctl stop plexpie-squeezelite, /usr/bin/systemctl restart plexpie-squeezelite
 $U ALL=(root) NOPASSWD: /usr/bin/systemctl start plexpie-spotify, /usr/bin/systemctl stop plexpie-spotify, /usr/bin/systemctl restart plexpie-spotify
