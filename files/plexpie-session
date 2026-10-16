@@ -1,0 +1,60 @@
+#!/bin/bash
+# PlexPie X session (started from ~/.xinitrc on tty1 autologin).
+# Keeps the overlay and the Chromium kiosk running; the plexpie daemon
+# decides which app is on screen.
+
+CONF=/etc/plexpie/plexpie.conf
+[ -r "$CONF" ] && . "$CONF"
+
+export DISPLAY="${DISPLAY:-:0}"
+PROFILE="$HOME/.config/plexpie-chromium"
+LAUNCHER="http://127.0.0.1:8080/"
+SCALE="${CHROMIUM_SCALE:-1}"
+
+log() { echo "$(date '+%F %T') $*"; }
+x_alive() { xset q >/dev/null 2>&1; }
+
+# PlexPie controls the backlight itself; X must not blank or power down.
+xset s off
+xset s noblank
+xset -dpms
+
+# Overlay (Home button + wake shield), restarted if it ever exits.
+(
+  while x_alive; do
+    python3 /opt/plexpie/plexpie-overlay.py
+    log "overlay exited ($?), restarting"
+    sleep 2
+  done
+) &
+
+log "waiting for the plexpie daemon"
+until curl -fs --max-time 1 "${LAUNCHER}api/state" >/dev/null; do x_alive || exit 0; sleep 0.5; done
+
+while x_alive; do
+  # Mark the last run as a clean exit so Chromium never shows "Restore pages?".
+  if [ -f "$PROFILE/Default/Preferences" ]; then
+    sed -i 's/"exited_cleanly":false/"exited_cleanly":true/; s/"exit_type":"[^"]*"/"exit_type":"Normal"/' \
+      "$PROFILE/Default/Preferences"
+  fi
+  log "starting chromium"
+  chromium \
+    --kiosk \
+    --user-data-dir="$PROFILE" \
+    --remote-debugging-address=127.0.0.1 \
+    --remote-debugging-port=9222 \
+    --remote-allow-origins=http://127.0.0.1 \
+    --force-device-scale-factor="$SCALE" \
+    --noerrdialogs --disable-infobars --disable-session-crashed-bubble \
+    --no-first-run --no-default-browser-check --password-store=basic \
+    --autoplay-policy=no-user-gesture-required \
+    --disable-background-timer-throttling \
+    --disable-renderer-backgrounding \
+    --disable-backgrounding-occluded-windows \
+    --disable-features=Translate,MediaRouter \
+    --overscroll-history-navigation=0 \
+    --check-for-update-interval=31536000 \
+    "$LAUNCHER"
+  log "chromium exited ($?), restarting in 2s"
+  sleep 2
+done

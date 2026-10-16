@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>AirPlay</title>
+<style>
+  :root { --bg: #0b0b0f; --text: #f4f4f7; --muted: #8e8e99; --accent: #3b8cf6; }
+  * { box-sizing: border-box; user-select: none; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden;
+    font-family: "Inter", "Noto Sans", "DejaVu Sans", system-ui, sans-serif; }
+  .backdrop { position: fixed; inset: -40px; background-size: cover; background-position: center;
+    filter: blur(40px) brightness(.35) saturate(1.2); opacity: 0; transition: opacity .6s; }
+  .backdrop.on { opacity: 1; }
+  .wrap { position: relative; height: 100%; display: flex; align-items: center; gap: 32px; padding: 0 40px 0 36px; }
+  .art { flex: none; width: 320px; height: 320px; border-radius: 18px; overflow: hidden;
+    background: linear-gradient(145deg, #1e3a66, #101018); display: grid; place-items: center;
+    box-shadow: 0 20px 50px -10px rgba(0,0,0,.7); }
+  .art img { width: 100%; height: 100%; object-fit: cover; display: none; }
+  .art svg { width: 110px; height: 110px; color: rgba(255,255,255,.55); }
+  .art.has img { display: block; } .art.has svg { display: none; }
+  .info { flex: 1; min-width: 0; }
+  .pill { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--accent); }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: currentColor; }
+  .playing .dot { animation: pulse 1.6s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .25 } }
+  h1 { margin: 14px 0 8px; font-size: 32px; line-height: 1.15; font-weight: 800;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .artist { font-size: 21px; color: var(--text); opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .album { margin-top: 6px; font-size: 16px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hint { margin-top: 18px; font-size: 16px; line-height: 1.5; color: var(--muted); }
+  .hint b { color: var(--text); }
+</style>
+</head>
+<body>
+<div class="backdrop" id="bg"></div>
+<div class="wrap">
+  <div class="art" id="art">
+    <img id="img" alt="">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M5 17a9 9 0 1 1 14 0"/><path d="M8.5 14.5a5 5 0 1 1 7 0"/><path d="M12 15l4 6H8z"/></svg>
+  </div>
+  <div class="info" id="info">
+    <div class="pill"><span class="dot"></span><span id="status">Ready</span></div>
+    <h1 id="title">AirPlay</h1>
+    <div class="artist" id="artist"></div>
+    <div class="album" id="album"></div>
+    <div class="hint" id="hint"></div>
+  </div>
+</div>
+<script>
+const $ = (id) => document.getElementById(id);
+let artVer = -1;
+
+function render(s) {
+  const a = s.airplay || {};
+  const has = !!(a.title || a.artist);
+  $("info").classList.toggle("playing", !!a.playing);
+  $("status").textContent = a.playing ? "Playing via AirPlay" : (has ? "Paused" : "Ready for AirPlay");
+  $("title").textContent = has ? (a.title || "Unknown track") : s.player_name;
+  $("artist").textContent = a.artist || "";
+  $("album").textContent = a.album || "";
+  $("hint").innerHTML = has ? "" :
+    `On your iPhone or Mac, open <b>Control Center → AirPlay</b> and pick <b>${s.player_name}</b>.`;
+  if (s.art_ver !== artVer) {
+    artVer = s.art_ver;
+    if (a.has_art) {
+      const url = "/api/art?v=" + artVer;
+      $("img").src = url;
+      $("art").classList.add("has");
+      $("bg").style.backgroundImage = `url(${url})`;
+      $("bg").classList.add("on");
+    } else {
+      $("art").classList.remove("has");
+      $("bg").classList.remove("on");
+    }
+  }
+}
+function poll() { fetch("/api/state").then(r => r.json()).then(render).catch(() => {}); }
+poll(); setInterval(poll, 1000);
+</script>
+</body>
+</html>

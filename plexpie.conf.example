@@ -1,0 +1,41 @@
+# PlexPie appliance settings.
+# Edit here, then re-run: sudo bash ~/plexpie/install.sh
+# Keep comments on their own lines (systemd reads this file too).
+
+# Linux user that runs everything (autologin on the touchscreen)
+APPLIANCE_USER="sz"
+
+# Name shown in Plexamp, AirPlay and Music Assistant
+PLAYER_NAME="GymMusicPlayer"
+AIRPLAY_NAME="GymMusicPlayer"
+
+# Home Assistant / MQTT (Mosquitto add-on on Home Assistant)
+HA_HOST="192.168.13.107"
+MQTT_HOST="192.168.13.107"
+MQTT_PORT="1883"
+MQTT_USER="mqtt"
+MQTT_PASS=""
+# Old topic kept for existing automations (payload: playing / idle). Empty to stop.
+MQTT_LEGACY_TOPIC="plexamp/state"
+
+# Music Assistant web interface (add-on port 8095 on Home Assistant)
+MA_URL="http://192.168.13.107:8095"
+
+# Sources: yes / no
+ENABLE_APPLE_MUSIC_WEB="yes"
+ENABLE_AIRPLAY="yes"
+ENABLE_MUSIC_ASSISTANT="yes"
+
+# Screen: turn off after this many seconds with no touch and nothing playing (0 = never)
+SCREEN_OFF_AFTER_SECS="60"
+# Brightness in percent
+SCREEN_BRIGHTNESS="100"
+# Floating Home button: top-left, top-right, bottom-left, bottom-right
+HOME_BUTTON_POSITION="bottom-left"
+# Browser zoom for the apps (1 = normal, 0.9 fits more on the 800x480 screen)
+CHROMIUM_SCALE="1"
+
+# Starting one source pauses the others
+PAUSE_OTHERS="yes"
+# Jump to the AirPlay "now playing" screen when someone starts AirPlay
+AUTO_SHOW_AIRPLAY="yes"

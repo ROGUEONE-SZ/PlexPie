@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>PlexPie</title>
+<style>
+  :root {
+    --bg: #0b0b0f; --panel: #16161c; --line: #26262e; --text: #f4f4f7; --muted: #8e8e99;
+    --plexamp: #f5a524; --apple: #fa3c5a; --airplay: #3b8cf6; --ma: #19c2a8;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden;
+    font-family: "Inter", "Noto Sans", "DejaVu Sans", system-ui, sans-serif; }
+  body { display: grid; grid-template-rows: 54px 1fr 76px; height: 100vh; padding: 0 14px; }
+
+  header { display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--line); }
+  .name { font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+  .np { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; justify-content: center; }
+  .np .chip { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+    padding: 4px 9px; border-radius: 999px; background: var(--panel); color: var(--muted); white-space: nowrap; }
+  .np .track { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .clock { font-size: 20px; font-variant-numeric: tabular-nums; font-weight: 600; }
+
+  main { display: grid; grid-template-columns: repeat(var(--cols, 4), 1fr); gap: 12px; padding: 14px 0; }
+  .tile { position: relative; border: 0; border-radius: 22px; color: var(--text); text-align: left;
+    padding: 18px; display: flex; flex-direction: column; justify-content: space-between;
+    background: linear-gradient(160deg, color-mix(in srgb, var(--c) 34%, #16161c) 0%, #121217 70%);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 30%, transparent); font: inherit;
+    transition: transform .12s ease, filter .12s ease; }
+  .tile:active { transform: scale(.97); filter: brightness(1.15); }
+  .tile svg { width: 58px; height: 58px; color: var(--c); }
+  .tile .label { font-size: 21px; font-weight: 700; line-height: 1.15; }
+  .tile .sub { margin-top: 6px; font-size: 13px; color: var(--muted); min-height: 1.3em; }
+  .tile.playing { box-shadow: inset 0 0 0 2px var(--c), 0 0 24px -6px var(--c); }
+  .tile.playing .sub { color: var(--c); font-weight: 600; }
+  .tile.off { filter: grayscale(1) brightness(.55); }
+  .eq { position: absolute; top: 18px; right: 18px; display: none; gap: 3px; height: 18px; align-items: flex-end; }
+  .tile.playing .eq { display: flex; }
+  .eq i { width: 4px; background: var(--c); border-radius: 2px; animation: eq 0.9s ease-in-out infinite; }
+  .eq i:nth-child(2) { animation-delay: -.3s } .eq i:nth-child(3) { animation-delay: -.6s }
+  @keyframes eq { 0%,100% { height: 5px } 50% { height: 18px } }
+
+  footer { display: flex; align-items: center; gap: 10px; border-top: 1px solid var(--line); }
+  .btn { height: 52px; min-width: 52px; padding: 0 16px; border: 0; border-radius: 14px; background: var(--panel);
+    color: var(--text); font: inherit; font-size: 15px; font-weight: 600; display: inline-flex; align-items: center;
+    justify-content: center; gap: 8px; }
+  .btn:active { filter: brightness(1.4); }
+  .btn svg { width: 22px; height: 22px; }
+  .vol { flex: 1; display: flex; align-items: center; gap: 10px; }
+  .bar { flex: 1; height: 10px; border-radius: 999px; background: var(--panel); overflow: hidden; }
+  .bar b { display: block; height: 100%; width: 0; background: var(--text); border-radius: inherit; transition: width .2s; }
+  .volnum { width: 38px; text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <div class="name" id="name">PlexPie</div>
+  <div class="np"><span class="chip" id="npchip">Idle</span><span class="track" id="nptrack"></span></div>
+  <div class="clock" id="clock">--:--</div>
+</header>
+
+<main id="tiles">
+  <button class="tile" data-src="plexamp" style="--c: var(--plexamp)">
+    <span class="eq"><i></i><i></i><i></i></span>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <path d="M4 10v4M8 6v12M12 3v18M16 7v10M20 10v4"/></svg>
+    <div><div class="label">Plexamp</div><div class="sub">Your library</div></div>
+  </button>
+  <button class="tile" data-src="apple" style="--c: var(--apple)">
+    <span class="eq"><i></i><i></i><i></i></span>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>
+    <div><div class="label">Apple Music</div><div class="sub">On this screen</div></div>
+  </button>
+  <button class="tile" data-src="airplay" style="--c: var(--airplay)">
+    <span class="eq"><i></i><i></i><i></i></span>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M5 17a9 9 0 1 1 14 0"/><path d="M8.5 14.5a5 5 0 1 1 7 0"/><path d="M12 15l4 6H8z"/></svg>
+    <div><div class="label">AirPlay</div><div class="sub">From your phone</div></div>
+  </button>
+  <button class="tile" data-src="ma" style="--c: var(--ma)">
+    <span class="eq"><i></i><i></i><i></i></span>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M14 13v4"/><circle cx="12.5" cy="17" r="1.5"/></svg>
+    <div><div class="label">Music Assistant</div><div class="sub">Checking…</div></div>
+  </button>
+</main>
+
+<footer>
+  <button class="btn" id="pause" title="Pause everything">
+    <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
+    Pause all
+  </button>
+  <div class="vol">
+    <button class="btn" id="voldown" aria-label="Volume down">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 12h12"/></svg></button>
+    <div class="bar"><b id="volbar"></b></div>
+    <span class="volnum" id="volnum">–</span>
+    <button class="btn" id="volup" aria-label="Volume up">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 12h12M12 6v12"/></svg></button>
+  </div>
+  <button class="btn" id="screenoff" title="Screen off">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>
+  </button>
+</footer>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const post = (path, body) => fetch(path, {method: "POST", headers: {"Content-Type": "application/json"},
+  body: JSON.stringify(body || {})}).then(r => r.json()).then(j => j.state && render(j.state)).catch(() => {});
+const SUBS = {plexamp: "Your library", apple: "On this screen", airplay: "From your phone", ma: "Your speakers"};
+
+function render(s) {
+  $("name").textContent = s.player_name || "PlexPie";
+  const tiles = [...document.querySelectorAll(".tile")];
+  let shown = 0;
+  tiles.forEach(t => {
+    const src = t.dataset.src;
+    const enabled = s.sources && src in s.sources;
+    t.style.display = enabled ? "" : "none";
+    if (!enabled) return;
+    shown++;
+    const playing = s.playing_by_source && s.playing_by_source[src];
+    t.classList.toggle("playing", !!playing);
+    const off = src === "ma" && !s.ma_up;
+    t.classList.toggle("off", off);
+    let sub = SUBS[src];
+    if (playing) sub = "Playing";
+    else if (off) sub = "Off — start it in Home Assistant";
+    else if (src === "airplay") sub = `Pick “${s.player_name}”`;
+    t.querySelector(".sub").textContent = sub;
+  });
+  document.body.style.setProperty("--cols", Math.max(shown, 1));
+  if (s.playing) {
+    $("npchip").textContent = s.now_source_name;
+    const n = s.now || {};
+    $("nptrack").textContent = [n.title, n.artist].filter(Boolean).join(" — ");
+  } else {
+    $("npchip").textContent = "Idle";
+    $("nptrack").textContent = "";
+  }
+  const v = s.volume;
+  $("volbar").style.width = (v == null ? 0 : v) + "%";
+  $("volnum").textContent = v == null ? "–" : v;
+}
+
+function poll() { fetch("/api/state").then(r => r.json()).then(render).catch(() => {}); }
+function clock() {
+  const d = new Date();
+  $("clock").textContent = d.toLocaleTimeString([], {hour: "numeric", minute: "2-digit"});
+}
+
+document.querySelectorAll(".tile").forEach(t =>
+  t.addEventListener("click", () => post("/api/source", {source: t.dataset.src})));
+$("pause").onclick = () => post("/api/pause_all");
+$("volup").onclick = () => post("/api/volume", {delta: 5});
+$("voldown").onclick = () => post("/api/volume", {delta: -5});
+$("screenoff").onclick = () => post("/api/screen", {on: false});
+
+clock(); poll();
+setInterval(clock, 5000);
+setInterval(poll, 1000);
+</script>
+</body>
+</html>

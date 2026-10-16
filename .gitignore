@@ -1,0 +1,5 @@
+# Your real settings (contains the MQTT password)
+plexpie.conf
+install-output.txt
+inventory*
+__pycache__/
