@@ -25,7 +25,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 
-VERSION = "1.4.0"
+VERSION = "1.5.0"
 CONF_PATH = os.environ.get("PLEXPIE_CONF", "/etc/plexpie/plexpie.conf")
 WWW = os.path.join(os.path.dirname(os.path.abspath(__file__)), "www")
 HTTP_PORT = int(os.environ.get("PLEXPIE_HTTP_PORT", "8080"))
@@ -606,8 +606,15 @@ def on_started(src):
             others = [s for s, p in ST.playing.items() if p and s != src]
         for other in others:
             pause_source(other)
-    if src == "airplay" and cfg_yes("AUTO_SHOW_AIRPLAY") and "airplay" in SOURCES:
-        switch_source("airplay")
+    # Show the app that just started playing (e.g. Plexamp started from the phone).
+    auto = cfg("AUTO_SHOW_SOURCES", "plexamp airplay ma").replace(",", " ").split()
+    if src == "airplay" and not cfg_yes("AUTO_SHOW_AIRPLAY"):
+        auto = [a for a in auto if a != "airplay"]
+    with ST.lock:
+        on_screen, typing = ST.source, ST.text_focus
+    if src in auto and src in SOURCES and on_screen != src and not typing:
+        log.info("%s started playing: showing it", src)
+        switch_source(src)
 
 
 def pause_source(src):

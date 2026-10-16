@@ -37,5 +37,8 @@ APPLE_MUSIC_ZOOM="75"
 
 # Starting one source pauses the others
 PAUSE_OTHERS="yes"
+# When something starts playing, bring that app to the screen
+# (any of: plexamp airplay ma apple; empty = never)
+AUTO_SHOW_SOURCES="plexamp airplay ma"
 # Jump to the AirPlay "now playing" screen when someone starts AirPlay
 AUTO_SHOW_AIRPLAY="yes"
