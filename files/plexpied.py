@@ -1942,7 +1942,9 @@ class HomeAssistant:
             pending = int(u.get("os") or 0) + int(u.get("plexpie") or 0)
             upd = json.dumps({"installed_version": VERSION,
                               "latest_version": VERSION if not pending else f"{VERSION} + {pending} updates",
-                              "in_progress": bool(u.get("run", {}).get("running"))})
+                              "in_progress": bool(u.get("run", {}).get("running")),
+                              "update_percentage": u.get("run", {}).get("percent")
+                              if u.get("run", {}).get("running") else None})
             if self.last.get("update") != upd:
                 self.pub(f"{self.base}/update", upd)
                 self.last["update"] = upd

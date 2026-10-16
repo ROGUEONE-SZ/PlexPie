@@ -9,7 +9,25 @@ U=$(stat -c %U "$REPO" 2>/dev/null || echo root)
 mkdir -p "$STATE"
 
 json_status() {   # step running(true/false) [extra json]
-  printf '{"step":"%s","running":%s,"time":%s%s}\n' "$1" "$2" "$(date +%s)" "${3:-}" > "$STATE/update-run.json"
+  printf '{"step":"%s","running":%s,"time":%s,"started":%s%s}\n' "$1" "$2" "$(date +%s)" \
+    "$(cat "$STATE/update-started" 2>/dev/null || echo 0)" "${3:-}" > "$STATE/update-run.json.tmp"
+  mv -f "$STATE/update-run.json.tmp" "$STATE/update-run.json"
+}
+
+apt_progress() {  # reads apt's Status-Fd and reports an overall percent between $1 and $1+$2
+  local base=$1 span=$2 last=-1 kind pkg pct msg lab b sp p
+  while IFS=: read -r kind pkg pct msg; do
+    case "$kind" in
+      dlstatus) lab="Downloading system updates"; b=$base; sp=$((span * 3 / 10)) ;;
+      pmstatus) lab="Installing system updates"; b=$((base + span * 3 / 10)); sp=$((span * 7 / 10)) ;;
+      *) continue ;;
+    esac
+    pct=${pct%%.*}; [[ "$pct" =~ ^[0-9]+$ ]] || pct=0
+    p=$((b + pct * sp / 100))
+    [ "$p" = "$last" ] && continue
+    last=$p
+    json_status "$lab" true ",\"percent\":$p,\"detail\":\"$(printf %s "$pkg" | tr -cd 'A-Za-z0-9._+-' | cut -c1-40)\""
+  done
 }
 
 case "${1:-}" in
@@ -69,22 +87,26 @@ print(json.dumps(sorted(seen.values(), key=lambda n: -n["signal"])[:20]))' ;;
   update-do)
     exec >>"$LOG" 2>&1
     echo "=== update started $(date)"
+    date +%s > "$STATE/update-started"
     export DEBIAN_FRONTEND=noninteractive
-    json_status "Downloading system updates" true
+    json_status "Checking for system updates" true ',"percent":1'
     apt-get update -q
-    json_status "Installing system updates" true
-    apt-get -y -q -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold upgrade || \
-      { json_status "System update failed (see $LOG)" false; exit 1; }
+    apt-get -y -q -o APT::Status-Fd=3 -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold \
+      upgrade 3> >(apt_progress 5 83)
+    rc=$?
+    wait $! 2>/dev/null                       # let the progress reader finish writing
+    [ $rc -eq 0 ] || { json_status "System update failed (see $LOG)" false; exit 1; }
+    json_status "Cleaning up" true ',"percent":89'
     apt-get -y -q autoremove
     if [ -d "$REPO/.git" ]; then
-      json_status "Updating PlexPie" true
+      json_status "Updating PlexPie" true ',"percent":91'
       sudo -u "$U" git -C "$REPO" pull -q --ff-only || { json_status "PlexPie update failed (see $LOG)" false; exit 1; }
-      json_status "Installing PlexPie" true
+      json_status "Installing PlexPie" true ',"percent":94'
       bash "$REPO/install.sh" --no-restart-ui </dev/null || { json_status "PlexPie install failed (see $LOG)" false; exit 1; }
     fi
     "$0" update-check >/dev/null
     reboot=false; [ -f /var/run/reboot-required ] && reboot=true
-    json_status "Up to date" false ",\"reboot\":$reboot"
+    json_status "Up to date" false ",\"percent\":100,\"reboot\":$reboot"
     echo "=== update finished $(date)" ;;
   update-status)
     cat "$STATE/update.json" 2>/dev/null || echo '{}'
