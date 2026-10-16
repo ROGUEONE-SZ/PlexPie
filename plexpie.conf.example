@@ -13,6 +13,10 @@ AIRPLAY_NAME="PlexPie"
 ENABLE_AIRPLAY="yes"
 ENABLE_APPLE_MUSIC_WEB="yes"
 ENABLE_MUSIC_ASSISTANT="no"
+ENABLE_SPOTIFY="no"
+ENABLE_SPOTIFY_WEB="no"
+# Settings from a phone browser at http://<pi>:8080/settings (PIN shown on the player)
+PHONE_ACCESS="yes"
 
 # Music Assistant server (Squeezelite connects here) and its web interface
 MA_HOST=""
@@ -43,7 +47,7 @@ TOUCH_ROTATE="0"
 # Starting one source pauses the others
 PAUSE_OTHERS="yes"
 # When something starts playing, bring that app to the screen (plexamp airplay ma apple)
-AUTO_SHOW_SOURCES="plexamp airplay ma"
+AUTO_SHOW_SOURCES="plexamp airplay ma spotify"
 AUTO_SHOW_AIRPLAY="yes"
 
 # Audio device PipeWire prefers (regex on the PipeWire node name; default: any USB DAC)

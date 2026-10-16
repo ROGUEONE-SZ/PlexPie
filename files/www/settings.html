@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PlexPie settings</title>
+<style>
+  :root { --bg: #0b0b0f; --panel: #16161c; --line: #26262e; --text: #f4f4f7; --muted: #8e8e99; --accent: #0a84ff;
+    --ok: #30d158; --warn: #ff9f0a; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--text);
+    font-family: "Inter", "Noto Sans", "DejaVu Sans", system-ui, -apple-system, sans-serif; }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 18px 16px 110px; }
+  h1 { font-size: 24px; margin: 4px 0 2px; }
+  .sub { color: var(--muted); font-size: 14px; margin-bottom: 18px; }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin: 22px 4px 8px; }
+  .card { background: var(--panel); border-radius: 16px; overflow: hidden; }
+  .row { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 10px 16px; border-top: 1px solid var(--line); }
+  .row:first-child { border-top: 0; }
+  .row .t { flex: 1; min-width: 0; }
+  .row .t b { display: block; font-weight: 600; font-size: 16px; }
+  .row .t small { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); flex: none; }
+  .dot.ok { background: var(--ok); } .dot.no { background: var(--warn); }
+  input[type=text], input[type=password], input[type=number], select {
+    width: 46%; max-width: 280px; background: #0f0f14; color: var(--text); border: 1px solid var(--line);
+    border-radius: 10px; padding: 10px 12px; font: inherit; font-size: 15px; }
+  input[type=range] { width: 46%; max-width: 280px; accent-color: var(--accent); }
+  .sw { position: relative; width: 52px; height: 32px; flex: none; }
+  .sw input { opacity: 0; width: 0; height: 0; }
+  .sw span { position: absolute; inset: 0; background: #3a3a3d; border-radius: 999px; transition: .2s; }
+  .sw span::after { content: ""; position: absolute; left: 3px; top: 3px; width: 26px; height: 26px; border-radius: 50%;
+    background: #fff; transition: .2s; }
+  .sw input:checked + span { background: var(--ok); }
+  .sw input:checked + span::after { transform: translateX(20px); }
+  .sw input:disabled + span { opacity: .4; }
+  .btn { border: 0; border-radius: 10px; padding: 10px 14px; font: inherit; font-size: 15px; font-weight: 600;
+    background: #2a2a31; color: var(--text); }
+  .btn:active { filter: brightness(1.3); }
+  .btn.danger { color: #ff6961; }
+  .bar { position: fixed; left: 0; right: 0; bottom: 0; padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+    background: linear-gradient(transparent, var(--bg) 35%); display: flex; justify-content: center; }
+  .save { width: 100%; max-width: 720px; border: 0; border-radius: 14px; padding: 15px; font: inherit; font-size: 17px;
+    font-weight: 700; background: var(--accent); color: #fff; }
+  .save:disabled { opacity: .5; }
+  .note { color: var(--muted); font-size: 13px; padding: 8px 4px; }
+  code { background: #0f0f14; padding: 2px 6px; border-radius: 6px; }
+  #login { max-width: 360px; margin: 18vh auto 0; text-align: center; padding: 0 16px; }
+  #login input { width: 100%; max-width: none; text-align: center; font-size: 28px; letter-spacing: .3em; margin: 18px 0; }
+  .hidden { display: none !important; }
+  #toast { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); background: #2a2a31; padding: 10px 16px;
+    border-radius: 12px; font-size: 15px; opacity: 0; transition: opacity .3s; pointer-events: none; }
+  #toast.on { opacity: 1; }
+</style>
+</head>
+<body>
+<div id="toast"></div>
+
+<div id="login" class="hidden">
+  <h1>PlexPie</h1>
+  <div class="sub">Enter the PIN shown on the player under Settings → Phone access.</div>
+  <input id="pin" type="password" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="••••••">
+  <button class="save" id="pinbtn">Unlock</button>
+  <div class="note" id="pinerr"></div>
+</div>
+
+<div class="wrap hidden" id="main">
+  <button class="btn local-only" id="home" style="float:right;margin-top:2px">Done</button>
+  <h1>Settings</h1>
+  <div class="sub" id="who"></div>
+
+  <h2>Apps on the screen</h2>
+  <div class="card" id="apps"></div>
+
+  <h2>Accounts</h2>
+  <div class="card" id="accounts"></div>
+  <div class="note">Passwords are never stored here. Each service signs in on its own page and keeps you signed in.</div>
+
+  <h2>Screen</h2>
+  <div class="card">
+    <div class="row"><div class="t"><b>Screen sleep</b><small>After this long with no touch and nothing playing</small></div>
+      <select id="SCREEN_OFF_AFTER_SECS">
+        <option value="30">30 seconds</option><option value="60">1 minute</option><option value="120">2 minutes</option>
+        <option value="300">5 minutes</option><option value="900">15 minutes</option><option value="0">Never</option>
+      </select></div>
+    <div class="row"><div class="t"><b>Brightness</b></div><input id="SCREEN_BRIGHTNESS" type="range" min="10" max="100" step="5"></div>
+    <div class="row"><div class="t"><b>Show what's playing</b><small>Switch to the app that starts playing</small></div>
+      <label class="sw"><input type="checkbox" id="AUTO_SHOW"><span></span></label></div>
+    <div class="row"><div class="t"><b>Swipe home</b><small>From the left edge or the top edge</small></div>
+      <label class="sw"><input type="checkbox" id="SWIPE_HOME"><span></span></label></div>
+  </div>
+
+  <h2>Home Assistant</h2>
+  <div class="card">
+    <div class="row"><div class="t"><b>MQTT broker</b><small>Empty turns Home Assistant off</small></div>
+      <input id="MQTT_HOST" type="text" placeholder="homeassistant.local" autocapitalize="off"></div>
+    <div class="row"><div class="t"><b>Port</b></div><input id="MQTT_PORT" type="number" placeholder="1883"></div>
+    <div class="row"><div class="t"><b>Username</b></div><input id="MQTT_USER" type="text" autocapitalize="off"></div>
+    <div class="row"><div class="t"><b>Password</b><small id="passnote"></small></div>
+      <input id="MQTT_PASS" type="password" autocomplete="new-password"></div>
+  </div>
+
+  <h2>Music Assistant</h2>
+  <div class="card">
+    <div class="row"><div class="t"><b>Server</b><small>Where the player connects</small></div>
+      <input id="MA_HOST" type="text" placeholder="homeassistant.local" autocapitalize="off"></div>
+    <div class="row"><div class="t"><b>Web address</b><small>Opened by the Music Assistant tile</small></div>
+      <input id="MA_URL" type="text" placeholder="http://homeassistant.local:8095" autocapitalize="off"></div>
+  </div>
+
+  <h2>Phone access</h2>
+  <div class="card">
+    <div class="row"><div class="t"><b>Settings from a phone</b><small id="phoneurl"></small></div>
+      <label class="sw"><input type="checkbox" id="PHONE_ACCESS"><span></span></label></div>
+    <div class="row local-only"><div class="t"><b>PIN</b><small>Asked once per phone</small></div>
+      <b id="pinshow" style="font-size:20px;letter-spacing:.15em"></b>
+      <button class="btn" id="newpin">New PIN</button></div>
+  </div>
+
+  <h2>System</h2>
+  <div class="card">
+    <div class="row"><div class="t"><b>Restart PlexPie</b><small>Reloads the screen and the apps</small></div>
+      <button class="btn" data-sys="restart">Restart</button></div>
+    <div class="row"><div class="t"><b>Reboot the Pi</b></div><button class="btn danger" data-sys="reboot">Reboot</button></div>
+  </div>
+  <div class="note" id="ver"></div>
+</div>
+
+<div class="bar hidden" id="bar"><button class="save" id="save" disabled>Save</button></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const APPS = [
+  ["ENABLE_APPLE_MUSIC_WEB", "Apple Music", "Web player on the screen"],
+  ["ENABLE_AIRPLAY", "AirPlay", "Play from iPhone, iPad or Mac"],
+  ["ENABLE_SPOTIFY", "Spotify Connect", "Play from the Spotify app (Premium)"],
+  ["ENABLE_SPOTIFY_WEB", "Spotify web player", "Browse Spotify on the screen"],
+  ["ENABLE_MUSIC_ASSISTANT", "Music Assistant", "Player and interface for Music Assistant"],
+];
+const FIELDS = ["SCREEN_OFF_AFTER_SECS", "SCREEN_BRIGHTNESS", "AUTO_SHOW", "SWIPE_HOME", "MQTT_HOST", "MQTT_PORT",
+  "MQTT_USER", "MQTT_PASS", "MA_HOST", "MA_URL", "PHONE_ACCESS"];
+let data = null;
+
+function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("on");
+  clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove("on"), 2600); }
+const api = (path, body) => fetch(path, body === undefined ? {} : {method: "POST",
+  headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
+
+function row(title, small, right) {
+  return `<div class="row"><div class="t"><b>${title}</b>${small ? `<small>${small}</small>` : ""}</div>${right}</div>`;
+}
+function esc(s) { return String(s ?? "").replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c])); }
+
+function render() {
+  const v = data.values;
+  $("who").textContent = `${data.player_name} · changes apply in a few seconds`;
+  $("apps").innerHTML = row("Plexamp", "Always on", `<label class="sw"><input type="checkbox" checked disabled><span></span></label>`) +
+    APPS.map(([k, name, desc]) => {
+      const missing = k in data.installed && !data.installed[k];
+      return row(name, missing ? "Not installed: run the installer again" : desc,
+        `<label class="sw"><input type="checkbox" id="${k}" ${v[k] ? "checked" : ""} ${missing ? "disabled" : ""}><span></span></label>`);
+    }).join("");
+  $("accounts").innerHTML = data.accounts.map(a => `<div class="row"><span class="dot ${a.ok === true ? "ok" : a.ok === false ? "no" : ""}"></span>
+      <div class="t"><b>${esc(a.name)}</b><small>${esc(a.status)}</small></div>
+      ${a.action ? `<button class="btn" data-signout="${a.id}">${esc(a.action)}</button>` : ""}</div>`).join("");
+  for (const k of FIELDS) {
+    const el = $(k); if (!el) continue;
+    if (el.type === "checkbox") el.checked = !!v[k]; else el.value = v[k] ?? "";
+  }
+  if (![...$("SCREEN_OFF_AFTER_SECS").options].some(o => o.value === String(v.SCREEN_OFF_AFTER_SECS)))
+    $("SCREEN_OFF_AFTER_SECS").insertAdjacentHTML("beforeend", `<option value="${esc(v.SCREEN_OFF_AFTER_SECS)}">${esc(v.SCREEN_OFF_AFTER_SECS)} seconds</option>`), $("SCREEN_OFF_AFTER_SECS").value = v.SCREEN_OFF_AFTER_SECS;
+  $("passnote").textContent = v.MQTT_PASS_SET ? "Saved · leave empty to keep it" : "";
+  $("phoneurl").innerHTML = data.phone_url ? `Open <code>${esc(data.phone_url)}</code> on your phone` : "";
+  $("pinshow").textContent = v.PHONE_PIN || "";
+  document.querySelectorAll(".local-only").forEach(e => e.classList.toggle("hidden", !data.local));
+  $("ver").textContent = `PlexPie ${data.version}`;
+  $("main").classList.remove("hidden"); $("bar").classList.remove("hidden");
+  $("save").disabled = true;
+}
+
+function collect() {
+  const out = {};
+  for (const [k] of APPS) { const el = $(k); if (el && !el.disabled) out[k] = el.checked; }
+  for (const k of FIELDS) { const el = $(k); if (el) out[k] = el.type === "checkbox" ? el.checked : el.value; }
+  return out;
+}
+
+async function load() {
+  const r = await api("/api/settings");
+  if (r.status === 401) { $("login").classList.remove("hidden"); return; }
+  if (r.status === 403) { document.body.innerHTML = '<div id="login"><h1>Phone access is off</h1><div class="sub">Turn it on in Settings on the player.</div></div>'; return; }
+  data = await r.json(); render();
+}
+
+async function waitBack() {
+  for (let i = 0; i < 30; i++) {
+    await new Promise(r => setTimeout(r, 1000));
+    try { const r = await api("/api/settings"); if (r.ok) { data = await r.json(); render(); return true; } } catch (e) {}
+  }
+  return false;
+}
+
+document.addEventListener("input", e => { if (e.target.closest("#main")) $("save").disabled = false; });
+document.addEventListener("change", e => { if (e.target.closest("#main")) $("save").disabled = false; });
+$("save").onclick = async () => {
+  $("save").disabled = true; $("save").textContent = "Saving…";
+  try { await api("/api/settings", collect()); } catch (e) {}
+  toast("Saved. Applying…");
+  await waitBack(); $("save").textContent = "Save"; toast("Done");
+};
+document.addEventListener("click", async e => {
+  const so = e.target.closest("[data-signout]");
+  if (so && confirm("Sign out? You'll sign in again on the screen next time.")) {
+    await api("/api/account", {action: "signout", id: so.dataset.signout}); toast("Signed out");
+    setTimeout(load, 1500);
+  }
+  const sys = e.target.closest("[data-sys]");
+  if (sys && confirm(sys.dataset.sys === "reboot" ? "Reboot the Pi now?" : "Restart PlexPie?")) {
+    await api("/api/system", {action: sys.dataset.sys}); toast(sys.dataset.sys === "reboot" ? "Rebooting…" : "Restarting…");
+    if (sys.dataset.sys === "restart") waitBack();
+  }
+});
+$("home").onclick = () => api("/api/source", {source: "home"});
+$("newpin").onclick = async () => {
+  if (!confirm("Make a new PIN? Phones will need to enter it again.")) return;
+  await api("/api/settings", {PHONE_PIN: "new"}); toast("New PIN…"); await waitBack();
+};
+$("pinbtn").onclick = async () => {
+  const r = await api("/api/login", {pin: $("pin").value});
+  if (r.ok) { $("login").classList.add("hidden"); load(); }
+  else { const j = await r.json().catch(() => ({})); $("pinerr").textContent = j.error || "Wrong PIN"; }
+};
+$("pin").addEventListener("keydown", e => { if (e.key === "Enter") $("pinbtn").click(); });
+load();
+</script>
+</body>
+</html>

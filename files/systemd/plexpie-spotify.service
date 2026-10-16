@@ -1,0 +1,17 @@
+[Unit]
+Description=PlexPie Spotify Connect receiver (go-librespot)
+After=network-online.target avahi-daemon.service user@@UID@.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=@USER@
+Group=@USER@
+Environment=HOME=@HOME@
+Environment=XDG_RUNTIME_DIR=/run/user/@UID@
+ExecStart=/usr/local/bin/go-librespot -config_dir @HOME@/.config/go-librespot
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

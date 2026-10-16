@@ -1,7 +1,7 @@
 # PlexPie
 
 Turn a Raspberry Pi with a touchscreen and a DAC into a one-screen music player:
-**Plexamp**, **AirPlay 2**, the **Apple Music** web player and **Music Assistant**, all
+**Plexamp**, **AirPlay 2**, **Spotify Connect**, the **Apple Music** web player and **Music Assistant**, all
 on one launcher and all controllable from **Home Assistant**.
 
 <p>
@@ -13,6 +13,7 @@ on one launcher and all controllable from **Home Assistant**.
 |---|---|
 | **Plexamp** | Plexamp headless with its full touch interface; also controllable from the Plexamp app on your phone. Lossless (FLAC/hi-res) to your DAC |
 | **AirPlay** | AirPlay 2 receiver (shairport-sync). The screen shows cover art, track and the stream format |
+| **Spotify** | Spotify Connect receiver (go-librespot): pick the Pi in the Spotify app (Premium). Optional Spotify web player on the screen |
 | **Apple Music** | music.apple.com on the screen (Chromium + Widevine), zoomed so it shows the full desktop layout |
 | **Music Assistant** | The Pi becomes a Music Assistant player (Squeezelite), and MA's own interface opens on the screen |
 | **Home** | The launcher: now playing, volume, pause all, screen off |
@@ -24,6 +25,7 @@ How it behaves:
 - **On-screen keyboard.** A keyboard slides up when you tap a text field (sign-ins, search), and the app shrinks to fit above it.
 - **Screen sleep.** The screen sleeps when nothing is playing. The first tap only wakes it.
 - **Self-healing.** A crashed app is restarted automatically.
+- **Settings screen.** The gear on the launcher opens Settings: switch apps on and off, see which accounts are signed in, set the screen sleep, Home Assistant and Music Assistant. The same page opens on your phone at `http://<pi-address>:8080/settings`, protected by a PIN shown on the player.
 
 ## What you need
 
@@ -33,6 +35,7 @@ How it behaves:
 - **Accounts:**
   - a **Plex** account for Plexamp
   - an **Apple Music** subscription, only for the web player
+  - **Spotify Premium**, only for Spotify Connect
   - optional: **Home Assistant** with an MQTT broker (e.g. the Mosquitto add-on), and a **Music Assistant** server
 
 > PlexPie takes over the Pi's screen: the desktop is replaced by the music launcher.
@@ -72,11 +75,23 @@ sudo bash install.sh
 ```
 </details>
 
+## Settings
+
+Tap the gear on the launcher, or open `http://<pi-address>:8080/settings` on your phone. The address and PIN are on the player's Settings page under **Phone access**.
+
+<img src="docs/settings.png" width="60%" alt="Settings page">
+
+- **Apps:** turn Apple Music, AirPlay, Spotify Connect, the Spotify web player and Music Assistant on or off. The change is instant: everything is installed, and players that are off are stopped.
+- **Accounts:** shows whether each service is linked, with sign-out for the web players. PlexPie never stores your passwords; each service signs in on its own page and keeps a token.
+- **Screen, Home Assistant, Music Assistant, phone access, restart and reboot.**
+
+From a phone, only the Settings page is reachable, and only with the PIN. Five wrong tries pause logins for a minute.
+
 ## Change settings, update, uninstall
 
 | | |
 |---|---|
-| Change your answers | `bash ~/plexpie/configure.sh && sudo bash ~/plexpie/install.sh` |
+| Change your answers | The Settings page, or `bash ~/plexpie/configure.sh && sudo bash ~/plexpie/install.sh` |
 | Update to the latest version | `cd ~/plexpie && git pull && sudo bash install.sh` |
 | Undo everything | `sudo bash ~/plexpie/rollback.sh`, then reboot |
 
@@ -129,6 +144,7 @@ out, and the Pi reconnects by itself when MA comes back.
 
 ## Good to know
 
+- **Spotify Connect** uses an unofficial protocol: if Spotify changes something, it may stop working until go-librespot is updated (`UPDATE_SPOTIFY=1 sudo -E bash install.sh`). Quality is up to 320 kbps.
 - **AirPlay from Apple Music is lossy** (AAC, about 256 kbps), even when your phone shows
   "Lossless". The iPhone converts the stream before sending it, and the AirPlay screen shows
   the actual format. For lossless, use Plexamp with your own FLAC files.
@@ -146,6 +162,7 @@ out, and the Pi reconnects by itself when MA comes back.
 | Swipe home doesn't work | `journalctl -u plexpie \| grep -i touch` (set `TOUCH_ROTATE` if your screen is mounted rotated) |
 | AirPlay | `journalctl -u plexpie-airplay -f` |
 | Music Assistant player | `journalctl -u plexpie-squeezelite -f` |
+| Spotify Connect | `journalctl -u plexpie-spotify -f` |
 | Plexamp | `journalctl -u plexamp -f` |
 | Audio devices | `wpctl status` |
 | Plexamp keeps spinning | Remove `~/.local/share/Plexamp/Settings/%40Plexamp%3Adiscovery%3Ahubs` and run `sudo systemctl restart plexamp` |
@@ -158,8 +175,8 @@ get.sh / configure.sh / install.sh / rollback.sh
 files/plexpied.py           control daemon: launcher API, app tabs, swipe home, screen, auto-pause, Home Assistant
 files/plexpie-overlay.py    on-screen keyboard and touch-to-wake
 files/plexpie-session       X session: overlay + Chromium kiosk
-files/www/                  launcher and AirPlay screens
-files/systemd/              services (plexpie, AirPlay, Squeezelite, Plexamp)
+files/www/                  launcher, now-playing (AirPlay/Spotify) and Settings screens
+files/systemd/              services (plexpie, AirPlay, Spotify, Squeezelite, Plexamp)
 files/audio/                PipeWire/ALSA: every source shares the DAC
 files/shairport-sync.conf   AirPlay receiver settings
 tools/diagnose.sh           read-only troubleshooting report
@@ -169,9 +186,10 @@ PlexPie glues together other people's excellent work:
 [Plexamp](https://www.plex.tv/plexamp/),
 [shairport-sync](https://github.com/mikebrady/shairport-sync) and nqptp,
 [Squeezelite](https://github.com/ralph-irving/squeezelite),
+[go-librespot](https://github.com/devgianlu/go-librespot),
 [Music Assistant](https://music-assistant.io), PipeWire and Chromium.
-Plexamp, Apple Music and AirPlay are trademarks of their owners; this project isn't
-affiliated with Plex or Apple.
+Plexamp, Apple Music, AirPlay and Spotify are trademarks of their owners; this project isn't
+affiliated with Plex, Apple or Spotify.
 
 ## License
 

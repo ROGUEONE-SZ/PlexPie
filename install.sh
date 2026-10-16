@@ -124,7 +124,8 @@ for alts in "chromium chromium-browser" "libwidevinecdm0"; do
   p=$(pick_pkg $alts)
   [ -n "$p" ] && PKGS+=("$p")
 done
-yes_ "${ENABLE_MUSIC_ASSISTANT:-yes}" && PKGS+=(squeezelite)
+# Every player is installed, so the Settings page can switch them on and off instantly.
+PKGS+=(squeezelite libvorbis0a libogg0)
 if yes_ "${ENABLE_AIRPLAY:-yes}" && [ "$SKIP_AIRPLAY_BUILD" = no ]; then
   PKGS+=(build-essential git autoconf automake libtool pkg-config libpopt-dev libconfig-dev
          libasound2-dev libavahi-client-dev libssl-dev libsoxr-dev libsodium-dev libavutil-dev
@@ -241,6 +242,37 @@ if yes_ "${ENABLE_AIRPLAY:-yes}"; then
   ok "AirPlay name: $AIRPLAY_NAME"
 fi
 
+# ----------------------------------------------------------- 5b. spotify
+step "Spotify Connect receiver"
+if [ ! -x /usr/local/bin/go-librespot ] || [ -n "${UPDATE_SPOTIFY:-}" ]; then
+  url=$(curl -fsSL https://api.github.com/repos/devgianlu/go-librespot/releases/latest | python3 -c '
+import json, sys
+assets = json.load(sys.stdin).get("assets", [])
+pick = [a["browser_download_url"] for a in assets
+        if "linux" in a["name"].lower() and ("arm64" in a["name"] or "aarch64" in a["name"])]
+print(pick[0] if pick else "")' || true)
+  if [ -n "$url" ]; then
+    tmp=$(mktemp -d)
+    curl -fsSL "$url" -o "$tmp/pkg"
+    case "$url" in
+      *.tar.gz|*.tgz) tar -xzf "$tmp/pkg" -C "$tmp" ;;
+      *.zip) python3 -m zipfile -e "$tmp/pkg" "$tmp" ;;
+      *) cp "$tmp/pkg" "$tmp/go-librespot" ;;
+    esac
+    bin=$(find "$tmp" -type f -name 'go-librespot*' ! -name '*.tar.gz' ! -name '*.zip' | head -1)
+    if [ -n "$bin" ]; then install -m 755 "$bin" /usr/local/bin/go-librespot; ok "go-librespot installed"; fi
+    rm -rf "$tmp"
+  else
+    note "Couldn't find a go-librespot download for this Pi; Spotify Connect stays off."
+  fi
+fi
+if [ -x /usr/local/bin/go-librespot ]; then
+  install -d -o "$U" -g "$U" "$UHOME/.config/go-librespot"
+  render "$REPO/files/spotify-config.yml" > "$UHOME/.config/go-librespot/config.yml"
+  chown "$U:$U" "$UHOME/.config/go-librespot/config.yml"
+  ok "Spotify device name: $PLAYER_NAME"
+fi
+
 # ---------------------------------------------------------- 6. plexpie files
 step "Installing PlexPie"
 install -d -m 755 /opt/plexpie /opt/plexpie/www
@@ -250,14 +282,17 @@ if [ -f /etc/plexpie/plexpie.conf ] && ! cmp -s "$REPO/plexpie.conf" /etc/plexpi
   cp -p /etc/plexpie/plexpie.conf /etc/plexpie/plexpie.conf.prev
 fi
 install -m 640 -o root -g "$U" "$REPO/plexpie.conf" /etc/plexpie/plexpie.conf
-for unit in plexpie plexpie-airplay plexpie-squeezelite; do
+for unit in plexpie plexpie-airplay plexpie-squeezelite plexpie-spotify; do
   render "$REPO/files/systemd/$unit.service" > "/etc/systemd/system/$unit.service"
 done
 
 # Let the daemon restart its own services and reboot, nothing else.
 cat > /etc/sudoers.d/plexpie <<EOF
 # PlexPie daemon: restart apps and reboot without a password
-$U ALL=(root) NOPASSWD: /usr/bin/systemctl restart plexamp, /usr/bin/systemctl restart plexpie-airplay, /usr/bin/systemctl restart plexpie-squeezelite, /usr/sbin/reboot
+$U ALL=(root) NOPASSWD: /usr/bin/systemctl restart plexamp, /usr/sbin/reboot
+$U ALL=(root) NOPASSWD: /usr/bin/systemctl start plexpie-airplay, /usr/bin/systemctl stop plexpie-airplay, /usr/bin/systemctl restart plexpie-airplay
+$U ALL=(root) NOPASSWD: /usr/bin/systemctl start plexpie-squeezelite, /usr/bin/systemctl stop plexpie-squeezelite, /usr/bin/systemctl restart plexpie-squeezelite
+$U ALL=(root) NOPASSWD: /usr/bin/systemctl start plexpie-spotify, /usr/bin/systemctl stop plexpie-spotify, /usr/bin/systemctl restart plexpie-spotify
 EOF
 chmod 440 /etc/sudoers.d/plexpie
 visudo -cf /etc/sudoers.d/plexpie >/dev/null
@@ -314,13 +349,15 @@ systemctl daemon-reload
 systemctl enable plexpie >/dev/null 2>&1
 if yes_ "${ENABLE_AIRPLAY:-yes}"; then systemctl enable plexpie-airplay >/dev/null 2>&1
 else systemctl disable --now plexpie-airplay >/dev/null 2>&1 || true; fi
-if yes_ "${ENABLE_MUSIC_ASSISTANT:-yes}"; then systemctl enable plexpie-squeezelite >/dev/null 2>&1
-else systemctl disable --now plexpie-squeezelite >/dev/null 2>&1 || true; fi
+# Optional players are enabled at boot; the plexpie daemon stops the ones switched off in Settings.
+systemctl enable plexpie-squeezelite >/dev/null 2>&1
+[ -x /usr/local/bin/go-librespot ] && systemctl enable plexpie-spotify >/dev/null 2>&1
 
 [ -f /opt/plexamp/js/index.js ] && systemctl restart plexamp
 systemctl restart plexpie
 yes_ "${ENABLE_AIRPLAY:-yes}" && systemctl restart plexpie-airplay
 yes_ "${ENABLE_MUSIC_ASSISTANT:-yes}" && systemctl restart plexpie-squeezelite
+yes_ "${ENABLE_SPOTIFY:-no}" && [ -x /usr/local/bin/go-librespot ] && systemctl restart plexpie-spotify
 
 if [ "$RESTART_UI" = yes ]; then
   # End the current screen session; autologin starts the new one.
@@ -333,7 +370,7 @@ fi
 
 sleep 4
 step "Status"
-for unit in plexamp plexpie plexpie-airplay plexpie-squeezelite nqptp; do
+for unit in plexamp plexpie plexpie-airplay plexpie-squeezelite plexpie-spotify nqptp; do
   printf '    %-22s %s\n' "$unit" "$(systemctl is-active "$unit" 2>/dev/null || true)"
 done
 if curl -fs --max-time 3 http://127.0.0.1:8080/api/state >/dev/null; then ok "launcher answering on the Pi"; fi

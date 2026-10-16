@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
-<title>AirPlay</title>
+<title>Now playing</title>
 <style>
   :root { --bg: #0b0b0f; --text: #f4f4f7; --muted: #8e8e99; --accent: #3b8cf6; }
   * { box-sizing: border-box; user-select: none; }
@@ -36,6 +36,11 @@
   .fmt.lossless { color: #30d158; background: rgba(48,209,88,.12); }
   .hint { margin-top: 18px; font-size: 16px; line-height: 1.5; color: var(--muted); }
   .hint b { color: var(--text); }
+  body.spotify { --accent: #1ed760; }
+  body.spotify .art { background: linear-gradient(145deg, #145c32, #101018); }
+  .btn { margin-top: 18px; display: none; border: 0; border-radius: 999px; padding: 11px 18px; font: inherit;
+    font-size: 15px; font-weight: 700; color: #0b0b0f; background: var(--accent); }
+  .btn.on { display: inline-block; }
 </style>
 </head>
 <body>
@@ -53,29 +58,38 @@
     <div class="album" id="album"></div>
     <div class="fmt" id="fmt"></div>
     <div class="hint" id="hint"></div>
+    <button class="btn" id="browse">Browse Spotify on this screen</button>
   </div>
 </div>
 <script>
 const $ = (id) => document.getElementById(id);
-let artVer = -1;
+const SRC = location.pathname.startsWith("/spotify") ? "spotify" : "airplay";
+document.body.classList.add(SRC);
+let artKey = null;
+
+const ICON_SPOTIFY = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M7.5 9.5c3-1 6.5-.7 9 .8M8 12.6c2.5-.8 5.3-.5 7.4.7M8.6 15.4c2-.6 4-.4 5.7.5"/></svg>';
+if (SRC === "spotify") document.querySelector(".art svg").outerHTML = ICON_SPOTIFY;
 
 function render(s) {
-  const a = s.airplay || {};
+  const a = (SRC === "spotify" ? s.spotify : s.airplay) || {};
   const has = !!(a.title || a.artist);
+  const via = SRC === "spotify" ? "Spotify Connect" : "AirPlay";
   $("info").classList.toggle("playing", !!a.playing);
-  $("status").textContent = a.playing ? "Playing via AirPlay" : (has ? "Paused" : "Ready for AirPlay");
+  $("status").textContent = a.playing ? `Playing via ${via}` : (has ? "Paused" : `Ready for ${via}`);
   $("title").textContent = has ? (a.title || "Unknown track") : s.player_name;
   $("artist").textContent = a.artist || "";
   $("album").textContent = a.album || "";
-  const f = a.format || "";
+  const f = SRC === "spotify" ? (has ? "Ogg Vorbis · 320 kbps · lossy" : "") : (a.format || "");
   $("fmt").textContent = f;
   $("fmt").className = "fmt" + (f ? " on" : "") + (/lossless/i.test(f) ? " lossless" : "");
-  $("hint").innerHTML = has ? "" :
-    `On your iPhone or Mac, open <b>Control Center → AirPlay</b> and pick <b>${s.player_name}</b>.`;
-  if (s.art_ver !== artVer) {
-    artVer = s.art_ver;
-    if (a.has_art) {
-      const url = "/api/art?v=" + artVer;
+  $("hint").innerHTML = has ? "" : (SRC === "spotify"
+    ? `Open <b>Spotify</b> on your phone, tap the devices icon and pick <b>${s.player_name}</b>. Needs Spotify Premium.`
+    : `On your iPhone or Mac, open <b>Control Center → AirPlay</b> and pick <b>${s.player_name}</b>.`);
+  $("browse").classList.toggle("on", SRC === "spotify" && !!(s.spotify || {}).web);
+  const url = SRC === "spotify" ? (a.art_url || "") : (a.has_art ? "/api/art?v=" + s.art_ver : "");
+  if (url !== artKey) {
+    artKey = url;
+    if (url) {
       $("img").src = url;
       $("art").classList.add("has");
       $("bg").style.backgroundImage = `url(${url})`;
@@ -86,6 +100,8 @@ function render(s) {
     }
   }
 }
+$("browse").onclick = () => fetch("/api/source", {method: "POST", headers: {"Content-Type": "application/json"},
+  body: JSON.stringify({source: "spotify_web"})});
 function poll() { fetch("/api/state").then(r => r.json()).then(render).catch(() => {}); }
 poll(); setInterval(poll, 1000);
 </script>

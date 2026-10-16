@@ -7,7 +7,7 @@
 <style>
   :root {
     --bg: #0b0b0f; --panel: #16161c; --line: #26262e; --text: #f4f4f7; --muted: #8e8e99;
-    --plexamp: #f5a524; --apple: #fa3c5a; --airplay: #3b8cf6; --ma: #19c2a8;
+    --plexamp: #f5a524; --apple: #fa3c5a; --airplay: #3b8cf6; --ma: #19c2a8; --spotify: #1ed760;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden;
@@ -21,6 +21,12 @@
     padding: 4px 9px; border-radius: 999px; background: var(--panel); color: var(--muted); white-space: nowrap; }
   .np .track { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .clock { font-size: 20px; font-variant-numeric: tabular-nums; font-weight: 600; }
+  .gear { width: 40px; height: 40px; border: 0; border-radius: 12px; background: transparent; color: var(--muted);
+    display: grid; place-items: center; margin-right: -6px; }
+  .gear:active { background: var(--panel); }
+  .gear svg { width: 22px; height: 22px; }
+  main.many .tile { padding: 14px; } main.many .tile svg { width: 46px; height: 46px; }
+  main.many .tile .label { font-size: 18px; }
 
   main { display: grid; grid-template-columns: repeat(var(--cols, 4), 1fr); gap: 12px; padding: 14px 0; }
   .tile { position: relative; border: 0; border-radius: 22px; color: var(--text); text-align: left;
@@ -58,6 +64,10 @@
   <div class="name" id="name">PlexPie</div>
   <div class="np"><span class="chip" id="npchip">Idle</span><span class="track" id="nptrack"></span></div>
   <div class="clock" id="clock">--:--</div>
+  <button class="gear" id="gear" aria-label="Settings">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+  </button>
 </header>
 
 <main id="tiles">
@@ -78,6 +88,12 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <path d="M5 17a9 9 0 1 1 14 0"/><path d="M8.5 14.5a5 5 0 1 1 7 0"/><path d="M12 15l4 6H8z"/></svg>
     <div><div class="label">AirPlay</div><div class="sub">From your phone</div></div>
+  </button>
+  <button class="tile" data-src="spotify" style="--c: var(--spotify)">
+    <span class="eq"><i></i><i></i><i></i></span>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <circle cx="12" cy="12" r="9.5"/><path d="M7 9.3c3.2-1 7-.7 9.8.9M7.6 12.6c2.7-.8 5.8-.5 8.1.8M8.3 15.7c2.1-.6 4.3-.4 6.2.6"/></svg>
+    <div><div class="label">Spotify</div><div class="sub">From your phone</div></div>
   </button>
   <button class="tile" data-src="ma" style="--c: var(--ma)">
     <span class="eq"><i></i><i></i><i></i></span>
@@ -110,7 +126,8 @@
 const $ = (id) => document.getElementById(id);
 const post = (path, body) => fetch(path, {method: "POST", headers: {"Content-Type": "application/json"},
   body: JSON.stringify(body || {})}).then(r => r.json()).then(j => j.state && render(j.state)).catch(() => {});
-const SUBS = {plexamp: "Your library", apple: "On this screen", airplay: "From your phone", ma: "Your speakers"};
+const SUBS = {plexamp: "Your library", apple: "On this screen", airplay: "From your phone",
+              spotify: "Spotify Connect", ma: "Your speakers"};
 
 function render(s) {
   $("name").textContent = s.player_name || "PlexPie";
@@ -133,6 +150,7 @@ function render(s) {
     t.querySelector(".sub").textContent = sub;
   });
   document.body.style.setProperty("--cols", Math.max(shown, 1));
+  $("tiles").classList.toggle("many", shown > 4);
   if (s.playing) {
     $("npchip").textContent = s.now_source_name;
     const n = s.now || {};
@@ -158,6 +176,7 @@ $("pause").onclick = () => post("/api/pause_all");
 $("volup").onclick = () => post("/api/volume", {delta: 5});
 $("voldown").onclick = () => post("/api/volume", {delta: -5});
 $("screenoff").onclick = () => post("/api/screen", {on: false});
+$("gear").onclick = () => post("/api/source", {source: "settings"});
 
 clock(); poll();
 setInterval(clock, 5000);

@@ -79,6 +79,9 @@ bold "Sources"
 dim "Plexamp is always included (needs a Plex account; some features need Plex Pass)."
 yesno ENABLE_AIRPLAY "Add an AirPlay 2 receiver? (builds from source, about 10 minutes)" "${ENABLE_AIRPLAY:-yes}"
 yesno ENABLE_APPLE_MUSIC_WEB "Add the Apple Music web player on the screen? (needs a subscription)" "${ENABLE_APPLE_MUSIC_WEB:-yes}"
+yesno ENABLE_SPOTIFY "Add a Spotify Connect receiver? (needs Spotify Premium)" "${ENABLE_SPOTIFY:-no}"
+ENABLE_SPOTIFY_WEB="${ENABLE_SPOTIFY_WEB:-no}"
+[ "$ENABLE_SPOTIFY" = yes ] && yesno ENABLE_SPOTIFY_WEB "Also add the Spotify web player on the screen?" "$ENABLE_SPOTIFY_WEB"
 yesno ENABLE_MUSIC_ASSISTANT "Add Music Assistant (needs a Music Assistant server)?" "${ENABLE_MUSIC_ASSISTANT:-no}"
 if [ "$ENABLE_MUSIC_ASSISTANT" = yes ]; then
   ask MA_HOST "Music Assistant server address (IP or hostname)" "${MA_HOST:-${HA_HOST:-homeassistant.local}}"
@@ -126,6 +129,10 @@ AIRPLAY_NAME="$AIRPLAY_NAME"
 ENABLE_AIRPLAY="$ENABLE_AIRPLAY"
 ENABLE_APPLE_MUSIC_WEB="$ENABLE_APPLE_MUSIC_WEB"
 ENABLE_MUSIC_ASSISTANT="$ENABLE_MUSIC_ASSISTANT"
+ENABLE_SPOTIFY="$ENABLE_SPOTIFY"
+ENABLE_SPOTIFY_WEB="$ENABLE_SPOTIFY_WEB"
+# Settings from a phone browser at http://<pi>:8080/settings (PIN shown on the player)
+PHONE_ACCESS="${PHONE_ACCESS:-yes}"
 
 # Music Assistant server (Squeezelite connects here) and its web interface
 MA_HOST="$MA_HOST"
@@ -156,7 +163,7 @@ TOUCH_ROTATE="${TOUCH_ROTATE:-0}"
 # Starting one source pauses the others
 PAUSE_OTHERS="${PAUSE_OTHERS:-yes}"
 # When something starts playing, bring that app to the screen (plexamp airplay ma apple)
-AUTO_SHOW_SOURCES="${AUTO_SHOW_SOURCES:-plexamp airplay ma}"
+AUTO_SHOW_SOURCES="${AUTO_SHOW_SOURCES:-plexamp airplay ma spotify}"
 AUTO_SHOW_AIRPLAY="${AUTO_SHOW_AIRPLAY:-yes}"
 
 # Audio device PipeWire prefers (regex on the PipeWire node name; default: any USB DAC)

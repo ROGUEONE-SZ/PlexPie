@@ -10,6 +10,7 @@ Group=@USER@
 Environment=HOME=@HOME@
 Environment=XDG_RUNTIME_DIR=/run/user/@UID@
 EnvironmentFile=/etc/plexpie/plexpie.conf
+EnvironmentFile=-@HOME@/.config/plexpie/settings.env
 # -s: the Music Assistant server (MA_HOST, else HA_HOST; empty = auto-discover on this subnet)
 # -C 5: let go of the audio device 5 s after playback stops.
 # ($$ hands the variables to the shell instead of systemd)

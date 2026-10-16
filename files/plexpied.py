@@ -25,7 +25,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 
-VERSION = "2.1.0"
+VERSION = "2.2.0"
 CONF_PATH = os.environ.get("PLEXPIE_CONF", "/etc/plexpie/plexpie.conf")
 WWW = os.path.join(os.path.dirname(os.path.abspath(__file__)), "www")
 HTTP_PORT = int(os.environ.get("PLEXPIE_HTTP_PORT", "8080"))
@@ -56,6 +56,45 @@ def load_conf(path):
 
 
 C = load_conf(CONF_PATH)
+SETTINGS_DIR = os.path.join(os.environ.get("HOME", "/tmp"), ".config", "plexpie")
+SETTINGS_JSON = os.path.join(SETTINGS_DIR, "settings.json")
+SETTINGS_ENV = os.path.join(SETTINGS_DIR, "settings.env")      # read by the systemd units too
+# What the Settings page may change, and how
+EDITABLE = {
+    "ENABLE_APPLE_MUSIC_WEB": "bool", "ENABLE_AIRPLAY": "bool", "ENABLE_SPOTIFY": "bool",
+    "ENABLE_SPOTIFY_WEB": "bool", "ENABLE_MUSIC_ASSISTANT": "bool",
+    "SCREEN_OFF_AFTER_SECS": "int", "SCREEN_BRIGHTNESS": "int", "AUTO_SHOW_SOURCES": "str",
+    "SWIPE_HOME": "bool", "MA_HOST": "str", "MA_URL": "str",
+    "MQTT_HOST": "str", "MQTT_PORT": "int", "MQTT_USER": "str", "MQTT_PASS": "secret",
+    "PHONE_ACCESS": "bool", "PHONE_PIN": "str",
+}
+
+
+def load_overrides():
+    try:
+        with open(SETTINGS_JSON) as f:
+            data = json.load(f)
+        return {k: str(v) for k, v in data.items() if k in EDITABLE}
+    except (OSError, ValueError):
+        return {}
+
+
+def save_overrides(values):
+    os.makedirs(SETTINGS_DIR, exist_ok=True)
+    cur = load_overrides()
+    cur.update({k: str(v) for k, v in values.items() if k in EDITABLE})
+    tmp = SETTINGS_JSON + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(cur, f, indent=1)
+    os.chmod(tmp, 0o600)
+    os.replace(tmp, SETTINGS_JSON)
+    with open(SETTINGS_ENV, "w") as f:          # same values, for systemd EnvironmentFile
+        for k, v in cur.items():
+            f.write(f'{k}="{v.replace(chr(34), "")}"\n')
+    os.chmod(SETTINGS_ENV, 0o600)
+
+
+C.update(load_overrides())
 
 
 def cfg(key, default=""):
@@ -81,14 +120,20 @@ SOURCES = {
     "plexamp": {"name": "Plexamp", "url": PLEXAMP + "/"},
     "apple": {"name": "Apple Music", "url": "https://music.apple.com/"},
     "airplay": {"name": "AirPlay", "url": f"http://127.0.0.1:{HTTP_PORT}/airplay"},
+    "spotify": {"name": "Spotify", "url": f"http://127.0.0.1:{HTTP_PORT}/spotify"},
+    "spotify_web": {"name": "Spotify web", "url": "https://open.spotify.com/", "hidden": True},
     "ma": {"name": "Music Assistant", "url": MA_URL + "/"},
+    "settings": {"name": "Settings", "url": f"http://127.0.0.1:{HTTP_PORT}/settings", "hidden": True},
 }
-if not cfg_yes("ENABLE_AIRPLAY"):
-    SOURCES.pop("airplay")
-if not cfg_yes("ENABLE_MUSIC_ASSISTANT"):
-    SOURCES.pop("ma")
-if not cfg_yes("ENABLE_APPLE_MUSIC_WEB"):
-    SOURCES.pop("apple")
+for key, flag, default in (("airplay", "ENABLE_AIRPLAY", "yes"), ("ma", "ENABLE_MUSIC_ASSISTANT", "yes"),
+                           ("apple", "ENABLE_APPLE_MUSIC_WEB", "yes"), ("spotify", "ENABLE_SPOTIFY", "no"),
+                           ("spotify_web", "ENABLE_SPOTIFY_WEB", "no")):
+    if not cfg_yes(flag, default):
+        SOURCES.pop(key)
+if "spotify" not in SOURCES:
+    SOURCES.pop("spotify_web", None)
+WEB_APPS = ("plexamp", "apple", "ma", "spotify_web", "settings")     # pages that may need the keyboard
+SPOTIFY_API = "http://127.0.0.1:3678"
 
 NAME_TO_KEY = {v["name"]: k for k, v in SOURCES.items()}
 MA_NETLOC = urllib.parse.urlparse(MA_URL).netloc
@@ -101,7 +146,12 @@ def source_for_url(url):
         return None
     host = (u.hostname or "").lower()
     if u.netloc == f"127.0.0.1:{HTTP_PORT}":
-        return "airplay" if u.path.startswith("/airplay") else "home"
+        for key in ("airplay", "spotify", "settings"):
+            if u.path.startswith("/" + key):
+                return key
+        return "home"
+    if host == "spotify.com" or host.endswith(".spotify.com"):
+        return "spotify_web"
     if u.netloc == "127.0.0.1:32500":
         return "plexamp"
     if host == "apple.com" or host.endswith(".apple.com"):
@@ -163,6 +213,7 @@ class State:
         self.ma_up = False
         self.cpu_temp = None
         self.ap_format = {}             # AirPlay stream: styp / sdsc / odsc text
+        self.spotify_user = ""
         self.text_focus = False
         self.text_y = None
         self.changed = threading.Event()
@@ -188,7 +239,9 @@ def state_json():
             "version": VERSION,
             "player_name": PLAYER_NAME,
             "source": ST.source,
-            "sources": {k: v["name"] for k, v in SOURCES.items()},
+            "sources": {k: v["name"] for k, v in SOURCES.items() if not v.get("hidden")},
+            "spotify": dict(ST.np.get("spotify", {}), playing=bool(ST.playing.get("spotify")),
+                            web="spotify_web" in SOURCES),
             "playing": ns is not None,
             "playing_by_source": {k: bool(ST.playing.get(k)) for k in SOURCES},
             "now_source": ns,
@@ -448,6 +501,20 @@ APPLE_STATE_JS = """(() => {
   }
 })()"""
 
+WEB_STATE_JS = """(() => {
+  const m = navigator.mediaSession && navigator.mediaSession.metadata;
+  const a = [...document.querySelectorAll('audio,video')];
+  return {playing: (navigator.mediaSession && navigator.mediaSession.playbackState === 'playing')
+                   || a.some(x => !x.paused),
+          title: m ? m.title : '', artist: m ? m.artist : '', album: m ? m.album : ''};
+})()"""
+
+WEB_PAUSE_JS = """(() => {
+  const b = document.querySelector('[data-testid="control-button-playpause"][aria-label*="Pause"]');
+  if (b) b.click(); else document.querySelectorAll('audio,video').forEach(x => x.pause());
+  return true;
+})()"""
+
 APPLE_PAUSE_JS = """(() => {
   try { MusicKit.getInstance().pause(); } catch (e) {}
   document.querySelectorAll('audio,video').forEach(x => x.pause());
@@ -607,6 +674,13 @@ def pause_source(src):
     elif src == "ma":
         sudo("/usr/bin/systemctl", "restart", "plexpie-squeezelite")
         set_playing("ma", False)
+    elif src == "spotify":
+        try:
+            http_get(SPOTIFY_API + "/player/pause", 3, method="POST")
+        except Exception as e:
+            log.warning("spotify pause failed: %s", e)
+    elif src == "spotify_web":
+        BROWSER.evaluate("spotify_web", WEB_PAUSE_JS)
 
 
 def pause_all():
@@ -875,6 +949,24 @@ def airplay_reader():
 
 
 # ---------------------------------------------------------------------- pollers
+def poll_spotify():
+    try:
+        raw = http_get(SPOTIFY_API + "/status", 2)
+        st = json.loads(raw) if raw else {}
+    except Exception:
+        st = {}
+    tr = st.get("track") or {}
+    playing = bool(tr) and not st.get("paused") and not st.get("stopped")
+    md = {"title": tr.get("name", ""), "artist": ", ".join(tr.get("artist_names") or []),
+          "album": tr.get("album_name", ""), "art_url": tr.get("album_cover_url", "")}
+    with ST.lock:
+        if ST.np.get("spotify") != md:
+            ST.np["spotify"] = md
+            mark_changed()
+        ST.spotify_user = st.get("username", "")
+    set_playing("spotify", playing)
+
+
 def fast_poller():
     n = 0
     while True:
@@ -890,6 +982,16 @@ def fast_poller():
                             mark_changed()
             if "ma" in SOURCES:
                 set_playing("ma", pw_streams().get("squeezelite", False))
+            if "spotify" in SOURCES:
+                poll_spotify()
+            if "spotify_web" in SOURCES and n % 2 == 1:
+                exists, val = BROWSER.evaluate("spotify_web", WEB_STATE_JS)
+                if exists is False:
+                    set_playing("spotify_web", False)
+                elif isinstance(val, dict):
+                    set_playing("spotify_web", val.get("playing"))
+                    with ST.lock:
+                        ST.np["spotify_web"] = {k: val.get(k, "") for k in ("title", "artist", "album")}
             if "apple" in SOURCES and n % 2 == 0:
                 exists, val = BROWSER.evaluate("apple", APPLE_STATE_JS)
                 if exists is False:
@@ -914,7 +1016,7 @@ def focus_poller():
             with ST.lock:
                 src = ST.source
             focus, y, home = (False, None, False)
-            if src in ("plexamp", "apple", "ma"):
+            if src in WEB_APPS:
                 focus, y, home = BROWSER.text_focus(src)
             if home:
                 log.info("home tab tapped in %s", src)
@@ -1125,17 +1227,177 @@ def watchdog():
             else:
                 browser_down_since = None
                 if ws != BROWSER.ws_url:
-                    if BROWSER.ws_url is not None:
-                        log.info("browser restarted, back to home")
+                    restarted = BROWSER.ws_url is not None
                     BROWSER.ws_url = ws
-                    with ST.lock:
-                        ST.source = "home"
-                    mark_changed()
+                    if restarted:                    # tabs are gone: the launcher is showing
+                        log.info("browser restarted, back to home")
+                        with ST.lock:
+                            ST.source = "home"
+                        mark_changed()
         except Exception as e:
             log.warning("watchdog: %s", e)
 
 
 # ------------------------------------------------------------------- web server
+# --------------------------------------------------------------------- settings
+OPTIONAL_UNITS = {"ENABLE_AIRPLAY": "plexpie-airplay", "ENABLE_SPOTIFY": "plexpie-spotify",
+                  "ENABLE_MUSIC_ASSISTANT": "plexpie-squeezelite"}
+OPTIONAL_DEFAULTS = {"ENABLE_AIRPLAY": "yes", "ENABLE_SPOTIFY": "no", "ENABLE_MUSIC_ASSISTANT": "yes"}
+SESSIONS = {}                     # phone-browser session token -> expiry
+LOGIN_FAILS = {"n": 0, "until": 0.0}
+
+
+def ensure_pin():
+    if not cfg("PHONE_PIN"):
+        import secrets
+        pin = f"{secrets.randbelow(1000000):06d}"
+        save_overrides({"PHONE_PIN": pin})
+        C["PHONE_PIN"] = pin
+
+
+def apply_services():
+    """Start the optional players that are switched on, stop the others."""
+    for flag, unit in OPTIONAL_UNITS.items():
+        if subprocess.run(["systemctl", "cat", unit], capture_output=True).returncode != 0:
+            continue                                # not installed on this Pi
+        want = cfg_yes(flag, OPTIONAL_DEFAULTS[flag])
+        active = subprocess.run(["systemctl", "is-active", "--quiet", unit]).returncode == 0
+        if want != active:
+            sudo("/usr/bin/systemctl", "start" if want else "stop", unit)
+
+
+def lan_address():
+    out = run(["hostname", "-I"]).split()
+    return next((a for a in out if "." in a), "")
+
+
+def browser_call(method, params):
+    """Run a DevTools command at browser level (e.g. clearing one site's data)."""
+    ws_url = BROWSER.version()
+    if not ws_url:
+        return False
+    try:
+        import websocket
+        ws = websocket.create_connection(ws_url, timeout=4, suppress_origin=True)
+        ws.send(json.dumps({"id": 1, "method": method, "params": params}))
+        deadline = time.time() + 4
+        while time.time() < deadline:
+            if json.loads(ws.recv()).get("id") == 1:
+                break
+        ws.close()
+        return True
+    except Exception as e:
+        log.warning("%s failed: %s", method, e)
+        return False
+
+
+SIGN_OUT_ORIGINS = {
+    "apple": ["https://music.apple.com", "https://apple.com", "https://www.apple.com", "https://idmsa.apple.com",
+              "https://authorize.music.apple.com"],
+    "spotify_web": ["https://open.spotify.com", "https://spotify.com", "https://www.spotify.com",
+                    "https://accounts.spotify.com"],
+}
+
+
+def sign_out(src):
+    for origin in SIGN_OUT_ORIGINS.get(src, []):
+        browser_call("Storage.clearDataForOrigin", {"origin": origin, "storageTypes": "all"})
+    tab = Browser.find(src, BROWSER.tabs() or [])
+    if tab:
+        try:
+            http_get(CDP + "/json/close/" + tab["id"], 3)
+        except Exception:
+            pass
+    log.info("signed out of %s", src)
+
+
+def accounts():
+    settings_dir = os.path.expanduser("~/.local/share/Plexamp/Settings")
+    plex_user = (read_file(os.path.join(settings_dir, "%40Plexamp%3Auser%3Aname")) or "").strip('"')
+    plex_linked = os.path.exists(os.path.join(settings_dir, "%40Plexamp%3Auser%3Atoken"))
+    out = [{"id": "plexamp", "name": "Plexamp",
+            "status": (f"Linked to {plex_user}" if plex_user else "Linked") if plex_linked
+            else "Not linked: run the installer again to link it", "ok": plex_linked}]
+    if "apple" in SOURCES:
+        _, auth = BROWSER.evaluate("apple", "(() => { try { return MusicKit.getInstance().isAuthorized } "
+                                            "catch (e) { return null } })()")
+        out.append({"id": "apple", "name": "Apple Music",
+                    "status": "Signed in" if auth else ("Not signed in" if auth is False
+                                                        else "Open Apple Music to check"),
+                    "ok": bool(auth), "action": "Sign out"})
+    if "spotify" in SOURCES:
+        with ST.lock:
+            user = ST.spotify_user
+        out.append({"id": "spotify", "name": "Spotify Connect",
+                    "status": f"In use by {user}" if user else "Pick this player in the Spotify app",
+                    "ok": bool(user)})
+    if "spotify_web" in SOURCES:
+        out.append({"id": "spotify_web", "name": "Spotify web player",
+                    "status": "Sign in on the screen", "ok": None, "action": "Sign out"})
+    if "ma" in SOURCES:
+        out.append({"id": "ma", "name": "Music Assistant",
+                    "status": "Reachable" if ST.ma_up else "Not reachable", "ok": ST.ma_up})
+    out.append({"id": "ha", "name": "Home Assistant",
+                "status": "Connected" if HA.connected else ("Not set up" if not cfg("MQTT_HOST") else "Not connected"),
+                "ok": HA.connected})
+    return out
+
+
+def settings_json(local):
+    vals = {}
+    for k, kind in EDITABLE.items():
+        if kind == "secret":
+            vals[k] = ""
+            vals[k + "_SET"] = bool(cfg(k))
+        elif kind == "bool":
+            vals[k] = cfg_yes(k, {"ENABLE_SPOTIFY": "no", "ENABLE_SPOTIFY_WEB": "no",
+                                  "PHONE_ACCESS": "yes"}.get(k, "yes"))
+        else:
+            vals[k] = cfg(k)
+    if not local:
+        vals["PHONE_PIN"] = ""                  # the PIN is only shown on the player itself
+    vals["AUTO_SHOW"] = bool(cfg("AUTO_SHOW_SOURCES", "plexamp airplay ma spotify").strip())
+    installed = {flag: subprocess.run(["systemctl", "cat", unit], capture_output=True).returncode == 0
+                 for flag, unit in OPTIONAL_UNITS.items()}
+    addr = lan_address()
+    return {"values": vals, "installed": installed, "accounts": accounts(), "player_name": PLAYER_NAME,
+            "version": VERSION, "phone_url": f"http://{addr}:{HTTP_PORT}/settings" if addr else "",
+            "local": local}
+
+
+def apply_settings(data):
+    clean = {}
+    for k, v in data.items():
+        if k == "AUTO_SHOW":
+            clean["AUTO_SHOW_SOURCES"] = "plexamp airplay ma spotify" if v else ""
+            continue
+        kind = EDITABLE.get(k)
+        if not kind or (kind == "secret" and not v):
+            continue                       # empty password field = keep the current one
+        if kind == "bool":
+            clean[k] = "yes" if v in (True, "yes", "on", "true", 1) else "no"
+        elif kind == "int":
+            try:
+                clean[k] = str(int(v))
+            except (TypeError, ValueError):
+                continue
+        else:
+            clean[k] = str(v).strip()
+    if clean.get("PHONE_PIN") == "new":
+        import secrets
+        clean["PHONE_PIN"] = f"{secrets.randbelow(1000000):06d}"
+    save_overrides(clean)
+    log.info("settings saved: %s", ", ".join(k for k in clean if k != "MQTT_PASS"))
+
+    def restart():                         # systemd starts us again with the new settings
+        time.sleep(0.8)
+        if any(k in clean for k in ("MA_HOST", "PLAYER_NAME")):
+            sudo("/usr/bin/systemctl", "restart", "plexpie-squeezelite")
+        os._exit(0)
+    spawn(restart)
+    return clean
+
+
 class Handler(http.server.BaseHTTPRequestHandler):
     server_version = "PlexPie/" + VERSION
 
@@ -1158,12 +1420,45 @@ class Handler(http.server.BaseHTTPRequestHandler):
         except OSError:
             self._send(404, b"not found", "text/plain")
 
+    # Phone browsers reach only the Settings page, and only with the PIN.
+    REMOTE_OPEN = ("/settings", "/api/login")
+    REMOTE_AUTH = ("/api/settings", "/api/account", "/api/system")
+
+    def _local(self):
+        return self.client_address[0] in ("127.0.0.1", "::1", "::ffff:127.0.0.1")
+
+    def _authed(self):
+        if self._local():
+            return True
+        for part in (self.headers.get("Cookie") or "").split(";"):
+            k, _, v = part.strip().partition("=")
+            if k == "plexpie" and SESSIONS.get(v, 0) > time.time():
+                return True
+        return False
+
+    def _gate(self, path):
+        if self._local():
+            return True
+        if not cfg_yes("PHONE_ACCESS"):
+            self._send(403, b'{"error":"phone access is off"}')
+            return False
+        if path in self.REMOTE_OPEN or (path in self.REMOTE_AUTH and self._authed()):
+            return True
+        self._send(401 if path in self.REMOTE_AUTH else 404, b'{"error":"not allowed"}')
+        return False
+
     def do_GET(self):
         path = urllib.parse.urlparse(self.path).path
+        if not self._gate(path):
+            return
         if path in ("/", "/index.html"):
             return self._file("index.html")
-        if path == "/airplay":
-            return self._file("airplay.html")
+        if path in ("/airplay", "/spotify"):
+            return self._file("nowplaying.html")
+        if path == "/settings":
+            return self._file("settings.html")
+        if path == "/api/settings":
+            return self._send(200, json.dumps(settings_json(self._local())).encode())
         if path == "/api/state":
             return self._send(200, json.dumps(state_json()).encode())
         if path == "/api/art":
@@ -1181,7 +1476,42 @@ class Handler(http.server.BaseHTTPRequestHandler):
             data = json.loads(self.rfile.read(n) or b"{}")
         except (ValueError, TypeError):
             data = {}
+        if not self._gate(path):
+            return
         ok = True
+        if path == "/api/login":
+            if time.time() < LOGIN_FAILS["until"]:
+                return self._send(429, b'{"error":"too many tries, wait a minute"}')
+            if str(data.get("pin", "")) == cfg("PHONE_PIN") and cfg("PHONE_PIN"):
+                import secrets
+                token = secrets.token_urlsafe(24)
+                SESSIONS[token] = time.time() + 30 * 86400
+                LOGIN_FAILS["n"] = 0
+                body = b'{"ok":true}'
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Set-Cookie", f"plexpie={token}; Max-Age=2592000; HttpOnly; SameSite=Strict; Path=/")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                return self.wfile.write(body)
+            LOGIN_FAILS["n"] += 1
+            if LOGIN_FAILS["n"] >= 5:
+                LOGIN_FAILS.update(n=0, until=time.time() + 60)
+            return self._send(403, b'{"error":"wrong PIN"}')
+        if path == "/api/settings":
+            saved = apply_settings(data)
+            return self._send(200, json.dumps({"ok": True, "saved": sorted(saved)}).encode())
+        if path == "/api/account":
+            if data.get("action") == "signout" and data.get("id") in SIGN_OUT_ORIGINS:
+                spawn(sign_out, data["id"])
+            return self._send(200, b'{"ok":true}')
+        if path == "/api/system":
+            what = data.get("action")
+            if what == "restart":
+                spawn(lambda: (time.sleep(0.5), run(["pkill", "-f", "plexpie-chromium"]), os._exit(0)))
+            elif what == "reboot":
+                spawn(lambda: (time.sleep(0.5), sudo("/usr/sbin/reboot")))
+            return self._send(200, b'{"ok":true}')
         if path == "/api/source":
             ok = switch_source(str(data.get("source", "home")))
         elif path == "/api/wake":
@@ -1264,7 +1594,8 @@ class HomeAssistant:
         b = self.base
         self.disc("select", "source", {"name": "Source", "icon": "mdi:television-guide",
                                         "state_topic": f"{b}/source", "command_topic": f"{b}/source/set",
-                                        "options": [v["name"] for v in SOURCES.values()]})
+                                        "options": [v["name"] for v in SOURCES.values()
+                                                    if not v.get("hidden")]})
         self.disc("sensor", "now_playing", {"name": "Now playing", "icon": "mdi:music",
                                              "state_topic": f"{b}/now", "json_attributes_topic": f"{b}/now/attr"})
         self.disc("sensor", "playing_source", {"name": "Playing source", "icon": "mdi:speaker",
@@ -1375,7 +1706,13 @@ def main():
     logging.basicConfig(level=os.environ.get("PLEXPIE_LOG", "INFO"),
                         format="%(asctime)s %(levelname)s %(message)s")
     log.info("PlexPie %s starting, sources: %s", VERSION, ", ".join(SOURCES))
-    server = Server(("127.0.0.1", HTTP_PORT), Handler)
+    ensure_pin()
+    bind = "0.0.0.0" if cfg_yes("PHONE_ACCESS") else "127.0.0.1"
+    server = Server((bind, HTTP_PORT), Handler)
+    tabs = BROWSER.tabs() or []                 # after a settings restart, keep what is on screen
+    if tabs and source_for_url(tabs[0].get("url", "")) in SOURCES:
+        ST.source = source_for_url(tabs[0]["url"])
+    spawn(apply_services)
     spawn(server.serve_forever)
     SCREEN.apply()
     if "airplay" in SOURCES:
