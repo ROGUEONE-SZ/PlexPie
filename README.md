@@ -4,9 +4,17 @@ Turn a Raspberry Pi with a touchscreen and a DAC into a one-screen music player:
 **Plexamp**, **AirPlay 2**, **Spotify Connect**, the **Apple Music** web player and **Music Assistant**, all
 on one launcher and all controllable from **Home Assistant**.
 
+> **New to Raspberry Pi?** Follow the **[step-by-step guide](docs/INSTALL.md)**: shopping list,
+> wiring your DAC to a receiver or speakers, preparing the memory card, installing, and first use.
+> No Linux knowledge needed.
+
 <p>
-  <img src="docs/launcher.png" width="49%" alt="Launcher with Plexamp, Apple Music, AirPlay and Music Assistant tiles">
-  <img src="docs/airplay.png" width="49%" alt="AirPlay now-playing screen with track and stream format">
+  <img src="docs/launcher.png" width="49%" alt="Home screen playing Hotel California by Eagles in Plexamp">
+  <img src="docs/airplay.png" width="49%" alt="AirPlay now-playing screen with cover, track and stream format">
+</p>
+<p>
+  <img src="docs/timer-running.png" width="49%" alt="Workout timer counting down a work interval">
+  <img src="docs/alert.png" width="49%" alt="Doorbell alert with camera picture">
 </p>
 
 | Source | What it is |
@@ -44,7 +52,7 @@ How it behaves:
 
 ## Install
 
-On the Pi, logged in as your normal user (not root):
+The [step-by-step guide](docs/INSTALL.md) walks through everything from an empty Pi. The short version, on the Pi, logged in as your normal user (not root):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ROGUEONE-SZ/plexamp-raspberry-pi-install/main/get.sh | bash
@@ -80,7 +88,7 @@ sudo bash install.sh
 
 Tap the gear on the launcher, or open `http://<pi-address>:8080/settings` on your phone. The address and PIN are on the player's Settings page under **Phone access**.
 
-<img src="docs/settings.png" width="60%" alt="Settings page">
+<img src="docs/settings.png" width="60%" alt="Settings page"> <img src="docs/phone-settings.png" width="22%" alt="Settings on a phone">
 
 - **Apps:** turn Apple Music, AirPlay, Spotify Connect, the Spotify web player and Music Assistant on or off. The change is instant: everything is installed, and players that are off are stopped.
 - **Accounts:** shows whether each service is linked, with sign-out for the web players. PlexPie never stores your passwords; each service signs in on its own page and keeps a token.

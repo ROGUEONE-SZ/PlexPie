@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 470" font-family="Inter, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#5b5b66"/></marker>
+    <style>
+      .box{fill:#ffffff;stroke:#c9c9d3;stroke-width:1.5}
+      .pi{fill:#fff4e5;stroke:#f5a524;stroke-width:2}
+      .t{font-size:15px;font-weight:700;fill:#16161c}
+      .s{font-size:12px;fill:#5b5b66}
+      .h{font-size:13px;font-weight:800;fill:#8e8e99;letter-spacing:.08em}
+      .w{stroke:#5b5b66;stroke-width:2;fill:none;marker-end:url(#a)}
+      .l{font-size:11px;fill:#5b5b66;font-style:italic}
+    </style>
+  </defs>
+  <rect width="900" height="470" rx="18" fill="#f6f6f9"/>
+
+  <!-- Pi -->
+  <rect class="pi" x="30" y="170" width="170" height="120" rx="14"/>
+  <text class="t" x="115" y="212" text-anchor="middle">Raspberry Pi</text>
+  <text class="s" x="115" y="232" text-anchor="middle">+ touchscreen</text>
+  <text class="s" x="115" y="252" text-anchor="middle">running PlexPie</text>
+  <text class="s" x="115" y="272" text-anchor="middle">(Wi-Fi or network cable)</text>
+
+  <!-- Option A -->
+  <text class="h" x="300" y="48">A · BEST: USB DAC INTO A RECEIVER OR AMPLIFIER</text>
+  <path class="w" d="M200 200 C240 200 240 90 290 90"/>
+  <text class="l" x="222" y="120">USB</text>
+  <rect class="box" x="290" y="62" width="150" height="56" rx="10"/>
+  <text class="t" x="365" y="86" text-anchor="middle">USB DAC</text>
+  <text class="s" x="365" y="104" text-anchor="middle">e.g. SMSL, Topping, FiiO</text>
+  <path class="w" d="M440 90 L500 90"/>
+  <text class="l" x="470" y="82" text-anchor="middle">RCA</text>
+  <rect class="box" x="500" y="62" width="170" height="56" rx="10"/>
+  <text class="t" x="585" y="86" text-anchor="middle">Receiver / amplifier</text>
+  <text class="s" x="585" y="104" text-anchor="middle">any analog input</text>
+  <path class="w" d="M670 90 L730 90"/>
+  <rect class="box" x="730" y="62" width="140" height="56" rx="10"/>
+  <text class="t" x="800" y="86" text-anchor="middle">Speakers</text>
+  <text class="s" x="800" y="104" text-anchor="middle">+ subwoofer</text>
+
+  <!-- Option B -->
+  <text class="h" x="300" y="200">B · USB DAC INTO POWERED SPEAKERS</text>
+  <path class="w" d="M200 230 L290 230"/>
+  <text class="l" x="232" y="222">USB</text>
+  <rect class="box" x="290" y="212" width="150" height="56" rx="10"/>
+  <text class="t" x="365" y="236" text-anchor="middle">USB DAC</text>
+  <text class="s" x="365" y="254" text-anchor="middle">with headphone amp</text>
+  <path class="w" d="M440 240 L500 240"/>
+  <text class="l" x="470" y="232" text-anchor="middle">RCA</text>
+  <rect class="box" x="500" y="212" width="370" height="56" rx="10"/>
+  <text class="t" x="685" y="236" text-anchor="middle">Powered speakers or headphones</text>
+  <text class="s" x="685" y="254" text-anchor="middle">e.g. Edifier, Audioengine, KEF LSX (analog in)</text>
+
+  <!-- Option C -->
+  <text class="h" x="300" y="350">C · NO DAC: HDMI OR THE HEADPHONE JACK</text>
+  <path class="w" d="M200 270 C240 270 240 390 290 390"/>
+  <text class="l" x="180" y="352">HDMI / 3.5 mm</text>
+  <rect class="box" x="290" y="362" width="580" height="56" rx="10"/>
+  <text class="t" x="580" y="386" text-anchor="middle">TV, soundbar or receiver (HDMI) · or the Pi's headphone jack</text>
+  <text class="s" x="580" y="404" text-anchor="middle">Works, but a USB DAC sounds much better and supports hi-res Plexamp</text>
+</svg>
