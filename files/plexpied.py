@@ -25,7 +25,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 
-VERSION = "1.2.0"
+VERSION = "1.3.0"
 CONF_PATH = os.environ.get("PLEXPIE_CONF", "/etc/plexpie/plexpie.conf")
 WWW = os.path.join(os.path.dirname(os.path.abspath(__file__)), "www")
 HTTP_PORT = int(os.environ.get("PLEXPIE_HTTP_PORT", "8080"))
@@ -162,6 +162,7 @@ class State:
         self.volume = None
         self.ma_up = False
         self.cpu_temp = None
+        self.ap_format = {}             # AirPlay stream: styp / sdsc / odsc text
         self.text_focus = False
         self.text_y = None
         self.changed = threading.Event()
@@ -194,7 +195,10 @@ def state_json():
             "now_source_name": SOURCES[ns]["name"] if ns else None,
             "now": dict(ST.np.get(ns, {})) if ns else {},
             "airplay": dict(ST.np.get("airplay", {}), playing=bool(ST.playing.get("airplay")),
-                            has_art=ST.art is not None),
+                            has_art=ST.art is not None,
+                            format=describe_format(ST.ap_format.get("sdsc")),
+                            stream_type=ST.ap_format.get("styp", ""),
+                            format_raw=dict(ST.ap_format)),
             "art_ver": ST.art_ver,
             "screen_on": ST.screen_on,
             "brightness": ST.brightness,
@@ -745,6 +749,23 @@ def now_playing_from_plist(raw):
     return found
 
 
+def describe_format(desc):
+    """Turn shairport-sync's stream description (e.g. 'ALAC/48000/S24/2') into words."""
+    if not desc:
+        return ""
+    parts = [x.strip() for x in desc.replace(",", "/").split("/") if x.strip()]
+    codec = parts[0].upper() if parts else ""
+    lossless = codec in ("ALAC", "LPCM", "PCM", "FLAC")
+    out = [codec]
+    for x in parts[1:]:
+        if x.isdigit() and int(x) >= 8000:
+            out.append(f"{int(x) / 1000:g} kHz")
+        elif lossless and x[:1] in ("S", "U") and x[1:].isdigit():
+            out.append(f"{x[1:]}-bit")      # decoder bit depth means nothing for AAC
+    out.append("lossless" if lossless else ("lossy" if codec in ("AAC", "AAC-ELD", "MP3") else ""))
+    return " · ".join(x for x in out if x)
+
+
 def on_airplay_item(typ, code, data):
     import base64
     raw = base64.b64decode(data) if data else b""
@@ -789,7 +810,12 @@ def on_airplay_item(typ, code, data):
                 ST.art = raw
                 ST.art_type = "image/png" if raw[:4] == b"\x89PNG" else "image/jpeg"
                 ST.art_ver += 1
+            elif code in ("sdsc", "odsc", "styp"):
+                text = text.strip().strip("\x00")
+                ST.ap_format[code] = text
+                log.info("airplay stream %s: %s", {"sdsc": "source", "odsc": "output", "styp": "type"}[code], text)
             elif code == "pend":
+                ST.ap_format = {}
                 ST.np["airplay"] = {"title": "", "artist": "", "album": ""}
                 ST.art = None
                 ST.art_ver += 1
@@ -1164,7 +1190,9 @@ class HomeAssistant:
         values = {
             "source": SOURCES[s["source"]]["name"] if s["source"] in SOURCES else "Home",
             "now": label[:250],
-            "now/attr": json.dumps({"source": s["now_source_name"], **now}),
+            "now/attr": json.dumps({"source": s["now_source_name"], **now,
+                                    **({"format": s["airplay"]["format"]} if s["now_source"] == "airplay"
+                                       and s["airplay"]["format"] else {})}),
             "now_source": s["now_source_name"] or "None",
             "playing": "ON" if s["playing"] else "OFF",
             "screen": "ON" if s["screen_on"] else "OFF",
