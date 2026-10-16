@@ -10,7 +10,7 @@ A Raspberry Pi 4 music endpoint with a 7" touchscreen and a USB DAC. One launche
 | **Music Assistant** | Squeezelite player for Music Assistant, plus MA's own interface on screen |
 | **Home** | The launcher itself, with now playing, volume, pause all and screen off |
 
-Starting any source pauses the others. A floating Home button sits over every app. The screen turns off after a minute with no touch and nothing playing. The first tap only wakes it, so it never presses a button by accident.
+Starting any source pauses the others. A floating Home button and an on-screen keyboard button sit over every app (the keyboard types into sign-in fields, including Apple ID pop-ups). The screen turns off after a minute with no touch and nothing playing. The first tap only wakes it, so it never presses a button by accident.
 
 ## Install or update
 
@@ -57,9 +57,9 @@ For full Plexamp transport control in HA, add the official **Plex** integration.
 
 In Music Assistant, go to **Settings → Providers** and make sure the **Squeezelite** player provider is enabled. The player `GymMusicPlayer` appears within a few seconds. When Music Assistant is stopped, the launcher tile greys out, and the Pi reconnects on its own when MA comes back.
 
-## First-time Apple Music sign-in
+## First-time sign-ins
 
-Plug a USB keyboard into the Pi, tap **Apple Music**, sign in with your Apple ID and two-factor code, then unplug the keyboard. The sign-in is kept.
+Plexamp, Apple Music and Music Assistant each ask you to sign in once on the screen. Tap the field, then the keyboard button next to Home, and type. The sign-ins are kept.
 
 ## Troubleshooting
 
@@ -78,7 +78,8 @@ Plug a USB keyboard into the Pi, tap **Apple Music**, sign in with your Apple ID
 ```
 install.sh  rollback.sh  plexpie.conf
 files/plexpied.py           control daemon (launcher API, tabs, screen, MQTT)
-files/plexpie-overlay.py    Home button + touch-to-wake shield
+files/plexpie-overlay.py    Home button, on-screen keyboard, touch-to-wake shield
+tools/diagnose.sh           read-only report of audio, AirPlay and logs
 files/plexpie-session       X session: overlay + Chromium kiosk
 files/www/                  launcher and AirPlay screens
 files/systemd/              service units

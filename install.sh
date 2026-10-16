@@ -117,7 +117,7 @@ step "Installing packages"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -q
 PKGS=(pipewire-alsa wireplumber pipewire-bin python3 python3-paho-mqtt python3-websocket python3-tk
-      xprintidle curl avahi-daemon xinit x11-xserver-utils chromium)
+      xprintidle xdotool curl avahi-daemon xinit x11-xserver-utils alsa-utils chromium)
 yes_ "${ENABLE_MUSIC_ASSISTANT:-yes}" && PKGS+=(squeezelite)
 if yes_ "${ENABLE_AIRPLAY:-yes}" && [ "$SKIP_AIRPLAY_BUILD" = no ]; then
   PKGS+=(build-essential git autoconf automake libtool pkg-config libpopt-dev libconfig-dev

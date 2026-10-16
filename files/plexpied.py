@@ -509,9 +509,17 @@ ITEM_RE = re.compile(
     rb"(?:\s*<data encoding=\"base64\">\s*(.*?)\s*</data>)?\s*</item>", re.S)
 
 
+AIRPLAY_SEEN = {"n": 0}
+
+
 def on_airplay_item(typ, code, data):
     import base64
     raw = base64.b64decode(data) if data else b""
+    if code == "pbeg":
+        AIRPLAY_SEEN["n"] = 0
+    if AIRPLAY_SEEN["n"] < 60:                      # first items of each session, for troubleshooting
+        AIRPLAY_SEEN["n"] += 1
+        log.info("airplay meta %s/%s (%d bytes)", typ, code, len(raw))
     text = raw.decode("utf-8", "replace")
     with ST.lock:
         np = ST.np.setdefault("airplay", {"title": "", "artist": "", "album": ""})
