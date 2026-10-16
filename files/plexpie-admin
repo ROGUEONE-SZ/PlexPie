@@ -100,7 +100,8 @@ print(json.dumps(sorted(seen.values(), key=lambda n: -n["signal"])[:20]))' ;;
     apt-get -y -q autoremove
     if [ -d "$REPO/.git" ]; then
       json_status "Updating PlexPie" true ',"percent":91'
-      sudo -u "$U" git -C "$REPO" pull -q --ff-only || { json_status "PlexPie update failed (see $LOG)" false; exit 1; }
+      { sudo -u "$U" git -C "$REPO" fetch -q && sudo -u "$U" git -C "$REPO" reset -q --hard @{u}; } || \
+        { json_status "PlexPie update failed (see $LOG)" false; exit 1; }   # an appliance copy: always match GitHub
       json_status "Installing PlexPie" true ',"percent":94'
       bash "$REPO/install.sh" --no-restart-ui </dev/null || { json_status "PlexPie install failed (see $LOG)" false; exit 1; }
     fi

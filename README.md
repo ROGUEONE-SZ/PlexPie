@@ -223,6 +223,5 @@ use it at home, change it, share it with friends, learn from it.
 with PlexPie on them, offering it as a paid service, or building it into a product. If you'd
 like to do that, open an issue to ask about a commercial license.
 
-
 PlexPie installs other projects (Plexamp, shairport-sync, go-librespot, Squeezelite, Chromium
 and more) from their official sources. Those keep their own licenses and terms.
