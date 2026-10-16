@@ -1,20 +1,18 @@
 #!/usr/bin/env python3
-"""PlexPie overlay: Home pill, pop-up keyboard and touch-to-wake shield.
+"""PlexPie overlay: pop-up keyboard and touch-to-wake shield.
 
-Small always-on-top X windows drawn over Chromium:
-  * Home pill    - a rounded Home button that appears when you touch the screen
-                   inside an app and fades out again after a few seconds idle.
-                   It has a small keyboard button as a manual fallback.
-  * Keyboard     - pops up by itself when a text field is focused (the daemon
-                   watches the page). It always sits at the bottom and the app
-                   shrinks to the space above it with the field scrolled into
-                   view. Types with real key presses (xdotool), so it works in
+Two always-on-top X windows drawn over Chromium:
+  * Keyboard     - appears only when you tap a text field yourself (the daemon
+                   watches the page; fields an app focuses on its own are
+                   ignored) and disappears when the field loses focus. It sits
+                   at the bottom and the app shrinks to the space above it.
+                   Types with real key presses (xdotool), so it works in
                    sign-in pop-ups too.
   * Wake shield  - black full-screen window while the backlight is off, so the
                    first tap only wakes the screen.
+The Home button is drawn inside each app's page by the daemon, not here.
 """
 import json
-import math
 import subprocess
 import threading
 import time
@@ -31,7 +29,6 @@ KEY_DOWN = "#6b6b70"
 FG = "#f5f5f7"
 FG_DIM = "#a1a1a6"
 ACCENT = "#0a84ff"
-PILL = "#232326"
 FONT = "DejaVu Sans"
 
 
@@ -66,40 +63,6 @@ root.withdraw()
 sw, sh = root.winfo_screenwidth(), root.winfo_screenheight()
 
 
-# ------------------------------------------------- rounded (shaped) windows
-try:
-    from Xlib import display as xdisplay
-    from Xlib.ext import shape as xshape
-    XD = xdisplay.Display()
-    HAS_SHAPE = XD.has_extension("SHAPE")
-except Exception:
-    XD, HAS_SHAPE = None, False
-
-
-def round_shape(win, w, h, radius):
-    """Clip a window to a rounded rectangle so no square corners show."""
-    if not HAS_SHAPE:
-        return
-    try:
-        win.update_idletasks()
-        xid = int(win.wm_frame(), 16)
-        rects = []
-        for y in range(h):
-            dy = 0.0
-            if y < radius:
-                dy = radius - y - 0.5
-            elif y >= h - radius:
-                dy = y - (h - radius) + 0.5
-            inset = 0 if dy <= 0 else radius - math.sqrt(max(0.0, radius * radius - dy * dy))
-            x0 = int(round(inset))
-            rects.append((x0, y, w - 2 * x0, 1))
-        XD.create_resource_object("window", xid).shape_rectangles(
-            xshape.SO.Set, xshape.SK.Bounding, 0, 0, 0, rects)
-        XD.flush()
-    except Exception:
-        pass
-
-
 def rounded_rect(c, x0, y0, x1, y1, r, **kw):
     pts = [x0 + r, y0, x1 - r, y0, x1, y0, x1, y0 + r, x1, y1 - r, x1, y1, x1 - r, y1,
            x0 + r, y1, x0, y1, x0, y1 - r, x0, y0 + r, x0, y0]
@@ -131,43 +94,6 @@ def send_key(name):
     focus_app()
     xdo("key", "--clearmodifiers", name)
 
-
-# ---------------------------------------------------------------- home pill
-PILL_W, PILL_H, MARGIN = 132, 52, 14
-pill = tk.Toplevel(root)
-pill.overrideredirect(True)
-pill.configure(bg=PILL)
-pc = tk.Canvas(pill, width=PILL_W, height=PILL_H, bg=PILL, highlightthickness=0)
-pc.pack()
-# home icon (left half)
-hx, hy = PILL_W * 0.27, PILL_H / 2
-pc.create_line(hx - 12, hy + 1, hx, hy - 11, hx + 12, hy + 1, fill=FG, width=2.5, capstyle="round", joinstyle="round")
-pc.create_line(hx - 8, hy - 2, hx - 8, hy + 11, hx + 8, hy + 11, hx + 8, hy - 2, fill=FG, width=2.5,
-               capstyle="round", joinstyle="round")
-pc.create_line(PILL_W / 2, 14, PILL_W / 2, PILL_H - 14, fill="#3f3f44", width=1)
-# keyboard icon (right half)
-kx, ky = PILL_W * 0.73, PILL_H / 2
-rounded_rect(pc, kx - 15, ky - 10, kx + 15, ky + 10, 4, fill="", outline=FG, width=2)
-for row in (-4, 1):
-    for i in range(5):
-        x = kx - 10 + i * 5
-        pc.create_rectangle(x, ky + row, x + 1.5, ky + row + 1.5, fill=FG, outline=FG)
-pc.create_line(kx - 7, ky + 6, kx + 7, ky + 6, fill=FG, width=2, capstyle="round")
-
-
-def pill_tap(e):
-    if e.x < PILL_W / 2:
-        hide_keyboard()
-        call("/api/source", {"source": "home"})
-    else:
-        if state["kb"]:
-            hide_keyboard(user=True)
-        else:
-            show_keyboard(auto=False)
-
-
-pc.bind("<ButtonRelease-1>", pill_tap)
-pill.withdraw()
 
 # ----------------------------------------------------------------- keyboard
 KB_H = 252
@@ -323,7 +249,6 @@ kc.bind("<ButtonRelease-1>", kb_release)
 
 def place_keyboard(field_y=None):
     kb.geometry(f"{sw}x{KB_H}+0+{sh - KB_H}")         # always at the bottom, like a phone
-    place_pill()
 
 
 def api_async(path, data):
@@ -340,7 +265,6 @@ def show_keyboard(auto=True, field_y=None):
         kb.deiconify()
         api_async("/api/keyboard", {"open": True, "height": sh - KB_H})   # app shrinks above the keys
     kb.lift()
-    pill.lift()
     focus_app()
 
 
@@ -351,7 +275,7 @@ def hide_keyboard(user=False):
     state["kb"] = False
     if user:
         state["dismissed"] = True        # stay closed until the field loses focus
-    place_pill()
+        state["dismissed_at"] = time.time()
 
 
 # -------------------------------------------------------------------- shield
@@ -362,25 +286,13 @@ shield.geometry(f"{sw}x{sh}+0+0")
 shield.bind("<ButtonPress-1>", lambda e: call("/api/wake", {}))
 shield.withdraw()
 
-state = {"pos": "top-left", "pill": False, "shield": False, "kb": False, "kb_auto": False,
-         "dismissed": False, "misses": 0, "no_focus": 0, "autohide": 5, "shown_at": 0.0}
-
-
-def place_pill():
-    pos = (state["pos"] or "bottom-left").lower()
-    top = "top" in pos
-    if state["kb"] and top == kb_state["top"]:
-        top = not top                                    # keep clear of the keyboard
-    x = MARGIN if "left" in pos else sw - PILL_W - MARGIN
-    y = MARGIN if top else sh - PILL_H - MARGIN
-    pill.geometry(f"{PILL_W}x{PILL_H}+{x}+{y}")
+state = {"shield": False, "kb": False, "kb_auto": False, "dismissed": False, "dismissed_at": 0.0,
+         "misses": 0, "no_focus": 1}
 
 
 def show(win, key, visible):
     if visible and not state[key]:
         win.deiconify()
-        if win is pill:
-            round_shape(pill, PILL_W, PILL_H, PILL_H // 2)
     elif not visible and state[key]:
         win.withdraw()
     if visible:
@@ -394,22 +306,23 @@ def tick():
         state["misses"] += 1
         if state["misses"] > 10:                         # daemon gone: never leave a black screen up
             show(shield, "shield", False)
-            show(pill, "pill", False)
             hide_keyboard()
         root.after(POLL_MS, tick)
         return
     state["misses"] = 0
-    state["autohide"] = s.get("home_autohide", 5)
-    if s.get("home_button") != state["pos"]:
-        state["pos"] = s.get("home_button")
-        place_pill()
     screen_on = s.get("screen_on", True)
     in_app = screen_on and s.get("source") != "home"
 
     # keyboard follows text-field focus in the app
     focused = in_app and s.get("text_focus")
     if focused:
+        if state["no_focus"] > 0 and not state["kb"] and x_idle_secs() > 2.5:
+            # the app focused a field on its own (no recent tap): don't pop up
+            state["dismissed"] = True
         state["no_focus"] = 0
+        if (state["dismissed"] and not state["kb"] and x_idle_secs() < 0.8
+                and time.time() - state["dismissed_at"] > 1.2):
+            state["dismissed"] = False                   # tapped the field again: bring it back
         if not state["kb"] and not state["dismissed"]:
             show_keyboard(auto=True, field_y=s.get("text_y"))
     else:
@@ -423,14 +336,9 @@ def tick():
     if state["kb"]:
         kb.lift()
 
-    # Home pill: on touch, then fades out; always there while the keyboard is open
-    autohide = state["autohide"]
-    recently_touched = x_idle_secs() < (autohide if autohide > 0 else 1e9)
-    show(pill, "pill", in_app and (recently_touched or state["kb"]))
     show(shield, "shield", not screen_on)
     root.after(POLL_MS, tick)
 
 
-place_pill()
 root.after(500, tick)
 root.mainloop()

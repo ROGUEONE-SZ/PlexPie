@@ -25,7 +25,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 
-VERSION = "1.3.0"
+VERSION = "1.4.0"
 CONF_PATH = os.environ.get("PLEXPIE_CONF", "/etc/plexpie/plexpie.conf")
 WWW = os.path.join(os.path.dirname(os.path.abspath(__file__)), "www")
 HTTP_PORT = int(os.environ.get("PLEXPIE_HTTP_PORT", "8080"))
@@ -297,20 +297,22 @@ class Browser:
         return None
 
     def text_focus(self, src):
-        """(is a text field focused in this source's tab, its centre y in CSS px or None)."""
+        """(text field focused?, its centre y in CSS px or None, Home tab tapped?) for a source's tab."""
         try:
             targets = json.loads(http_get(CDP + "/json/list", 2))
         except Exception:
-            return False, None
+            return False, None, False
         pages = [t for t in targets if t.get("type") == "page"]
         tab = self.find(src, pages)
         if not tab or "webSocketDebuggerUrl" not in tab:
-            return False, None
+            return False, None, False
         p = self.eval_target(tab["webSocketDebuggerUrl"], FOCUS_JS, 2)
         if not isinstance(p, dict):
-            return False, None
+            return False, None, False
+        if p.get("home"):
+            return False, None, True
         if p.get("text"):
-            return True, p.get("y")
+            return True, p.get("y"), False
         if p.get("iframe"):
             # Sign-in pop-ups (Apple ID) live in cross-site iframes, which are separate targets.
             for t in targets:
@@ -321,8 +323,8 @@ class Browser:
                 f = self.eval_target(t["webSocketDebuggerUrl"], FOCUS_JS, 2)
                 if isinstance(f, dict) and f.get("text"):
                     y = f.get("y")
-                    return True, (p.get("top") or 0) + y if y is not None else p.get("y")
-        return False, None
+                    return True, ((p.get("top") or 0) + y if y is not None else p.get("y")), False
+        return False, None, False
 
 
 BROWSER = Browser()
@@ -421,15 +423,40 @@ class Viewport:
 VIEWPORT = Viewport()
 
 FOCUS_JS = """(() => {
+  // --- PlexPie Home tab, drawn inside the app's own page (re-added after navigation)
+  if (window.top === window && document.body && !document.getElementById('plexpie-home')) {
+    const ns = 'http://www.w3.org/2000/svg';
+    const b = document.createElement('div');
+    b.id = 'plexpie-home';
+    Object.assign(b.style, {
+      position: 'fixed', left: '0', top: '50%', transform: 'translateY(-50%)', width: '26px', height: '72px',
+      borderRadius: '0 18px 18px 0', background: 'rgba(28,28,30,.42)', backdropFilter: 'blur(14px) saturate(1.4)',
+      webkitBackdropFilter: 'blur(14px) saturate(1.4)', border: '1px solid rgba(255,255,255,.14)', borderLeft: 'none',
+      boxShadow: '0 4px 18px rgba(0,0,0,.28)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      zIndex: '2147483647', cursor: 'pointer', touchAction: 'manipulation', userSelect: 'none'});
+    const svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('width', '17'); svg.setAttribute('height', '17');
+    const path = document.createElementNS(ns, 'path');
+    path.setAttribute('d', 'M3 11.5 12 4l9 7.5M6 10v9.5h4.5V15h3v4.5H18V10');
+    path.setAttribute('fill', 'none'); path.setAttribute('stroke', 'rgba(255,255,255,.92)');
+    path.setAttribute('stroke-width', '2.2'); path.setAttribute('stroke-linecap', 'round');
+    path.setAttribute('stroke-linejoin', 'round');
+    svg.appendChild(path); b.appendChild(svg);
+    const stop = e => { e.stopPropagation(); e.preventDefault(); };
+    ['pointerdown', 'mousedown', 'touchstart'].forEach(t => b.addEventListener(t, stop, {capture: true, passive: false}));
+    b.addEventListener('click', e => { stop(e); window.__plexpieHome = Date.now(); }, true);
+    document.body.appendChild(b);
+  }
+  const home = !!window.__plexpieHome; window.__plexpieHome = 0;
   const TEXT = ['', 'text', 'email', 'password', 'search', 'tel', 'url', 'number'];
   let e = document.activeElement;
   while (e && e.shadowRoot && e.shadowRoot.activeElement) e = e.shadowRoot.activeElement;
-  if (!e) return {text: false};
+  if (!e) return {text: false, home};
   const t = e.tagName;
   const text = (t === 'INPUT' && TEXT.includes((e.getAttribute('type') || '').toLowerCase()) && !e.readOnly && !e.disabled)
     || t === 'TEXTAREA' || e.isContentEditable === true;
   const r = e.getBoundingClientRect();
-  return {text: !!text, iframe: t === 'IFRAME', y: (r.top + r.bottom) / 2, top: r.top};
+  return {text: !!text, iframe: t === 'IFRAME', y: (r.top + r.bottom) / 2, top: r.top, home};
 })()"""
 
 APPLE_STATE_JS = """(() => {
@@ -901,15 +928,19 @@ def focus_poller():
         try:
             with ST.lock:
                 src = ST.source
-            focus, y = (False, None)
+            focus, y, home = (False, None, False)
             if src in ("plexamp", "apple", "ma"):
-                focus, y = BROWSER.text_focus(src)
+                focus, y, home = BROWSER.text_focus(src)
+            if home:
+                log.info("home tab tapped in %s", src)
+                switch_source("home")
+                focus, y = False, None
             y = round(y * scale) if (focus and isinstance(y, (int, float))) else None
             with ST.lock:
                 ST.text_focus, ST.text_y = bool(focus), y
         except Exception as e:
             log.debug("focus poller: %s", e)
-        time.sleep(0.5)
+        time.sleep(0.35)
 
 
 def slow_poller():

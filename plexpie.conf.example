@@ -30,10 +30,6 @@ ENABLE_MUSIC_ASSISTANT="yes"
 SCREEN_OFF_AFTER_SECS="60"
 # Brightness in percent
 SCREEN_BRIGHTNESS="100"
-# Floating Home button: top-left, top-right, bottom-left, bottom-right
-HOME_BUTTON_POSITION="top-left"
-# Seconds the Home button stays after you touch the screen (0 = always visible)
-HOME_BUTTON_AUTOHIDE_SECS="5"
 # Browser zoom for the apps (1 = normal, 0.9 fits more on the 800x480 screen)
 CHROMIUM_SCALE="1"
 

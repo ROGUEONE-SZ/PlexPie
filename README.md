@@ -10,7 +10,7 @@ A Raspberry Pi 4 music endpoint with a 7" touchscreen and a USB DAC. One launche
 | **Music Assistant** | Squeezelite player for Music Assistant, plus MA's own interface on screen |
 | **Home** | The launcher itself, with now playing, volume, pause all and screen off |
 
-Starting any source pauses the others. Inside an app, a small Home pill appears in the top-left corner when you touch the screen and fades out after 5 seconds. A full keyboard pops up at the bottom when you tap a text field (including the Apple ID pop-up), and the app shrinks to the space above it, like on a phone. The screen turns off after a minute with no touch and nothing playing. The first tap only wakes it, so it never presses a button by accident.
+Starting any source pauses the others. Each app gets a slim frosted Home tab on its left edge, drawn inside the app's own page. A full keyboard slides up only when you tap a text field (including the Apple ID pop-up), and the app shrinks to the space above it, like on a phone. The screen turns off after a minute with no touch and nothing playing. The first tap only wakes it, so it never presses a button by accident.
 
 ## Install or update
 
@@ -23,6 +23,12 @@ sudo bash install.sh
 ```
 
 `plexpie.conf` holds your MQTT password, so it is git-ignored and never committed.
+
+**Update an installed Pi** (the Pi's `~/plexpie` is a clone of this repo):
+
+```bash
+ssh sz@192.168.23.3 'cd ~/plexpie && git pull -q && sudo bash install.sh'
+```
 
 **From the Mac**, with this folder at `~/Scripts/plexpie`:
 
@@ -59,7 +65,7 @@ In Music Assistant, go to **Settings → Providers** and make sure the **Squeeze
 
 ## First-time sign-ins
 
-Plexamp, Apple Music and Music Assistant each ask you to sign in once on the screen. Tap a field and the keyboard appears; **return** submits. If it ever doesn't appear, touch the screen and tap the keyboard icon on the Home pill. The sign-ins are kept.
+Plexamp, Apple Music and Music Assistant each ask you to sign in once on the screen. Tap a field and the keyboard appears; **return** submits and **⌄** hides it (tap the field again to bring it back). The sign-ins are kept.
 
 ## Troubleshooting
 
@@ -78,7 +84,7 @@ Plexamp, Apple Music and Music Assistant each ask you to sign in once on the scr
 ```
 install.sh  rollback.sh  plexpie.conf
 files/plexpied.py           control daemon (launcher API, tabs, screen, MQTT)
-files/plexpie-overlay.py    Home pill, pop-up keyboard, touch-to-wake shield
+files/plexpie-overlay.py    pop-up keyboard, touch-to-wake shield
 tools/diagnose.sh           read-only report of audio, AirPlay and logs
 files/plexpie-session       X session: overlay + Chromium kiosk
 files/www/                  launcher and AirPlay screens
