@@ -510,6 +510,96 @@ ITEM_RE = re.compile(
 
 
 AIRPLAY_SEEN = {"n": 0}
+IMAGE_MAGIC = (b"\xff\xd8\xff", b"\x89PNG")
+
+
+def _plist(raw):
+    import plistlib
+    try:
+        return plistlib.loads(raw)
+    except Exception:
+        return None
+
+
+def _unarchive(obj):
+    """Turn an NSKeyedArchiver plist into plain dicts/lists (best effort)."""
+    import plistlib
+    objects = obj.get("$objects") if isinstance(obj, dict) else None
+    if not isinstance(objects, list):
+        return obj
+    seen = set()
+
+    def res(v, depth=0):
+        if depth > 40:
+            return None
+        if isinstance(v, plistlib.UID):
+            if v.data in seen:
+                return None
+            seen.add(v.data)
+            try:
+                return res(objects[v.data], depth + 1)
+            finally:
+                seen.discard(v.data)
+        if isinstance(v, dict):
+            if "NS.keys" in v and "NS.objects" in v:
+                return {str(res(k, depth + 1)): res(o, depth + 1) for k, o in zip(v["NS.keys"], v["NS.objects"])}
+            if "NS.objects" in v:
+                return [res(o, depth + 1) for o in v["NS.objects"]]
+            if "NS.string" in v:
+                return v["NS.string"]
+            if "NS.data" in v:
+                return v["NS.data"]
+            return {k: res(x, depth + 1) for k, x in v.items() if k != "$class"}
+        if isinstance(v, list):
+            return [res(x, depth + 1) for x in v]
+        return v
+
+    top = obj.get("$top", {})
+    return {k: res(v) for k, v in top.items()} if isinstance(top, dict) else top
+
+
+def now_playing_from_plist(raw):
+    """Pull title / artist / album / artwork out of an AirPlay 2 'copl' plist.
+
+    The plist (and plists nested inside it as data blobs) carries the sender's
+    MediaRemote now-playing info, e.g. kMRMediaRemoteNowPlayingInfoTitle.
+    """
+    found = {}
+
+    def walk(v, depth=0):
+        if depth > 12:
+            return
+        if isinstance(v, (bytes, bytearray)):
+            b = bytes(v)
+            if b.startswith(IMAGE_MAGIC):
+                found.setdefault("art", b)
+            elif b.startswith(b"bplist") or b.lstrip().startswith(b"<?xml"):
+                inner = _plist(b)
+                if inner is not None:
+                    walk(_unarchive(inner), depth + 1)
+            return
+        if isinstance(v, dict):
+            for k, x in v.items():
+                kl = str(k).lower()
+                if isinstance(x, str) and x.strip():
+                    if kl.endswith("infotitle") or kl in ("title", "itemtitle", "name"):
+                        found.setdefault("title", x)
+                    elif kl.endswith("infoartist") or kl in ("artist", "artistname", "trackartistname"):
+                        found.setdefault("artist", x)
+                    elif kl.endswith("infoalbum") or kl in ("album", "albumname"):
+                        found.setdefault("album", x)
+                elif isinstance(x, (bytes, bytearray)) and "artwork" in kl and bytes(x).startswith(IMAGE_MAGIC):
+                    found.setdefault("art", bytes(x))
+                walk(x, depth + 1)
+        elif isinstance(v, list):
+            for x in v:
+                walk(x, depth + 1)
+
+    top = _plist(raw)
+    if top is None:
+        return found
+    walk(_unarchive(top))
+    return found
 
 
 def on_airplay_item(typ, code, data):
@@ -533,7 +623,26 @@ def on_airplay_item(typ, code, data):
             else:
                 return
         elif typ == "ssnc":
-            if code == "PICT" and raw:
+            if code == "copl" and raw:
+                info = now_playing_from_plist(raw)
+                try:  # keep the biggest recent one for troubleshooting (tools/diagnose.sh)
+                    p = "/tmp/plexpie-copl-last.bin"
+                    if len(raw) >= (os.path.getsize(p) if os.path.exists(p) else 0) or info:
+                        with open(p, "wb") as f:
+                            f.write(raw[:2_000_000])
+                except OSError:
+                    pass
+                if not info:
+                    return
+                for k in ("title", "artist", "album"):
+                    if info.get(k):
+                        np[k] = info[k]
+                if info.get("art"):
+                    ST.art = info["art"]
+                    ST.art_type = "image/png" if info["art"][:4] == b"\x89PNG" else "image/jpeg"
+                    ST.art_ver += 1
+                log.info("airplay now playing: %s / %s", np.get("title"), np.get("artist"))
+            elif code == "PICT" and raw:
                 ST.art = raw
                 ST.art_type = "image/png" if raw[:4] == b"\x89PNG" else "image/jpeg"
                 ST.art_ver += 1

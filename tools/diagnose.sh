@@ -31,6 +31,33 @@ sec PLEXAMP LOG
 journalctl -u plexamp -n 15 --no-pager 2>&1
 sec SHAIRPORT CONFIG
 cat /etc/plexpie/shairport-sync.conf
+sec AIRPLAY NOW-PLAYING DATA
+if [ -f /tmp/plexpie-copl-last.bin ]; then
+python3 - <<'PY'
+import plistlib
+raw = open("/tmp/plexpie-copl-last.bin", "rb").read()
+print("bytes:", len(raw), "starts:", raw[:16])
+def show(v, ind=0, depth=0):
+    if depth > 6: return
+    pad = "  " * ind
+    if isinstance(v, dict):
+        for k, x in list(v.items())[:60]:
+            if isinstance(x, (dict, list)):
+                print(pad + str(k) + ":"); show(x, ind + 1, depth + 1)
+            elif isinstance(x, (bytes, bytearray)):
+                print(pad + str(k) + ": <%d bytes %r>" % (len(x), bytes(x[:8])))
+            else:
+                print(pad + str(k) + ": " + str(x)[:80])
+    elif isinstance(v, list):
+        for x in v[:20]: show(x, ind, depth + 1)
+try:
+    show(plistlib.loads(raw))
+except Exception as e:
+    print("not a plist:", e)
+PY
+else
+  echo "(none saved yet - play something via AirPlay first)"
+fi
 sec TEST TONE
 echo "Playing a 'front left / front right' voice through the default output now."
 timeout 15 speaker-test -D default -c 2 -t wav -l 1 2>&1 | tail -5

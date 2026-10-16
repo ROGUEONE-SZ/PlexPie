@@ -148,6 +148,15 @@ if as_user systemctl --user restart pipewire pipewire-pulse wireplumber; then
 else
   note "PipeWire will pick up the new settings at the next reboot"
 fi
+# The DAC used to get the full signal (Plexamp wrote to it directly). Keep it at
+# 100% and leave volume to the Onkyo, Plexamp and the phone.
+for _ in $(seq 20); do
+  as_user wpctl status 2>/dev/null | grep -q "SMSL" && break
+  sleep 0.5
+done
+if as_user wpctl set-volume @DEFAULT_AUDIO_SINK@ 1.0 2>/dev/null; then
+  ok "DAC output volume set to 100%"
+fi
 
 # -------------------------------------------------------------- 4. plexamp
 step "Plexamp"
