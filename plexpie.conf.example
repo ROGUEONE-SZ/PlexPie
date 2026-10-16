@@ -36,6 +36,10 @@ CHROMIUM_SCALE="1"
 # Apple Music web player zoom in percent (75 shows the full desktop layout; 100 = normal)
 APPLE_MUSIC_ZOOM="75"
 
+# Swipe right from the left edge, or down from the top edge, to go home
+SWIPE_HOME="yes"
+# Touchscreen rotation in degrees if your screen is mounted rotated (0, 90, 180, 270)
+TOUCH_ROTATE="0"
 # Starting one source pauses the others
 PAUSE_OTHERS="yes"
 # When something starts playing, bring that app to the screen (plexamp airplay ma apple)

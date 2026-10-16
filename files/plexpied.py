@@ -25,7 +25,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 
-VERSION = "2.0.0"
+VERSION = "2.1.0"
 CONF_PATH = os.environ.get("PLEXPIE_CONF", "/etc/plexpie/plexpie.conf")
 WWW = os.path.join(os.path.dirname(os.path.abspath(__file__)), "www")
 HTTP_PORT = int(os.environ.get("PLEXPIE_HTTP_PORT", "8080"))
@@ -423,31 +423,9 @@ class Viewport:
 VIEWPORT = Viewport()
 
 FOCUS_JS = """(() => {
-  // --- PlexPie Home tab, drawn inside the app's own page (re-added after navigation)
-  if (window.top === window && document.body && !document.getElementById('plexpie-home')) {
-    const ns = 'http://www.w3.org/2000/svg';
-    const b = document.createElement('div');
-    b.id = 'plexpie-home';
-    Object.assign(b.style, {
-      position: 'fixed', left: '0', top: '50%', transform: 'translateY(-50%)', width: '26px', height: '72px',
-      borderRadius: '0 18px 18px 0', background: 'rgba(28,28,30,.42)', backdropFilter: 'blur(14px) saturate(1.4)',
-      webkitBackdropFilter: 'blur(14px) saturate(1.4)', border: '1px solid rgba(255,255,255,.14)', borderLeft: 'none',
-      boxShadow: '0 4px 18px rgba(0,0,0,.28)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-      zIndex: '2147483647', cursor: 'pointer', touchAction: 'manipulation', userSelect: 'none'});
-    const svg = document.createElementNS(ns, 'svg');
-    svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('width', '17'); svg.setAttribute('height', '17');
-    const path = document.createElementNS(ns, 'path');
-    path.setAttribute('d', 'M3 11.5 12 4l9 7.5M6 10v9.5h4.5V15h3v4.5H18V10');
-    path.setAttribute('fill', 'none'); path.setAttribute('stroke', 'rgba(255,255,255,.92)');
-    path.setAttribute('stroke-width', '2.2'); path.setAttribute('stroke-linecap', 'round');
-    path.setAttribute('stroke-linejoin', 'round');
-    svg.appendChild(path); b.appendChild(svg);
-    const stop = e => { e.stopPropagation(); e.preventDefault(); };
-    ['pointerdown', 'mousedown', 'touchstart'].forEach(t => b.addEventListener(t, stop, {capture: true, passive: false}));
-    b.addEventListener('click', e => { stop(e); window.__plexpieHome = Date.now(); }, true);
-    document.body.appendChild(b);
-  }
-  const home = !!window.__plexpieHome; window.__plexpieHome = 0;
+  // remove the old in-page Home tab from pages loaded by an earlier version
+  const oldTab = document.getElementById('plexpie-home'); if (oldTab) oldTab.remove();
+  const home = false;
   const TEXT = ['', 'text', 'email', 'password', 'search', 'tel', 'url', 'number'];
   let e = document.activeElement;
   while (e && e.shadowRoot && e.shadowRoot.activeElement) e = e.shadowRoot.activeElement;
@@ -950,6 +928,139 @@ def focus_poller():
         time.sleep(0.35)
 
 
+class SwipeTracker:
+    """Recognises edge swipes from normalised touch positions (0..1).
+
+    * swipe right that starts at the left edge
+    * swipe down that starts at the top edge
+    """
+    EDGE_X, EDGE_Y = 0.06, 0.07         # how close to the edge a swipe must start
+    MIN_TRAVEL = 0.22                   # how far it must go (fraction of the screen)
+    MAX_SECS = 1.2
+
+    def __init__(self, on_swipe):
+        self.on_swipe = on_swipe
+        self.start = None
+        self.last = None
+
+    def down(self, x, y, t):
+        self.start = (x, y, t)
+        self.last = (x, y)
+
+    def move(self, x=None, y=None):
+        if self.start is None:
+            return
+        lx, ly = self.last
+        self.last = (lx if x is None else x, ly if y is None else y)
+
+    def up(self, t):
+        if self.start is None or self.last is None:
+            self.start = None
+            return None
+        x0, y0, t0 = self.start
+        x1, y1 = self.last
+        self.start = None
+        dx, dy, dt = x1 - x0, y1 - y0, t - t0
+        kind = None
+        if dt <= self.MAX_SECS:
+            if x0 <= self.EDGE_X and dx >= self.MIN_TRAVEL and abs(dy) < dx * 0.8:
+                kind = "left-edge"
+            elif y0 <= self.EDGE_Y and dy >= self.MIN_TRAVEL and abs(dx) < dy * 0.8:
+                kind = "top-edge"
+        if kind:
+            self.on_swipe(kind)
+        return kind
+
+
+def on_swipe(kind):
+    with ST.lock:
+        src, screen_on = ST.source, ST.screen_on
+    if screen_on and src != "home":
+        log.info("swipe from the %s: home", kind)
+        switch_source("home")
+
+
+def find_touchscreen():
+    import evdev
+    best = None
+    for path in evdev.list_devices():
+        try:
+            dev = evdev.InputDevice(path)
+            caps = dev.capabilities(absinfo=False)
+            abs_codes = caps.get(evdev.ecodes.EV_ABS, [])
+            keys = caps.get(evdev.ecodes.EV_KEY, [])
+            if evdev.ecodes.BTN_TOUCH in keys and (evdev.ecodes.ABS_X in abs_codes
+                                                   or evdev.ecodes.ABS_MT_POSITION_X in abs_codes):
+                best = dev
+                if evdev.ecodes.INPUT_PROP_DIRECT in dev.input_props():
+                    return dev            # a real touchscreen, not a touchpad
+        except OSError:
+            continue
+    return best
+
+
+def gesture_reader():
+    """Watch the touchscreen itself, so swipes work in every app."""
+    if not cfg_yes("SWIPE_HOME"):
+        return
+    try:
+        import evdev
+        from evdev import ecodes as e
+    except ImportError:
+        log.warning("python3-evdev missing: swipe-to-home is off")
+        return
+    tracker = SwipeTracker(on_swipe)
+    rotate = cfg_int("TOUCH_ROTATE", 0) % 360
+    while True:
+        dev = find_touchscreen()
+        if dev is None:
+            time.sleep(10)
+            continue
+        log.info("touchscreen for gestures: %s", dev.name)
+        try:
+            caps = dict(dev.capabilities(absinfo=True).get(e.EV_ABS, []))
+            use_mt = e.ABS_X not in caps
+            cx, cy = (e.ABS_MT_POSITION_X, e.ABS_MT_POSITION_Y) if use_mt else (e.ABS_X, e.ABS_Y)
+            ix, iy = caps[cx], caps[cy]
+            slot, pos, touching, moved = 0, [None, None], False, False
+
+            def norm():
+                x = (pos[0] - ix.min) / max(1, ix.max - ix.min)
+                y = (pos[1] - iy.min) / max(1, iy.max - iy.min)
+                if rotate == 90:
+                    x, y = y, 1 - x
+                elif rotate == 180:
+                    x, y = 1 - x, 1 - y
+                elif rotate == 270:
+                    x, y = 1 - y, x
+                return x, y
+
+            for ev in dev.read_loop():
+                if ev.type == e.EV_ABS:
+                    if ev.code == e.ABS_MT_SLOT:
+                        slot = ev.value
+                    elif slot == 0 or not use_mt:
+                        if ev.code == cx:
+                            pos[0], moved = ev.value, True
+                        elif ev.code == cy:
+                            pos[1], moved = ev.value, True
+                elif ev.type == e.EV_KEY and ev.code == e.BTN_TOUCH:
+                    touching = ev.value == 1
+                    if not touching:
+                        tracker.up(time.time())
+                    moved = True
+                elif ev.type == e.EV_SYN and moved and None not in pos:
+                    moved = False
+                    x, y = norm()
+                    if touching and tracker.start is None:
+                        tracker.down(x, y, time.time())
+                    elif touching:
+                        tracker.move(x, y)
+        except OSError as err:
+            log.warning("touchscreen read failed (%s), retrying", err)
+            time.sleep(3)
+
+
 def slow_poller():
     host = urllib.parse.urlparse(MA_URL).hostname
     port = urllib.parse.urlparse(MA_URL).port or 8095
@@ -1269,7 +1380,7 @@ def main():
     SCREEN.apply()
     if "airplay" in SOURCES:
         spawn(airplay_reader)
-    for fn in (fast_poller, slow_poller, focus_poller, screen_loop, watchdog):
+    for fn in (fast_poller, slow_poller, focus_poller, gesture_reader, screen_loop, watchdog):
         spawn(fn)
     HA.start()
     while True:

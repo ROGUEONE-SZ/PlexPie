@@ -115,7 +115,7 @@ step "Installing packages"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -q
 PKGS=(pipewire pipewire-pulse pipewire-alsa wireplumber pipewire-bin python3 python3-paho-mqtt
-      python3-websocket python3-tk xprintidle xdotool curl git avahi-daemon xserver-xorg xinit
+      python3-websocket python3-tk python3-evdev xprintidle xdotool curl git avahi-daemon xserver-xorg xinit
       x11-xserver-utils alsa-utils nodejs fonts-dejavu-core)
 # Chromium is "chromium" on Trixie and "chromium-browser" on older Raspberry Pi OS;
 # Widevine (needed by the Apple Music web player) comes from Raspberry Pi's repository.
@@ -267,7 +267,7 @@ cat > /etc/udev/rules.d/99-plexpie-backlight.rules <<'EOF'
 # PlexPie: let the video group turn the touchscreen backlight on and off
 SUBSYSTEM=="backlight", ACTION=="add", RUN+="/bin/chgrp video /sys%p/brightness /sys%p/bl_power", RUN+="/bin/chmod g+w /sys%p/brightness /sys%p/bl_power"
 EOF
-usermod -aG video "$U"
+usermod -aG video,input "$U"   # backlight + touchscreen gestures
 for d in /sys/class/backlight/*; do
   [ -e "$d/brightness" ] || continue
   chgrp video "$d/brightness" "$d/bl_power" 2>/dev/null || true

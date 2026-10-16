@@ -34,20 +34,12 @@
     color: var(--muted); }
   .fmt.on { display: inline-block; }
   .fmt.lossless { color: #30d158; background: rgba(48,209,88,.12); }
-  .home { position: fixed; left: 0; top: 50%; transform: translateY(-50%); width: 26px; height: 72px;
-    border-radius: 0 18px 18px 0; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.14);
-    border-left: none; display: flex; align-items: center; justify-content: center; z-index: 10; }
-  .home:active { background: rgba(255,255,255,.2); }
   .hint { margin-top: 18px; font-size: 16px; line-height: 1.5; color: var(--muted); }
   .hint b { color: var(--text); }
 </style>
 </head>
 <body>
 <div class="backdrop" id="bg"></div>
-<div class="home" id="home" aria-label="Home">
-  <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="rgba(255,255,255,.92)" stroke-width="2.2"
-       stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5M6 10v9.5h4.5V15h3v4.5H18V10"/></svg>
-</div>
 <div class="wrap">
   <div class="art" id="art">
     <img id="img" alt="">
@@ -95,8 +87,6 @@ function render(s) {
   }
 }
 function poll() { fetch("/api/state").then(r => r.json()).then(render).catch(() => {}); }
-$("home").onclick = () => fetch("/api/source", {method: "POST", headers: {"Content-Type": "application/json"},
-  body: JSON.stringify({source: "home"})});
 poll(); setInterval(poll, 1000);
 </script>
 </body>

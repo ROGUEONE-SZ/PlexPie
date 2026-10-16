@@ -20,7 +20,7 @@ on one launcher and all controllable from **Home Assistant**.
 How it behaves:
 
 - **One source at a time.** Starting one source pauses the others, and the screen switches to the app that started playing.
-- **Home tab.** Every app gets a slim frosted Home tab on its left edge.
+- **Swipe home.** Swipe right from the left edge, or down from the top edge, to get back to the launcher from any app.
 - **On-screen keyboard.** A keyboard slides up when you tap a text field (sign-ins, search), and the app shrinks to fit above it.
 - **Screen sleep.** The screen sleeps when nothing is playing. The first tap only wakes it.
 - **Self-healing.** A crashed app is restarted automatically.
@@ -90,6 +90,7 @@ your MQTT password, so it's never committed to git. A few you might want:
 | `APPLE_MUSIC_ZOOM` | Apple Music zoom in percent (`100` = normal) |
 | `DAC_MATCH` | Which audio device to prefer (default: any USB DAC) |
 | `CHROMIUM_SCALE` | Zoom for all apps, for screens that aren't 800×480 |
+| `SWIPE_HOME`, `TOUCH_ROTATE` | Edge swipes to go home; rotation if the screen is mounted rotated |
 
 ## Home Assistant
 
@@ -141,7 +142,8 @@ out, and the Pi reconnects by itself when MA comes back.
 |---|---|
 | Full report (services, audio, logs, test tone) | `bash ~/plexpie/tools/diagnose.sh` |
 | Launcher, screen or Home Assistant | `journalctl -u plexpie -f` |
-| Chromium, keyboard, Home tab | `~/.local/state/plexpie/session.log` |
+| Chromium, keyboard | `~/.local/state/plexpie/session.log` |
+| Swipe home doesn't work | `journalctl -u plexpie \| grep -i touch` (set `TOUCH_ROTATE` if your screen is mounted rotated) |
 | AirPlay | `journalctl -u plexpie-airplay -f` |
 | Music Assistant player | `journalctl -u plexpie-squeezelite -f` |
 | Plexamp | `journalctl -u plexamp -f` |
@@ -153,7 +155,7 @@ out, and the Pi reconnects by itself when MA comes back.
 
 ```
 get.sh / configure.sh / install.sh / rollback.sh
-files/plexpied.py           control daemon: launcher API, app tabs, screen, auto-pause, Home Assistant
+files/plexpied.py           control daemon: launcher API, app tabs, swipe home, screen, auto-pause, Home Assistant
 files/plexpie-overlay.py    on-screen keyboard and touch-to-wake
 files/plexpie-session       X session: overlay + Chromium kiosk
 files/www/                  launcher and AirPlay screens
