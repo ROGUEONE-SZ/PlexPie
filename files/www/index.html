@@ -12,8 +12,10 @@
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden;
     font-family: "Inter", "Noto Sans", "DejaVu Sans", system-ui, sans-serif; }
-  body { display: grid; grid-template-rows: 54px 1fr 76px; height: 100vh; padding: 0 14px; }
+  body { display: grid; grid-template-rows: var(--hh, 54px) 1fr var(--fh, 76px); height: 100vh;
+    padding: 0 var(--pad, 14px); font-size: var(--fs, 16px); }
 
+  header, footer { zoom: var(--z, 1); }
   header { display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--line); }
   .name { font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
   .np { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; justify-content: center; }
@@ -25,19 +27,21 @@
     display: grid; place-items: center; margin-right: -6px; }
   .gear:active { background: var(--panel); }
   .gear svg { width: 22px; height: 22px; }
-  main.many .tile { padding: 14px; } main.many .tile svg { width: 46px; height: 46px; }
-  main.many .tile .label { font-size: 18px; }
 
-  main { display: grid; grid-template-columns: repeat(var(--cols, 4), 1fr); gap: 12px; padding: 14px 0; }
-  .tile { position: relative; border: 0; border-radius: 22px; color: var(--text); text-align: left;
+
+  main { display: grid; grid-template-columns: repeat(var(--cols, 4), 1fr); grid-template-rows: repeat(var(--rows, 1), 1fr);
+    gap: var(--gap, 12px); padding: var(--gap, 12px) 0; min-height: 0; }
+  .tile { container-type: size; min-height: 0; position: relative; border: 0; border-radius: 22px; color: var(--text); text-align: left;
     padding: 18px; display: flex; flex-direction: column; justify-content: space-between;
     background: linear-gradient(160deg, color-mix(in srgb, var(--c) 34%, #16161c) 0%, #121217 70%);
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 30%, transparent); font: inherit;
     transition: transform .12s ease, filter .12s ease; }
   .tile:active { transform: scale(.97); filter: brightness(1.15); }
-  .tile svg { width: 58px; height: 58px; color: var(--c); }
-  .tile .label { font-size: 21px; font-weight: 700; line-height: 1.15; }
-  .tile .sub { margin-top: 6px; font-size: 13px; color: var(--muted); min-height: 1.3em; }
+  .tile { padding: clamp(10px, 8cqmin, 28px); border-radius: clamp(14px, 9cqmin, 28px); }
+  .tile svg { width: clamp(28px, 26cqmin, 110px); height: clamp(28px, 26cqmin, 110px); color: var(--c); }
+  .tile .label { font-size: clamp(15px, 11cqmin, 34px); font-weight: 700; line-height: 1.15; }
+  .tile .sub { margin-top: .35em; font-size: clamp(11px, 6.5cqmin, 18px); color: var(--muted); min-height: 1.3em; }
+  @container (max-height: 150px) { .tile .sub { display: none; } }
   .tile.playing { box-shadow: inset 0 0 0 2px var(--c), 0 0 24px -6px var(--c); }
   .tile.playing .sub { color: var(--c); font-weight: 600; }
   .tile.off { filter: grayscale(1) brightness(.55); }
@@ -56,7 +60,7 @@
   .vol { flex: 1; display: flex; align-items: center; gap: 10px; }
   .bar { flex: 1; height: 10px; border-radius: 999px; background: var(--panel); overflow: hidden; }
   .bar b { display: block; height: 100%; width: 0; background: var(--text); border-radius: inherit; transition: width .2s; }
-  .volnum { width: 38px; text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+  .volnum { width: 38px; font-size: 15px; text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
 </style>
 </head>
 <body>
@@ -149,8 +153,8 @@ function render(s) {
     else if (src === "airplay") sub = `Pick “${s.player_name}”`;
     t.querySelector(".sub").textContent = sub;
   });
-  document.body.style.setProperty("--cols", Math.max(shown, 1));
-  $("tiles").classList.toggle("many", shown > 4);
+  fit(Math.max(shown, 1));
+
   if (s.playing) {
     $("npchip").textContent = s.now_source_name;
     const n = s.now || {};
@@ -163,6 +167,34 @@ function render(s) {
   $("volbar").style.width = (v == null ? 0 : v) + "%";
   $("volnum").textContent = v == null ? "–" : v;
 }
+
+// Pick the grid that gives the most comfortable tiles for this screen: one row on a wide
+// screen, 2-3 rows of near-square tiles on square or portrait screens.
+function fit(n) {
+  const W = innerWidth, H = innerHeight, s = Math.min(W / 800, H / 480, 2.2);
+  const root = document.body.style, px = v => Math.round(v) + "px";
+  const short = Math.min(W, H);
+  root.setProperty("--hh", px(Math.max(48, short * 0.11)));
+  root.setProperty("--fh", px(Math.max(64, short * 0.15)));
+  root.setProperty("--pad", px(Math.max(12, short * 0.028)));
+  root.setProperty("--gap", px(Math.max(10, short * 0.025)));
+  root.setProperty("--fs", px(Math.max(15, 16 * Math.max(1, s))));
+  const z = Math.max(1, Math.min(s, 2));               // bars grow on big screens
+  root.setProperty("--z", z.toFixed(2));
+  root.setProperty("--hh", px(Math.max(48, short * 0.11, 54 * z)));
+  root.setProperty("--fh", px(Math.max(64, short * 0.15, 76 * z)));
+  const gridH = H - Math.max(48, short * 0.11, 54 * z) - Math.max(64, short * 0.15, 76 * z) - 2 * Math.max(10, short * 0.025);
+  const gridW = W - 2 * Math.max(12, short * 0.028);
+  let best = null;
+  for (let cols = 1; cols <= n; cols++) {
+    const rows = Math.ceil(n / cols), w = gridW / cols, h = gridH / rows;
+    const ratio = w / h;                     // tiles look best between tall-ish (0.55) and square (1.1)
+    const penalty = Math.abs(Math.log(ratio / 0.8)) + (rows * cols - n) * 0.15;
+    if (!best || penalty < best.penalty) best = {cols, rows, penalty};
+  }
+  root.setProperty("--cols", best.cols); root.setProperty("--rows", best.rows);
+}
+addEventListener("resize", () => fit(document.querySelectorAll(".tile:not([style*='display: none'])").length || 4));
 
 function poll() { fetch("/api/state").then(r => r.json()).then(render).catch(() => {}); }
 function clock() {

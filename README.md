@@ -30,7 +30,7 @@ How it behaves:
 ## What you need
 
 - **Raspberry Pi 4 or 5** with **Raspberry Pi OS 64-bit** (Bookworm or Trixie, Lite or Desktop).
-- **A touchscreen.** The layout is designed for 800×480 (the official 7" display) and adapts to other sizes.
+- **A touchscreen**, any size or shape: the launcher picks its grid for the screen (one row on wide screens, a 2–3 row grid of near-square tiles on square or portrait screens) and scales up on big displays.
 - **Audio output:** a USB DAC, which is picked automatically, or HDMI / the headphone jack.
 - **Accounts:**
   - a **Plex** account for Plexamp
