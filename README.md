@@ -69,6 +69,8 @@ it turned out nicer than I expected. Please read this before you start:
 PlexPie is my design: I knew exactly what I wanted for my gym,
 and I built it with **[Claude](https://claude.ai)** (Anthropic's AI) writing most of the code, while I
 drove the design, made the calls and tested everything on my own Pi, receiver and network.
+It started as a rough Plexamp-on-a-Pi setup; one weekend I decided to turn it into something much
+better. What's a better way to use AI than to make your own life a little better?
 
 What that means for you:
 
