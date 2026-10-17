@@ -221,8 +221,10 @@ elif [ -t 0 ]; then
   echo "         It expires after 4 minutes, so paste it right away."
   echo "      2. Paste it below, then type the player name ($PLAYER_NAME)."
   echo "      3. When Plexamp says it is ready, press Ctrl+C to continue the install."
+  echo "    If nothing happens for a minute after a step, press Enter once."
   echo
-  as_user node /opt/plexamp/js/index.js </dev/tty || true
+  # Talk to the terminal directly (not through the install log), so Plexamp's questions show up right away.
+  as_user node /opt/plexamp/js/index.js </dev/tty >/dev/tty 2>&1 || true
   [ -s "$PLEX_TOKEN" ] && ok "Plexamp linked" || note "Plexamp isn't linked yet; run this installer again to retry."
 else
   note "Plexamp isn't linked to a Plex account yet. Run this installer again from an"
