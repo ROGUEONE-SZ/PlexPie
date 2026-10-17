@@ -25,7 +25,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 
-VERSION = "2.8.5"
+VERSION = "2.8.6"
 CONF_PATH = os.environ.get("PLEXPIE_CONF", "/etc/plexpie/plexpie.conf")
 WWW = os.path.join(os.path.dirname(os.path.abspath(__file__)), "www")
 HTTP_PORT = int(os.environ.get("PLEXPIE_HTTP_PORT", "8080"))
@@ -2554,6 +2554,7 @@ class HomeAssistant:
                                        "step": 1, "unit_of_measurement": "%", "mode": "slider",
                                        "state_topic": f"{b}/volume", "command_topic": f"{b}/volume/set"})
         for oid, name, icon in (("pause_all", "Pause all", "mdi:pause"),
+                                ("play", "Play", "mdi:play"),
                                 ("restart_screen", "Restart screen", "mdi:restart"),
                                 ("reboot", "Reboot", "mdi:restart-alert"),
                                 ("shutdown", "Shut down", "mdi:power")):
@@ -2638,6 +2639,11 @@ class HomeAssistant:
                 set_volume(float(val))
             elif key == "pause_all":
                 spawn(pause_all)
+            elif key == "play":
+                with ST.lock:
+                    idle = ST.now_source() is None
+                if idle:
+                    spawn(toggle_play)
             elif key == "restart_screen":
                 run(["pkill", "-f", "plexpie-chromium"])
             elif key == "update" and val == "install":
