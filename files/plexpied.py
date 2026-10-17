@@ -25,7 +25,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 
-VERSION = "2.8.3"
+VERSION = "2.8.4"
 CONF_PATH = os.environ.get("PLEXPIE_CONF", "/etc/plexpie/plexpie.conf")
 WWW = os.path.join(os.path.dirname(os.path.abspath(__file__)), "www")
 HTTP_PORT = int(os.environ.get("PLEXPIE_HTTP_PORT", "8080"))
@@ -2588,6 +2588,7 @@ class HomeAssistant:
         client.publish(f"{b}/status", "online", retain=True)
         client.subscribe(f"{b}/+/set")
         client.subscribe(f"{b}/shortcut/#")   # commands, and the retained state from before a restart
+        client.subscribe(f"homeassistant/switch/{self.node}/+/config")   # to remove buttons no longer listed
         self.last = {}
         self.art_sent = -1
         self.publish_state()
@@ -2597,6 +2598,13 @@ class HomeAssistant:
         log.warning("MQTT disconnected")
 
     def on_message(self, client, userdata, msg):
+        if msg.topic.startswith("homeassistant/"):
+            oid = msg.topic.split("/")[-2]
+            if oid.startswith("shortcut_") and oid[9:] not in SHORTCUTS and msg.payload:
+                log.info("removing old launcher button %s from Home Assistant", oid[9:])
+                client.publish(msg.topic, "", retain=True)
+                client.publish(f"{self.base}/shortcut/{oid[9:]}", "", retain=True)
+            return
         rel = msg.topic[len(self.base) + 1:]
         val = msg.payload.decode("utf-8", "replace").strip()
         if rel.startswith("shortcut/"):
