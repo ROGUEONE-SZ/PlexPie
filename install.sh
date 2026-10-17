@@ -217,7 +217,8 @@ elif [ -t 0 ]; then
   systemctl stop plexamp 2>/dev/null || true
   echo
   echo "    Plexamp needs to be linked to your Plex account once:"
-  echo "      1. On any device, open https://plex.tv/claim and copy the claim code."
+  echo "      1. On any device, open https://plex.tv/claim and copy the whole code, including \"claim-\"."
+  echo "         It expires after 4 minutes, so paste it right away."
   echo "      2. Paste it below, then type the player name ($PLAYER_NAME)."
   echo "      3. When Plexamp says it is ready, press Ctrl+C to continue the install."
   echo

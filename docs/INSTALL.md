@@ -142,7 +142,7 @@ minutes**; building AirPlay takes the longest. You can leave it running.
 Partway through, the installer stops and asks for a **claim code**:
 
 1. On your phone or computer, open [plex.tv/claim](https://plex.tv/claim) and sign in to Plex.
-2. Copy the code it shows (it starts with `claim-`).
+2. Copy the whole code it shows, **including** the `claim-` at the start.
 3. Paste it into the terminal and press <kbd>Enter</kbd>. The code expires after a few minutes, so
    do this right away.
 4. When it asks for a player name, type the same name you gave in the wizard and press <kbd>Enter</kbd>.
