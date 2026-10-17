@@ -49,6 +49,26 @@ def set_prop(path, iface, name, value):
     dbus.Interface(bus.get_object(BUS, path), "org.freedesktop.DBus.Properties").Set(iface, name, value)
 
 
+def unblock_rfkill():
+    """Bluetooth is often 'soft-blocked' on a fresh Raspberry Pi OS; unblock it (no rfkill tool needed)."""
+    import glob
+    for d in glob.glob("/sys/class/rfkill/rfkill*"):
+        try:
+            if open(os.path.join(d, "type")).read().strip() == "bluetooth" and \
+                    open(os.path.join(d, "soft")).read().strip() == "1":
+                with open(os.path.join(d, "soft"), "w") as f:
+                    f.write("0")
+        except OSError:
+            pass
+
+
+def try_set(path, name, value, errors):
+    try:
+        set_prop(path, "org.bluez.Adapter1", name, value)
+    except dbus.DBusException as e:
+        errors.append(f"{name}: {e.get_dbus_message() or e.get_dbus_name()}")
+
+
 def trust(device):
     try:
         set_prop(device, "org.bluez.Device1", "Trusted", dbus.Boolean(True))
@@ -121,15 +141,22 @@ def tick():
             write({"available": False})
             return True
         a = objs[ad]["org.bluez.Adapter1"]
+        errors = []
         if not a.get("Powered"):
-            set_prop(ad, "org.bluez.Adapter1", "Powered", dbus.Boolean(True))
+            unblock_rfkill()
+            try_set(ad, "Powered", dbus.Boolean(True), errors)
+            time.sleep(0.5)
+            a = objects()[ad]["org.bluez.Adapter1"]
+            if not a.get("Powered"):
+                write({"available": False, "error": "; ".join(errors) or "the Bluetooth radio won't switch on"})
+                return True
         if str(a.get("Alias")) != NAME:
-            set_prop(ad, "org.bluez.Adapter1", "Alias", NAME)
+            try_set(ad, "Alias", NAME, errors)
         want = pairing_open()
         if bool(a.get("Discoverable")) != want or last["discoverable"] is None:
-            set_prop(ad, "org.bluez.Adapter1", "DiscoverableTimeout", dbus.UInt32(0))
-            set_prop(ad, "org.bluez.Adapter1", "Pairable", dbus.Boolean(want))
-            set_prop(ad, "org.bluez.Adapter1", "Discoverable", dbus.Boolean(want))
+            try_set(ad, "DiscoverableTimeout", dbus.UInt32(0), errors)
+            try_set(ad, "Pairable", dbus.Boolean(want), errors)
+            try_set(ad, "Discoverable", dbus.Boolean(want), errors)
             last["discoverable"] = want
         devices, playing, track, codec, player, connected = [], False, {}, "", "", ""
         for path, ifaces in objs.items():
@@ -160,7 +187,7 @@ def tick():
                 left = max(0, round(float(open(PAIR_FLAG).read()) - time.time()))
             except (OSError, ValueError):
                 pass
-        write({"available": True, "name": NAME, "pairing_left": left, "devices": devices,
+        write({"available": True, "name": NAME, "pairing_left": left, "devices": devices, "warning": "; ".join(errors),
                "connected": connected, "playing": playing, "codec": codec, "player": player, **track})
     except dbus.DBusException as e:
         write({"available": False, "error": str(e)[:200]})

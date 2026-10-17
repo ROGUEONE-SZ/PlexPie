@@ -118,7 +118,7 @@ PKGS=(pipewire pipewire-pulse pipewire-alsa wireplumber pipewire-bin python3 pyt
       python3-websocket python3-tk python3-evdev xprintidle xdotool curl git avahi-daemon xserver-xorg xinit
       x11-xserver-utils alsa-utils nodejs fonts-dejavu-core python3-numpy python3-pil)
 # Bluetooth receiver: BlueZ, PipeWire's Bluetooth plugin, and D-Bus bindings for the pairing helper
-yes_ "${ENABLE_BLUETOOTH:-yes}" && PKGS+=(bluez libspa-0.2-bluetooth python3-dbus python3-gi)
+yes_ "${ENABLE_BLUETOOTH:-yes}" && PKGS+=(bluez libspa-0.2-bluetooth python3-dbus python3-gi rfkill)
 # Chromium is "chromium" on Trixie and "chromium-browser" on older Raspberry Pi OS;
 # Widevine (needed by the Apple Music web player) comes from Raspberry Pi's repository.
 for alts in "chromium chromium-browser" "libwidevinecdm0"; do
