@@ -160,6 +160,10 @@ if not done:
 PY
     ;;
   update-status)
+    # A restart or power cut in the middle of an update leaves "running" behind: clear it.
+    if grep -q '"running":true' "$STATE/update-run.json" 2>/dev/null && ! systemctl is-active --quiet plexpie-update; then
+      json_status "The last update was interrupted. Tap Update now to finish it" false
+    fi
     cat "$STATE/update.json" 2>/dev/null || echo '{}'
     cat "$STATE/update-run.json" 2>/dev/null || echo '{}' ;;
   *) echo "usage: plexpie-admin wifi-status|wifi-on|wifi-off|wifi-scan|wifi-connect SSID|update-check|update-run|update-status|apply-run|protect-status|protect-on|protect-off" >&2
