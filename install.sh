@@ -284,7 +284,8 @@ install -m 755 -o root -g root "$REPO/files/plexpie-admin" /opt/plexpie/plexpie-
 install -m 755 -o root -g root "$REPO/files/plexpie-bt.py" /opt/plexpie/plexpie-bt.py
 install -d -m 755 /var/lib/plexpie
 echo "$REPO" > /etc/plexpie/repo_dir
-install -m 644 "$REPO/files/www/"*.html "$REPO/files/www/"*.png /opt/plexpie/www/
+install -m 644 "$REPO/files/www/"*.html "$REPO/files/www/"*.png "$REPO/files/www/"*.js /opt/plexpie/www/
+install -m 644 "$REPO/docs/PlexPie-Setup-Guide.pdf" /opt/plexpie/www/guide.pdf 2>/dev/null || true
 if [ -f /etc/plexpie/plexpie.conf ] && ! cmp -s "$REPO/plexpie.conf" /etc/plexpie/plexpie.conf; then
   cp -p /etc/plexpie/plexpie.conf /etc/plexpie/plexpie.conf.prev
 fi

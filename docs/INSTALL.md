@@ -17,7 +17,7 @@ things on its own.
 6. [Link Plexamp to your Plex account](#6-link-plexamp-to-your-plex-account)
 7. [First use: play some music](#7-first-use-play-some-music)
 8. [Set up your receiver or speakers](#8-set-up-your-receiver-or-speakers)
-9. [Settings, also from your phone](#9-settings-also-from-your-phone)
+9. [Settings, also from your phone, tablet or computer](#9-settings-also-from-your-phone-tablet-or-computer)
 10. [Optional: Home Assistant](#10-optional-home-assistant)
 11. [Updating and uninstalling](#11-updating-and-uninstalling)
 12. [Something's not working?](#12-somethings-not-working)
@@ -129,7 +129,7 @@ shown in brackets, or type your own:
 | Add an AirPlay 2 receiver? | `yes` if you have an iPhone, iPad or Mac |
 | Add the Apple Music web player? | `yes` if you have Apple Music |
 | Add a Spotify Connect receiver? | `yes` if you have Spotify Premium |
-| Let any phone play to it over Bluetooth? | `yes` (it's only visible when you tap "Pair a phone") |
+| Let any phone, tablet or computer play to it over Bluetooth? | `yes` (it's only visible when you tap "Pair a device") |
 | Add Music Assistant? | `no`, unless you already run a Music Assistant server |
 | Connect to Home Assistant? | `no`, unless you use Home Assistant (you can add it later) |
 | Turn the screen off after how many idle seconds? | `60` is a good start |
@@ -165,8 +165,8 @@ from any app, **swipe right from the left edge** of the screen, or **swipe down 
 - **Spotify:** in the Spotify app, tap the speaker icon and choose your player name.
 - **Apple Music:** tap the tile and sign in to Apple Music on the screen. A keyboard slides up when
   you tap a text box.
-- **Bluetooth:** any phone, including Android and guests' phones. Tap the tile, tap **Pair a phone**,
-  then on the phone open **Settings → Bluetooth** and tap your player's name. Next time the phone
+- **Bluetooth:** any phone, tablet or computer, including Android and guests' devices. Tap the tile, tap **Pair a device**,
+  then on the device open its **Bluetooth settings** and tap your player's name. Next time the device
   connects by itself; just pick the player in its Bluetooth list. Sound quality is below AirPlay or
   Plexamp, but it works with everything.
 - **Timer:** an interval timer for workouts, plus countdown and stopwatch. Big numbers and beeps,
@@ -229,30 +229,41 @@ equalizer off if you want lossless music to reach your DAC untouched.
 **A subwoofer that never turns off?** Plug it into a smart plug and let Home Assistant switch it
 with the receiver.
 
-## 9. Settings, also from your phone
+## 9. Settings, also from your phone, tablet or computer
 
-Tap the **gear** at the top right of the home screen.
+Tap the **gear** at the top right of the home screen. Settings works like an iPad's: tap a category
+on the left, and its settings show on the right. Tap **Done** to go back to the home screen.
+**Save** appears at the bottom only when you've changed something.
 
 <img src="settings.png" width="80%" alt="Settings on the touchscreen">
 
-Here you can:
+| Category | What's in it |
+|---|---|
+| **Configuration** | Every app: on/off, account status and sign-out, its options, and **Setup instructions** |
+| **Screen** | Sleep, brightness, visualizer, album-art colors, night dimming |
+| **Sound** | Equalizer and room correction |
+| **Network** | Wi-Fi |
+| **Updates** | PlexPie and Raspberry Pi OS, each with **Check now**, **Update** and a progress bar |
+| **Remote access** | The address, QR code and PIN, and your registered devices |
+| **Backup** | Send a backup to your phone, tablet or computer; restore |
+| **Setup guides** | Step-by-step instructions for every app, as a PDF too |
+| **System** | Power-cut protection, restart, shut down |
 
-- turn apps on and off (they disappear from the home screen),
-- see which accounts are signed in,
-- set the screen brightness and sleep time,
-- join a Wi-Fi network, or turn Wi-Fi off,
-- install updates with one button,
-- connect Home Assistant and add home-screen buttons for it,
-- dim the screen at night, or let a Home Assistant light sensor set the brightness,
-- choose the visualizer and turn album-art colors on or off.
+<img src="updates.png" width="49%" alt="Updates with progress"> <img src="settings-ha.png" width="49%" alt="Configuration › Home Assistant">
 
-<img src="phone-screen.png" width="30%" alt="Screen settings: album-art colors, visualizer, night dimming">
+**From your phone, tablet or computer:** under **Remote access**, Settings shows an address like
+`http://192.168.1.42:8080/settings`, a QR code and a **PIN**. Scan the code with your camera (or
+type the address in any browser, on the same Wi-Fi) and enter the PIN once. That device stays
+signed in and appears under **Registered devices**, where you can sign it out later.
 
-**From your phone:** under **Phone access**, Settings shows an address like
-`http://192.168.1.42:8080/settings` and a **PIN**. Open that address on your phone (on the same
-Wi-Fi) and type the PIN once. Your phone stays signed in.
+<img src="phone-pin.png" width="24%" alt="Enter the PIN"> <img src="phone-settings.png" width="24%" alt="Settings on a phone"> <img src="phone-config.png" width="24%" alt="Configuration"> <img src="phone-remote.png" width="24%" alt="Registered devices">
 
-<img src="phone-pin.png" width="30%" alt="Phone: enter the PIN"> <img src="phone-settings.png" width="30%" alt="Phone: settings">
+**Setup guides:** every app has step-by-step instructions on the player itself (they work offline
+and always match your version). On the screen, **Settings › Setup guides › Send the guides to a
+device** shows a QR code; on your phone or tablet tap **Save as PDF**, **Share** or **Print**. The
+[full setup guide (PDF)](PlexPie-Setup-Guide.pdf) is here too.
+
+<img src="phone-guide.png" width="24%" alt="Setup guides"> <img src="phone-guide-airplay.png" width="24%" alt="The AirPlay guide">
 
 To keep it on your home screen like an app: **Share → Add to Home Screen** on iPhone, or
 **⋮ → Add to Home screen** on Android.
@@ -260,11 +271,11 @@ To keep it on your home screen like an app: **Share → Add to Home Screen** on 
 ## 10. Optional: Home Assistant
 
 If you use [Home Assistant](https://www.home-assistant.io) with the Mosquitto broker app, enter the
-broker's address, username and password in **Settings → Home Assistant**. The player then appears
+broker's address, username and password in **Settings → Configuration → Home Assistant**. The player then appears
 in Home Assistant by itself, with:
 
 - what's playing, a **Playing** sensor, the current app, volume and screen controls,
-- **launcher buttons:** type names in **Settings → Home Assistant → Launcher buttons** (for example
+- **launcher buttons:** type names in **Settings → Configuration → Home Assistant → Launcher buttons** (for example
   `Lights`). Each becomes a button on the home screen and a switch in Home Assistant, so a tap can
   run any automation,
 - **screen alerts:** show a message and a camera picture on the screen with a chime, for example
@@ -278,16 +289,17 @@ rings. The [main README](../README.md#home-assistant) has the details and exampl
 
 ## 11. Updating and uninstalling
 
-- **Update:** **Settings → Updates → Update now**. It installs Raspberry Pi OS updates and the newest
-  PlexPie together, with a progress bar, and tells you if a restart is needed. It also checks by
-  itself twice a day.
+- **Update:** **Settings → Updates**. PlexPie and Raspberry Pi OS each have their own row: tap
+  **Check now**, then **Update** when something is found. A progress bar shows the step, the package
+  and the time so far. Raspberry Pi OS tells you if a restart is needed. Both check by themselves
+  twice a day, and Home Assistant shows them as two update entities.
 - **Change your wizard answers:** connect to the Pi (step 4) and run
   `bash ~/plexpie/configure.sh && sudo bash ~/plexpie/install.sh`.
-- **Back up your settings:** open Settings **on your phone or computer** (see section 9), then
-  **Backup → Download**. You get one small file with all your PlexPie settings. Keep it safe: it
+- **Back up your settings:** on the screen, **Settings → Backup** shows a QR code. Scan it with your
+  phone or tablet (or open Settings on a registered computer) and tap **Download**. You get one small file with all your PlexPie settings. Keep it safe: it
   includes your Home Assistant password.
 - **Restore on a new memory card:** install PlexPie on the new card (sections 3 to 6; you can accept
-  the wizard's suggested answers), open Settings on your phone, then **Backup → Choose file** and pick
+  the wizard's suggested answers), open Settings on your phone, tablet or computer, then **Backup → Choose file** and pick
   your backup. The player reinstalls itself with your settings in about a minute. Sign in to Apple
   Music again afterwards; for safety, account sign-ins are not part of the backup.
 - **Power-cut protection:** **Settings → System → Power-cut protection** makes the memory card
@@ -314,12 +326,12 @@ rings. The [main README](../README.md#home-assistant) has the details and exampl
 | Problem | Try this |
 |---|---|
 | No sound | Check the receiver's input and volume. In Settings, make sure the app is on. Then run `bash ~/plexpie/tools/diagnose.sh`, which also plays a test tone |
-| A phone can't find the player over Bluetooth | Tap **Pair a phone** first: the player is only visible for 2 minutes after that. On the phone, turn Bluetooth off and on |
-| Bluetooth sound stutters | On a Pi 4, Bluetooth and Wi-Fi share one radio. Use a network cable, or keep the phone closer |
-| AirPlay or Spotify doesn't show the player | Phone and Pi must be on the same network. Some routers block this between Wi-Fi and wired devices; turn on "mDNS" or "Bonjour" forwarding in the router |
+| A phone, tablet or computer can't find the player over Bluetooth | Tap **Pair a device** first: the player is only visible for 2 minutes after that. On the device, turn Bluetooth off and on |
+| Bluetooth sound stutters | On a Pi 4, Bluetooth and Wi-Fi share one radio. Use a network cable, or keep the device closer |
+| AirPlay or Spotify doesn't show the player | Your device and the Pi must be on the same network. Some routers block this between Wi-Fi and wired devices; turn on "mDNS" or "Bonjour" forwarding in the router |
 | The screen is upside down or touches land in the wrong place | Set `TOUCH_ROTATE` in `~/plexpie/plexpie.conf`, then run `sudo bash ~/plexpie/install.sh` |
 | Plexamp keeps spinning | Settings → System → **Restart PlexPie** |
-| Can't find the phone address | It's in Settings → Phone access on the player |
+| Can't find the address for other devices | It's in Settings → Remote access on the player (with a QR code) |
 | The screen is black | Tap it: it's probably asleep. Still black? Unplug the power for 10 seconds |
 | Anything else | Run `bash ~/plexpie/tools/diagnose.sh` and [open an issue](https://github.com/ROGUEONE-SZ/plexamp-raspberry-pi-install/issues) with its output |
 

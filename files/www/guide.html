@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PlexPie setup guides</title>
+<meta name="theme-color" content="#f6f6f9">
+<style>
+  :root { --bg: #f6f6f9; --paper: #fff; --text: #16161c; --muted: #5b5b66; --line: #e3e3ea; --accent: #0a6cff; --tip: #fff4e5; --tipline: #f5a524; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.55 "Inter", "Noto Sans", "DejaVu Sans", system-ui, -apple-system, sans-serif; }
+  .top { position: sticky; top: 0; z-index: 3; display: flex; align-items: center; gap: 8px; padding: calc(8px + env(safe-area-inset-top)) 12px 8px;
+    background: rgba(246,246,249,.94); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
+  .top h1 { flex: 1; font-size: 17px; margin: 0; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .top a, .top button { border: 0; background: none; color: var(--accent); font: inherit; font-size: 16px; padding: 6px 8px; text-decoration: none; white-space: nowrap; cursor: pointer; }
+  .top .left { min-width: 92px; } .top .right { min-width: 92px; display: flex; justify-content: flex-end; gap: 2px; }
+  main { max-width: 760px; margin: 0 auto; padding: 16px 16px calc(40px + env(safe-area-inset-bottom)); }
+  .toc { background: var(--paper); border-radius: 14px; overflow: hidden; border: 1px solid var(--line); }
+  .toc a { display: flex; gap: 12px; align-items: center; padding: 13px 16px; color: var(--text); text-decoration: none; border-top: 1px solid var(--line); }
+  .toc a:first-child { border-top: 0; }
+  .toc a small { display: block; color: var(--muted); font-size: 13px; }
+  .toc a::after { content: "›"; margin-left: auto; color: #b0b0ba; font-size: 22px; }
+  .toc b { font-weight: 600; }
+  .lead { color: var(--muted); margin: 4px 2px 16px; }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0 6px; }
+  .actions a, .actions button { border: 1px solid var(--line); background: var(--paper); color: var(--accent); border-radius: 999px; padding: 8px 15px;
+    font: inherit; font-size: 15px; font-weight: 600; text-decoration: none; cursor: pointer; }
+  section.g { background: var(--paper); border: 1px solid var(--line); border-radius: 16px; padding: 18px 20px 8px; margin: 0 0 18px; }
+  section.g h2 { margin: 0 0 4px; font-size: 24px; }
+  section.g .sub { color: var(--muted); margin: 0 0 12px; }
+  h3 { font-size: 17px; margin: 18px 0 6px; }
+  ol, ul { padding-left: 22px; margin: 6px 0 12px; }
+  li { margin: 5px 0; }
+  .tip { background: var(--tip); border-left: 4px solid var(--tipline); border-radius: 8px; padding: 10px 14px; margin: 12px 0; font-size: 15px; }
+  code, .k { background: #eef0f5; border-radius: 6px; padding: 1px 6px; font: 14px ui-monospace, Menlo, monospace; word-break: break-all; }
+  .k { font-family: inherit; font-weight: 600; word-break: normal; }
+  pre { background: #16161c; color: #f4f4f7; border-radius: 10px; padding: 12px 14px; overflow-x: auto; font: 13px/1.5 ui-monospace, Menlo, monospace; white-space: pre-wrap; word-break: break-all; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; margin: 8px 0 14px; }
+  td, th { border-top: 1px solid var(--line); padding: 7px 6px; text-align: left; vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; }
+  figure { margin: 12px 0; }
+  figure img { width: 100%; border-radius: 10px; border: 1px solid var(--line); display: block; background: #111; }
+  figure.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  figure.phone { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  figure.svg img { background: #fff; }
+  figcaption { color: var(--muted); font-size: 13px; margin-top: 4px; grid-column: 1 / -1; }
+  .cover { display: none; }
+  .hidden { display: none !important; }
+  body.one section.g:not(.on), body.one .home { display: none; }
+  body:not(.one) .onlyone { display: none; }
+
+  @media print {
+    @page { size: A4; margin: 14mm 14mm 16mm; }
+    html, body { background: #fff; font-size: 11.5pt; }
+    .top, .actions, .toc, .lead, .noprint, .home { display: none !important; }
+    main { max-width: none; padding: 0; }
+    section.g { border: 0; padding: 0; margin: 0 0 8mm; break-before: page; }
+    body.one section.g { break-before: auto; }
+    section.g:first-of-type { break-before: auto; }
+    figure, .tip, table, pre { break-inside: avoid; }
+    figure img { max-height: 85mm; width: auto; max-width: 100%; margin: 0 auto; }
+    figure.pair img, figure.phone img { max-height: 70mm; }
+    body.all .cover { break-after: page; display: flex; flex-direction: column; justify-content: center; min-height: 240mm; text-align: center; }
+    .cover h1 { font-size: 34pt; margin: 0 0 4mm; } .cover p { color: #5b5b66; font-size: 13pt; margin: 2mm 0; }
+    .cover img { width: 70%; margin: 10mm auto; border-radius: 10px; }
+    a { color: inherit; text-decoration: none; }
+  }
+</style>
+</head>
+<body>
+<div class="top">
+  <span class="left"><a id="back" href="/settings#guides">‹ Settings</a></span>
+  <h1 id="title">Setup guides</h1>
+  <span class="right"><a class="onlyone" href="#" id="allbtn">All guides</a></span>
+</div>
+
+<main>
+  <div class="cover"><h1>PlexPie</h1><p>Setup guide</p><img src="/img/launcher.png" alt=""><p data-ver></p>
+    <p>github.com/ROGUEONE-SZ/plexamp-raspberry-pi-install</p></div>
+
+  <div class="home">
+    <p class="lead">Step-by-step instructions for <b data-name>your player</b>. Tap a guide to open it. Each one can be saved as a PDF, shared or printed.</p>
+    <div class="actions noprint">
+      <a href="/guide.pdf" download="PlexPie-Setup-Guide.pdf" id="pdfall">Download full guide (PDF)</a>
+      <button data-share>Share</button>
+      <button data-print>Print</button>
+    </div>
+    <p class="lead hidden" id="localnote">To save, share or print these guides, go back and use <b>Send the guides to a device</b>.</p>
+    <h3>Get started</h3>
+    <div class="toc" id="toc1"></div>
+    <h3>Apps</h3>
+    <div class="toc" id="toc2"></div>
+    <h3>Everyday</h3>
+    <div class="toc" id="toc3"></div>
+  </div>
+
+  <div class="actions noprint onlyone">
+    <button data-print>Save as PDF</button>
+    <button data-share>Share</button>
+    <a href="/guide.pdf" download="PlexPie-Setup-Guide.pdf">Full guide (PDF)</a>
+  </div>
+
+  <!-- ===================================================================== build -->
+  <section class="g" id="build" data-group="1" data-sub="Parts, memory card, wiring, installing">
+    <h2>Build and install</h2>
+    <p class="sub">From a box of parts to music playing, in about an hour. You only need a computer for the first part.</p>
+    <h3>1. What you need</h3>
+    <table>
+      <tr><th>Part</th><th>Notes</th></tr>
+      <tr><td><b>Raspberry Pi 4 or 5</b></td><td>2 GB or more. A Pi 4 with 4 GB is plenty.</td></tr>
+      <tr><td><b>Official power supply</b></td><td>Cheap phone chargers cause random freezes.</td></tr>
+      <tr><td><b>microSD card</b></td><td>32 GB or larger, "A1" or "A2" rated (SanDisk, Samsung).</td></tr>
+      <tr><td><b>Touchscreen</b></td><td>The official 7" Touch Display, or any HDMI touchscreen.</td></tr>
+      <tr><td><b>USB DAC</b> (recommended)</td><td>From about $50 (SMSL, Topping, FiiO). Sounds far better than the headphone jack.</td></tr>
+      <tr><td><b>Cable</b></td><td>RCA (DAC to receiver) or 3.5 mm (DAC to powered speakers).</td></tr>
+      <tr><td><b>Accounts</b></td><td>Plex (free). Optional: Apple Music, Spotify Premium, Home Assistant.</td></tr>
+    </table>
+    <h3>2. Connect the hardware (power unplugged)</h3>
+    <ol>
+      <li><b>Screen:</b> the official display's ribbon cable goes in the Pi's DISPLAY connector. An HDMI screen uses HDMI plus its USB cable (for touch).</li>
+      <li><b>Network:</b> a network cable is most reliable. Wi-Fi works too.</li>
+      <li><b>Sound:</b> pick one of these:</li>
+    </ol>
+    <figure class="svg"><img src="/img/wiring.svg" alt="Three ways to connect the sound"></figure>
+    <h3>3. Put Raspberry Pi OS on the memory card</h3>
+    <ol>
+      <li>On your computer, install <b>Raspberry Pi Imager</b> from <code>raspberrypi.com/software</code> and open it.</li>
+      <li><span class="k">Choose Device</span>: your Pi. <span class="k">Choose OS</span>: <b>Raspberry Pi OS (64-bit)</b>. <span class="k">Choose Storage</span>: the memory card.</li>
+      <li>Click <span class="k">Next</span>, then <span class="k">Edit Settings</span>: set a <b>hostname</b> (e.g. <code>plexpie</code>), a <b>username and password</b> (write them down), your <b>Wi-Fi</b> if you're not using a cable, and your time zone.</li>
+      <li>On the <span class="k">Services</span> tab, turn on <b>Enable SSH</b> with password authentication.</li>
+      <li><span class="k">Save</span> › <span class="k">Yes</span> › <span class="k">Yes</span>. When it's done, put the card in the Pi and plug in the power. The first start takes 2 to 3 minutes.</li>
+    </ol>
+    <h3>4. Install PlexPie</h3>
+    <ol>
+      <li>On your computer, open <b>Terminal</b> (Mac: ⌘ Space, type Terminal) or <b>PowerShell</b> (Windows: Start, type PowerShell).</li>
+      <li>Type <code>ssh pi@plexpie.local</code> (your username and hostname), press Enter, type <code>yes</code>, then your password. Nothing shows while you type the password; that's normal.</li>
+      <li>Paste this line and press Enter:
+        <pre>curl -fsSL https://raw.githubusercontent.com/ROGUEONE-SZ/plexamp-raspberry-pi-install/main/get.sh | bash</pre></li>
+      <li>Answer the short questions (press Enter to accept a suggestion): player name, which apps you want, screen sleep.</li>
+      <li>When it asks for a <b>claim code</b>: open <code>plex.tv/claim</code> on any device, copy the code, paste it, press Enter, type the player name, and press Ctrl+C when Plexamp says it's ready.</li>
+      <li>It takes 15 to 30 minutes. When it's done, the screen shows the PlexPie home screen.</li>
+    </ol>
+    <div class="tip"><b>Can't connect?</b> Use the Pi's number address instead of <code>plexpie.local</code>. Your router's list of devices shows it, e.g. <code>ssh pi@192.168.1.42</code>.</div>
+  </section>
+
+  <!-- ===================================================================== plexamp -->
+  <section class="g" id="plexamp" data-group="2" data-sub="Link your Plex account and play">
+    <h2>Plexamp</h2>
+    <p class="sub">Your own music library, in full quality.</p>
+    <ol>
+      <li>Plexamp is linked to your Plex account during the install (the claim code step). Settings › Configuration › Plexamp shows which account.</li>
+      <li>On the screen, tap <span class="k">Plexamp</span> and pick music, or</li>
+      <li>On your phone or tablet, open the <b>Plexamp</b> app, tap the speaker icon and pick <b data-name>your player</b>. Your phone becomes the remote.</li>
+    </ol>
+    <figure><img src="/img/launcher.png" alt="The PlexPie home screen"></figure>
+    <div class="tip"><b>Linked to the wrong account, or not linked?</b> Run the installer again from a computer (Build and install, step 4). It asks for a new claim code.</div>
+  </section>
+
+  <!-- ===================================================================== apple -->
+  <section class="g" id="apple" data-group="2" data-sub="Sign in once on the screen">
+    <h2>Apple Music</h2>
+    <p class="sub">The Apple Music web player, right on the screen.</p>
+    <ol>
+      <li>Settings › Configuration › <b>Apple Music</b>: switch it on and tap <span class="k">Save</span>.</li>
+      <li>On the home screen, tap <span class="k">Apple Music</span>, then <span class="k">Sign In</span> (top right).</li>
+      <li>Enter your Apple ID. If you get a code on your iPhone, type it on the screen.</li>
+      <li>You stay signed in. PlexPie never sees or stores your password.</li>
+    </ol>
+    <div class="tip"><b>Want to play from your iPhone instead?</b> Use AirPlay: it works with Apple Music and every other app.</div>
+    <p>To sign out: Settings › Configuration › Apple Music › <span class="k">Sign out</span>.</p>
+  </section>
+
+  <!-- ===================================================================== airplay -->
+  <section class="g" id="airplay" data-group="2" data-sub="Play from an iPhone, iPad or Mac">
+    <h2>AirPlay</h2>
+    <p class="sub">Play anything from an iPhone, iPad or Mac.</p>
+    <ol>
+      <li>Make sure your device is on the same Wi-Fi as the player.</li>
+      <li><b>iPhone or iPad:</b> open Control Center (swipe down from the top-right corner), tap the AirPlay icon on the music tile, and pick <b data-name>your player</b>.</li>
+      <li><b>Mac:</b> click the AirPlay or Control Center icon in the menu bar and pick <b data-name>your player</b>.</li>
+      <li>The screen shows the cover, title and a visualizer. Volume follows your device.</li>
+    </ol>
+    <figure><img src="/img/airplay.png" alt="AirPlay playing on the screen"></figure>
+    <div class="tip"><b>Don't see it?</b> Check Settings › Configuration › AirPlay is on, and that your device isn't on a guest Wi-Fi.</div>
+  </section>
+
+  <!-- ===================================================================== spotify -->
+  <section class="g" id="spotify" data-group="2" data-sub="Spotify Connect and the web player">
+    <h2>Spotify</h2>
+    <p class="sub">Two ways: pick the player from the Spotify app (Premium), or browse Spotify on the screen.</p>
+    <h3>Spotify Connect (from your phone, tablet or computer)</h3>
+    <ol>
+      <li>Settings › Configuration › Spotify: switch on <b>Spotify Connect</b> and tap <span class="k">Save</span>.</li>
+      <li>In the Spotify app, start a song, tap the <b>devices</b> icon (bottom left) and pick <b data-name>your player</b>.</li>
+    </ol>
+    <figure><img src="/img/spotify.png" alt="Spotify playing on the screen"></figure>
+    <h3>Spotify web player (on the screen)</h3>
+    <ol>
+      <li>Switch on <b>Spotify web player</b> and tap <span class="k">Save</span>.</li>
+      <li>Tap the Spotify tile on the home screen and log in once.</li>
+    </ol>
+  </section>
+
+  <!-- ===================================================================== bluetooth -->
+  <section class="g" id="bluetooth" data-group="2" data-sub="Pair a phone, tablet or computer">
+    <h2>Bluetooth</h2>
+    <p class="sub">Any phone, tablet or computer can play to it, even a guest's Android phone.</p>
+    <ol>
+      <li>On the screen, tap <span class="k">Bluetooth</span> › <span class="k">Pair a device</span> (or Settings › Configuration › Bluetooth › <span class="k">Pair</span>). The player is visible for 2 minutes.</li>
+      <li>On your device, open <b>Settings › Bluetooth</b> (Mac: System Settings › Bluetooth) and tap <b data-name>your player</b>.</li>
+      <li>Confirm on your device if it asks. No PIN is needed.</li>
+      <li>Play music. Next time it connects by itself: just pick it in your device's Bluetooth or AirPlay/output list.</li>
+    </ol>
+    <figure class="pair"><img src="/img/bluetooth-pair.png" alt="Pairing"><img src="/img/bluetooth.png" alt="Playing over Bluetooth"></figure>
+    <p>To remove a device: Settings › Configuration › Bluetooth › <span class="k">Forget</span>.</p>
+  </section>
+
+  <!-- ===================================================================== ma -->
+  <section class="g" id="ma" data-group="2" data-sub="Use it as a Music Assistant speaker">
+    <h2>Music Assistant</h2>
+    <p class="sub">If you run Music Assistant (usually inside Home Assistant), the player becomes one of its speakers.</p>
+    <ol>
+      <li>Settings › Configuration › Music Assistant: switch it on.</li>
+      <li><b>Server address:</b> the computer that runs Music Assistant, e.g. <code>homeassistant.local</code> or <code>192.168.1.20</code>.</li>
+      <li><b>Web address:</b> the Music Assistant page, usually the same address with <code>:8095</code>, e.g. <code>http://homeassistant.local:8095</code>.</li>
+      <li>Tap <span class="k">Save</span>. In Music Assistant, open Settings › Players: <b data-name>your player</b> appears there. Turn it on.</li>
+    </ol>
+    <div class="tip">The dot next to <b>Server</b> turns green when the player can reach Music Assistant.</div>
+  </section>
+
+  <!-- ===================================================================== ha -->
+  <section class="g" id="ha" data-group="2" data-sub="Controls, dashboard tile, launcher buttons">
+    <h2>Home Assistant</h2>
+    <p class="sub">Control the player from Home Assistant, show a dashboard on the screen, and add your own buttons.</p>
+    <h3>1. Connect (MQTT)</h3>
+    <ol>
+      <li>In Home Assistant, install the <b>Mosquitto broker</b> add-on (Settings › Add-ons) and the <b>MQTT</b> integration, if you haven't.</li>
+      <li>Create a Home Assistant user for the player (Settings › People › Users), e.g. <code>plexpie</code>.</li>
+      <li>On the player: Settings › Configuration › Home Assistant. Enter the <b>Broker</b> (your Home Assistant address), port <code>1883</code>, and that username and password. Tap <span class="k">Save</span>.</li>
+      <li>In Home Assistant, the player appears under Settings › Devices & services › MQTT with now playing, volume, source, sleep timer, screen, brightness, pause/play, the PlexPie and Raspberry Pi OS updates, restart and shut down.</li>
+    </ol>
+    <h3>2. Dashboard tile on the screen</h3>
+    <ol>
+      <li>Switch on <b>Home Assistant tile</b> and enter the <b>Address</b>, e.g. <code>http://homeassistant.local:8123</code>.</li>
+      <li>Optional: make a small dashboard just for this screen and enter its name under <b>Dashboard</b>, e.g. <code>gym-screen</code>.</li>
+      <li>Tap the tile once and sign in to Home Assistant on the screen.</li>
+    </ol>
+    <h3>3. Launcher buttons</h3>
+    <ol>
+      <li>Under <b>Launcher buttons</b>, type names separated by commas, e.g. <code>Gym lights, Sound</code>, and tap <span class="k">Save</span>.</li>
+      <li>Each one appears on the home screen and as a switch in Home Assistant. Use it in an automation, e.g. when "Gym lights" turns on, turn on the lights.</li>
+    </ol>
+    <h3>4. Alerts on the screen</h3>
+    <p>Call <code>notify.send_message</code> on the player's <b>Screen alert</b> entity with a message, e.g. "Someone's at the door". Add a camera picture with the MQTT topic <code>plexpie/&lt;player&gt;/alert/set</code>.</p>
+    <figure><img src="/img/alert.png" alt="A doorbell alert on the screen"></figure>
+  </section>
+
+  <!-- ===================================================================== timer -->
+  <section class="g" id="timer" data-group="2" data-sub="Intervals, countdown, stopwatch">
+    <h2>Workout timer</h2>
+    <p class="sub">Big, readable, with beeps. Keeps the screen on while it runs.</p>
+    <ol>
+      <li>Settings › Configuration › Workout timer: switch it on.</li>
+      <li>On the home screen, tap <span class="k">Timer</span>. Pick <b>Intervals</b>, <b>Countdown</b> or <b>Stopwatch</b>.</li>
+      <li>For intervals, set Work, Rest, Rounds and Ready with − and + (hold to go faster), then <span class="k">Start</span>.</li>
+      <li>It beeps for the last 3 seconds of each part. Music keeps playing.</li>
+    </ol>
+    <figure class="pair"><img src="/img/timer.png" alt="Timer setup"><img src="/img/timer-running.png" alt="Timer running"></figure>
+  </section>
+
+  <!-- ===================================================================== eq -->
+  <section class="g" id="eq" data-group="3" data-sub="Presets and room correction">
+    <h2>Equalizer</h2>
+    <p class="sub">Shape the sound for your room, speakers or headphones.</p>
+    <ol>
+      <li>Settings › Sound: switch on <b>Equalizer</b>.</li>
+      <li>Pick a <b>Preset</b>: Less bass, More bass, Loudness (for quiet listening), Vocal, Soft treble, or Custom (5 sliders).</li>
+      <li>The curve shows what changes. Tap <span class="k">Save</span>.</li>
+    </ol>
+    <h3>Headphones or room correction</h3>
+    <ol>
+      <li>For headphones, open <code>autoeq.app</code>, pick your model, choose <b>Equalizer APO</b> and copy the parametric EQ.</li>
+      <li>For a room, measure with REW and export the filters as Equalizer APO text.</li>
+      <li>Pick the preset <b>Pasted filters</b> and paste the text.</li>
+    </ol>
+    <div class="tip">With the equalizer off, lossless music plays untouched.</div>
+  </section>
+
+  <!-- ===================================================================== remote -->
+  <section class="g" id="remote" data-group="3" data-sub="Change settings from any device">
+    <h2>Remote access</h2>
+    <p class="sub">Change settings from any phone, tablet or computer on your Wi-Fi.</p>
+    <ol>
+      <li>On the player: Settings › <b>Remote access</b>. Note the <b>Address</b> and <b>PIN</b>, or scan the code with your camera.</li>
+      <li>On your device, open <code data-url>the address</code> in Safari, Chrome or any browser.</li>
+      <li>Enter the PIN. You only do this once per device.</li>
+      <li>Tip: add it to your home screen (Safari: Share › Add to Home Screen) so it opens like an app.</li>
+    </ol>
+    <figure class="pair"><img src="/img/remote.png" alt="Remote access on the screen"><img src="/img/phone-remote.png" alt="Registered devices on a phone" style="object-fit:contain"></figure>
+    <p>Every device you sign in shows under <b>Registered devices</b>, with when it was last used. Tap <span class="k">Sign out</span> to remove one, or <span class="k">New PIN</span> on the player to sign them all out.</p>
+  </section>
+
+  <!-- ===================================================================== backup -->
+  <section class="g" id="backup" data-group="3" data-sub="Keep your settings safe">
+    <h2>Backup and restore</h2>
+    <p class="sub">One small file with all your settings, for a new memory card or a second player.</p>
+    <h3>Make a backup</h3>
+    <ol>
+      <li>On the player: Settings › <b>Backup</b>. Scan the code with your phone or tablet camera (or open Settings on a registered device).</li>
+      <li>Tap <span class="k">Download</span>. On an iPhone or iPad, choose <b>Save to Files</b> (iCloud Drive is a good place).</li>
+    </ol>
+    <figure><img src="/img/backup-qr.png" alt="Send a backup to a device"></figure>
+    <h3>Restore</h3>
+    <ol>
+      <li>Install PlexPie on the new card (Build and install).</li>
+      <li>Open Settings › Backup from a registered device, tap <span class="k">Choose file</span> and pick the backup.</li>
+      <li>The player reinstalls itself with your settings (about a minute). Sign in to Apple Music, Spotify and Home Assistant on the screen again.</li>
+    </ol>
+    <div class="tip">The backup includes your Home Assistant password. Keep it somewhere private.</div>
+  </section>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const params = new URLSearchParams(location.search);
+let local = false;
+let info = {name: "", url: "", version: ""};
+
+function fill() {
+  document.querySelectorAll("[data-name]").forEach(e => { if (info.name) e.textContent = info.name; });
+  document.querySelectorAll("[data-url]").forEach(e => { if (info.url) e.textContent = info.url; });
+  document.querySelectorAll("[data-ver]").forEach(e => e.textContent = info.version ? "Version " + info.version : "");
+}
+function toc() {
+  const items = [...document.querySelectorAll("section.g")];
+  for (const n of [1, 2, 3])
+    $("toc" + n).innerHTML = items.filter(s => s.dataset.group == n).map(s =>
+      `<a href="#${s.id}"><span><b>${s.querySelector("h2").textContent}</b><small>${s.dataset.sub}</small></span></a>`).join("");
+}
+function route() {
+  const id = location.hash.slice(1), sec = id && document.getElementById(id);
+  const one = !!(sec && sec.matches("section.g")) && !params.has("all");
+  document.body.classList.toggle("one", one);
+  document.body.classList.toggle("all", !one);
+  document.querySelectorAll("section.g").forEach(s => s.classList.toggle("on", s === sec));
+  $("title").textContent = one ? sec.querySelector("h2").textContent : "Setup guides";
+  document.title = (one ? sec.querySelector("h2").textContent + " · " : "") + "PlexPie setup guides";
+  scrollTo(0, 0); setTimeout(() => scrollTo(0, 0), 60);     // undo the browser's jump to the #anchor
+}
+$("allbtn").onclick = e => { e.preventDefault(); history.replaceState(null, "", location.pathname); route(); };
+document.addEventListener("click", e => {
+  if (e.target.closest("[data-print]")) window.print();
+  if (e.target.closest("[data-share]")) {
+    const title = document.title, url = local && info.url ? info.url.replace(/\/settings$/, "") + "/guide" + location.hash : location.href;
+    if (navigator.share) navigator.share({title, url}).catch(() => {});
+    else navigator.clipboard?.writeText(url).then(() => alert("Link copied"), () => {});
+  }
+});
+function onScreen() {      // on the player's own screen there's no file to save: point to "Send to a device"
+  document.querySelectorAll("[data-print],[data-share],a[download]").forEach(e => e.classList.add("hidden"));
+  $("localnote").classList.remove("hidden");
+}
+if (params.has("generic")) $("back").classList.add("hidden");
+addEventListener("hashchange", route); addEventListener("load", () => setTimeout(() => scrollTo(0, 0), 60));
+toc(); route();
+if (!params.has("generic"))
+  fetch("/api/settings").then(r => r.ok ? r.json() : null).then(d => {
+    if (!d) return;
+    info = {name: d.player_name, url: d.phone_url, version: d.version}; fill();
+    local = !!d.local; if (local) onScreen();
+  }).catch(() => {});
+if (params.has("all")) setTimeout(() => window.print && params.has("print") && window.print(), 500);
+</script>
+</body>
+</html>

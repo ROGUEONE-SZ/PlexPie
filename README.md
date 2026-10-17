@@ -19,10 +19,10 @@ on one launcher and all controllable from **Home Assistant**.
 
 | Source | What it is |
 |---|---|
-| **Plexamp** | Plexamp headless with its full touch interface; also controllable from the Plexamp app on your phone. Lossless (FLAC/hi-res) to your DAC |
+| **Plexamp** | Plexamp headless with its full touch interface; also controllable from the Plexamp app on your phone or tablet. Lossless (FLAC/hi-res) to your DAC |
 | **AirPlay** | AirPlay 2 receiver (shairport-sync). The screen shows cover art, track and the stream format |
 | **Spotify** | Spotify Connect receiver (go-librespot): pick the Pi in the Spotify app (Premium). Optional Spotify web player on the screen |
-| **Bluetooth** | Any phone can play to it: tap **Pair a phone**, then pick the player in the phone's Bluetooth settings |
+| **Bluetooth** | Any phone, tablet or computer can play to it: tap **Pair a device**, then pick the player in its Bluetooth settings |
 | **Apple Music** | music.apple.com on the screen (Chromium + Widevine), zoomed so it shows the full desktop layout |
 | **Music Assistant** | The Pi becomes a Music Assistant player (Squeezelite), and MA's own interface opens on the screen |
 | **Timer** | Workout timer: intervals (work / rest / rounds), countdown and stopwatch, with big digits and beeps |
@@ -39,12 +39,13 @@ How it behaves:
 - **Visualizer.** Spectrum bars or VU meters on the AirPlay, Spotify and Bluetooth screens; tap the cover for full screen.
 - **Album-art colors.** The screens take their accent color from the cover that's playing.
 - **Night dimming and auto-brightness.** Dim on a schedule, or follow a Home Assistant light sensor.
-- **Home Assistant tile.** A Home Assistant dashboard on the screen; tip: make a small one just for this screen and set it under Settings → Home Assistant.
+- **Home Assistant tile.** A Home Assistant dashboard on the screen; tip: make a small one just for this screen and set it under Settings → Configuration → Home Assistant.
 - **Optional knob and power button.** A $3 rotary knob for volume and play/pause, and a push button to shut down and start ([wiring](docs/gpio.svg)).
 - **Sleep timer.** The zᶻ button next to the clock stops the music after 15 to 90 minutes, fading out over the last minute.
-- **Backup and restore.** Download all your settings as one file from your phone, and restore them on a new memory card.
+- **Backup and restore.** Send all your settings as one file to a registered phone, tablet or computer (scan a QR code on the screen), and restore them on a new memory card.
+- **Setup guides built in.** Plain-English, step-by-step instructions for every app, on the player itself (offline, always matching your version). Save one as a PDF, share it, or download the [full setup guide (PDF)](docs/PlexPie-Setup-Guide.pdf).
 - **Power-cut protection.** An optional read-only mode, so pulling the plug can't damage the memory card.
-- **Settings screen.** The gear on the launcher opens Settings: switch apps on and off, see which accounts are signed in, set the screen sleep, Home Assistant and Music Assistant. The same page opens on your phone at `http://<pi-address>:8080/settings`, protected by a PIN shown on the player.
+- **Settings screen.** The gear on the launcher opens Settings, organised by category like an iPad: Configuration (every app and account), Screen, Sound, Network, Updates, Remote access, Backup, Setup guides and System. The same page opens on any phone, tablet or computer at `http://<pi-address>:8080/settings`, protected by a PIN shown on the player.
 
 ## What you need
 
@@ -96,25 +97,34 @@ sudo bash install.sh
 
 ## Settings
 
-Tap the gear on the launcher, or open `http://<pi-address>:8080/settings` on your phone. The address and PIN are on the player's Settings page under **Phone access**.
+Tap the gear on the launcher, or open `http://<pi-address>:8080/settings` on any phone, tablet or computer. The address, a QR code and the PIN are on the player under **Settings › Remote access**.
 
-<img src="docs/settings.png" width="60%" alt="Settings page"> <img src="docs/phone-settings.png" width="22%" alt="Settings on a phone">
+Settings is laid out like an iPad: categories on the left, details on the right (on a phone, tap a category and use **‹ Settings** to go back). Nothing slides or swipes; **Done** returns to the home screen, and **Save** appears only when you've changed something.
+
+<img src="docs/settings.png" width="60%" alt="Settings: categories on the left, Configuration on the right"> <img src="docs/phone-settings.png" width="22%" alt="Settings on a phone">
 
 <p>
-  <img src="docs/bluetooth.png" width="49%" alt="Playing from a phone over Bluetooth">
-  <img src="docs/phone-eq-custom.png" width="22%" alt="Equalizer with five bands and the resulting curve">
-  <img src="docs/phone-bluetooth.png" width="22%" alt="Bluetooth pairing and paired phones">
+  <img src="docs/updates.png" width="49%" alt="Updates: PlexPie and Raspberry Pi OS, each with its own progress bar">
+  <img src="docs/remote.png" width="49%" alt="Remote access: address, PIN, QR code and registered devices">
+</p>
+<p>
+  <img src="docs/phone-config.png" width="22%" alt="Configuration: every app and its status">
+  <img src="docs/phone-updates.png" width="22%" alt="Updates on a phone">
+  <img src="docs/phone-remote.png" width="22%" alt="Registered devices">
+  <img src="docs/phone-guide-airplay.png" width="22%" alt="A setup guide on a phone">
 </p>
 
-- **Apps:** turn Apple Music, AirPlay, Spotify Connect, the Spotify web player and Music Assistant on or off. The change is instant: everything is installed, and players that are off are stopped.
-- **Accounts:** shows whether each service is linked, with sign-out for the web players. PlexPie never stores your passwords; each service signs in on its own page and keeps a token.
+- **Configuration:** every app in one list (Plexamp, Apple Music, AirPlay, Spotify, Bluetooth, Music Assistant, Home Assistant, Workout timer), each with its on/off switch, account status and sign-out, its own options, and a **Setup instructions** link. PlexPie never stores your passwords; each service signs in on its own page.
+- **Screen:** sleep, brightness, show what's playing, swipe home, album-art colors, visualizer, night dimming, light sensor.
 - **Sound:** the equalizer, with a live curve of what it does.
-- **Bluetooth:** pair a phone, see paired phones, forget one.
-- **Updates:** checks twice a day for Raspberry Pi OS and PlexPie updates; **Update now** installs both, and tells you if a restart is needed. Home Assistant also gets an update entity with an Install button.
 - **Network:** Wi-Fi on/off, current network, scan and join (the password goes to NetworkManager, not PlexPie).
-- **Screen, Home Assistant, Music Assistant, phone access, restart and reboot.**
+- **Updates:** **PlexPie** and **Raspberry Pi OS** are separate rows. **Check now** looks in the background; when something's found the button becomes **Update**, with a list of what's new, and a live progress bar (step, package and elapsed time) while it installs. Raspberry Pi OS asks for a restart only when it needs one. Both check by themselves twice a day, and Home Assistant gets two update entities with Install buttons.
+- **Remote access:** the address, a QR code to scan, the PIN, and the list of **registered devices** (e.g. "iPad · Safari, last used today") with **Sign out** for each.
+- **Backup:** on the screen, scan the QR code to download the backup on your phone, tablet or computer; restore from the same page.
+- **Setup guides:** step-by-step instructions with pictures for every app; **Send the guides to a device** by QR code, then save as PDF, share or print.
+- **System:** power-cut protection, restart, reboot, shut down.
 
-From a phone, only the Settings page is reachable, and only with the PIN. Five wrong tries pause logins for a minute. A phone stays signed in for a year (renewed each visit); **New PIN** signs every phone out.
+From another device, only Settings and the guides are reachable, and only with the PIN. Five wrong tries pause logins for a minute. A device stays signed in for a year (renewed each visit); **New PIN** signs every device out.
 
 To keep it on your home screen: open the page, then **Share → Add to Home Screen** (iPhone) or **⋮ → Add to Home screen** (Android). It opens like an app.
 
@@ -213,7 +223,7 @@ out, and the Pi reconnects by itself when MA comes back.
   "Lossless". The iPhone converts the stream before sending it, and the AirPlay screen shows
   the actual format. For lossless, use Plexamp with your own FLAC files.
 - **The Apple Music web player** needs Widevine. Raspberry Pi OS includes it; plain Debian doesn't.
-- **AirPlay doesn't show up on your phone?** The phone and the Pi are probably on different
+- **AirPlay doesn't show up on your iPhone, iPad or Mac?** It and the Pi are probably on different
   subnets. Enable an mDNS repeater (Avahi) on your router.
 
 ## Troubleshooting

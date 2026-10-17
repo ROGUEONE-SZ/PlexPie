@@ -9,19 +9,21 @@ U=$(stat -c %U "$REPO" 2>/dev/null || echo root)
 mkdir -p "$STATE"
 
 json_status() {   # step running(true/false) [extra json]
-  printf '{"step":"%s","running":%s,"time":%s,"started":%s%s}\n' "$1" "$2" "$(date +%s)" \
-    "$(cat "$STATE/update-started" 2>/dev/null || echo 0)" "${3:-}" > "$STATE/update-run.json.tmp"
+  printf '{"step":"%s","running":%s,"time":%s,"started":%s,"kind":"%s"%s}\n' "$1" "$2" "$(date +%s)" \
+    "$(cat "$STATE/update-started" 2>/dev/null || echo 0)" "${KIND:-$(cat "$STATE/update-kind" 2>/dev/null)}" \
+    "${3:-}" > "$STATE/update-run.json.tmp"
   mv -f "$STATE/update-run.json.tmp" "$STATE/update-run.json"
 }
 
 apt_progress() {  # reads apt's Status-Fd and reports an overall percent between $1 and $1+$2
-  local base=$1 span=$2 last=-1 kind pkg pct msg lab b sp p
+  local base=$1 span=$2 fixed=${3:-} last=-1 kind pkg pct msg lab b sp p
   while IFS=: read -r kind pkg pct msg; do
     case "$kind" in
-      dlstatus) lab="Downloading system updates"; b=$base; sp=$((span * 3 / 10)) ;;
-      pmstatus) lab="Installing system updates"; b=$((base + span * 3 / 10)); sp=$((span * 7 / 10)) ;;
+      dlstatus) lab="Downloading updates"; b=$base; sp=$((span * 3 / 10)) ;;
+      pmstatus) lab="Installing updates"; b=$((base + span * 3 / 10)); sp=$((span * 7 / 10)) ;;
       *) continue ;;
     esac
+    [ -n "$fixed" ] && { lab=$fixed; b=$base; sp=$span; }
     pct=${pct%%.*}; [[ "$pct" =~ ^[0-9]+$ ]] || pct=0
     p=$((b + pct * sp / 100))
     [ "$p" = "$last" ] && continue
@@ -71,47 +73,81 @@ print(json.dumps(sorted(seen.values(), key=lambda n: -n["signal"])[:20]))' ;;
     nmcli radio wifi on
     nmcli connection reload
     nmcli connection up id "$name" ;;
-  update-check)
-    apt-get update -qq >/dev/null 2>&1
-    os=$(apt-get -s -o Debug::NoLocking=1 upgrade 2>/dev/null | grep -c '^Inst ')
-    pp=0
+  check-plexpie)    # is there a newer PlexPie on GitHub? (quick: one git fetch)
+    behind=0; latest=""; changes="[]"
     if [ -d "$REPO/.git" ]; then
       sudo -u "$U" git -C "$REPO" fetch -q 2>/dev/null
-      pp=$(sudo -u "$U" git -C "$REPO" rev-list --count HEAD..@{u} 2>/dev/null || echo 0)
+      behind=$(sudo -u "$U" git -C "$REPO" rev-list --count HEAD..@{u} 2>/dev/null || echo 0)
+      latest=$(sudo -u "$U" git -C "$REPO" show @{u}:files/plexpied.py 2>/dev/null | sed -n 's/^VERSION = "\(.*\)"/\1/p' | head -1)
+      changes=$(sudo -u "$U" git -C "$REPO" log --format=%s HEAD..@{u} 2>/dev/null | head -6 | \
+        python3 -c 'import json,sys; print(json.dumps([l.strip()[:90] for l in sys.stdin if l.strip()]))')
     fi
+    printf '{"checked":%s,"behind":%s,"latest":"%s","changes":%s}\n' "$(date +%s)" "${behind:-0}" \
+      "$(printf %s "$latest" | tr -cd '0-9A-Za-z.+-')" "${changes:-[]}" > "$STATE/plexpie.json.tmp"
+    mv -f "$STATE/plexpie.json.tmp" "$STATE/plexpie.json"
+    cat "$STATE/plexpie.json" ;;
+  check-os)         # how many Raspberry Pi OS packages can be updated? (refreshes the package list)
+    apt-get update -qq >/dev/null 2>&1
+    pk=$(apt-get -s -o Debug::NoLocking=1 upgrade 2>/dev/null | awk '/^Inst /{print $2}')
+    n=$(printf '%s\n' "$pk" | grep -c .)
+    names=$(printf '%s\n' "$pk" | head -8 | python3 -c 'import json,sys; print(json.dumps([l.strip() for l in sys.stdin if l.strip()]))')
     reboot=false; [ -f /var/run/reboot-required ] && reboot=true
-    printf '{"checked":%s,"os":%s,"plexpie":%s,"reboot":%s}\n' "$(date +%s)" "$os" "$pp" "$reboot" > "$STATE/update.json"
-    cat "$STATE/update.json" ;;
-  update-run)       # start the update in its own unit, so it survives PlexPie restarting
+    printf '{"checked":%s,"count":%s,"packages":%s,"reboot":%s}\n' "$(date +%s)" "$n" "${names:-[]}" "$reboot" \
+      > "$STATE/os.json.tmp"
+    mv -f "$STATE/os.json.tmp" "$STATE/os.json"
+    cat "$STATE/os.json" ;;
+  update-check) "$0" check-plexpie >/dev/null; "$0" check-os >/dev/null ;;
+  update-run)       # update-run plexpie|os|all, in its own unit so it survives PlexPie restarting
+    kind=${2:-all}
+    [[ "$kind" =~ ^(plexpie|os|all)$ ]] || { echo "usage: update-run plexpie|os|all" >&2; exit 2; }
     protect_active && { echo "Power-cut protection is on: turn it off to install updates" >&2; exit 3; }
     systemctl is-active --quiet plexpie-update && { echo "already running"; exit 0; }
     systemctl reset-failed plexpie-update 2>/dev/null
-    systemd-run --quiet --unit=plexpie-update --collect /opt/plexpie/plexpie-admin update-do ;;
+    systemd-run --quiet --unit=plexpie-update --collect /opt/plexpie/plexpie-admin update-do "$kind" ;;
   update-do)
+    kind=${2:-all}
     exec >>"$LOG" 2>&1
-    echo "=== update started $(date)"
+    echo "=== $kind update started $(date)"
     date +%s > "$STATE/update-started"
+    echo "$kind" > "$STATE/update-kind"
     export DEBIAN_FRONTEND=noninteractive
-    json_status "Checking for system updates" true ',"percent":1'
-    apt-get update -q
-    apt-get -y -q -o APT::Status-Fd=3 -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold \
-      upgrade 3> >(apt_progress 5 83)
-    rc=$?
-    wait $! 2>/dev/null                       # let the progress reader finish writing
-    [ $rc -eq 0 ] || { json_status "System update failed (see $LOG)" false; exit 1; }
-    json_status "Cleaning up" true ',"percent":89'
-    apt-get -y -q autoremove
-    if [ -d "$REPO/.git" ]; then
-      json_status "Updating PlexPie" true ',"percent":91'
-      { sudo -u "$U" git -C "$REPO" fetch -q && sudo -u "$U" git -C "$REPO" reset -q --hard @{u}; } || \
-        { json_status "PlexPie update failed (see $LOG)" false; exit 1; }   # an appliance copy: always match GitHub
-      json_status "Installing PlexPie" true ',"percent":94'
-      bash "$REPO/install.sh" --no-restart-ui </dev/null || { json_status "PlexPie install failed (see $LOG)" false; exit 1; }
+    if [ "$kind" != plexpie ]; then
+      KIND=os; [ "$kind" = all ] && span=60 || span=100     # "all" = OS first (0-60%), then PlexPie (60-100%)
+      json_status "Refreshing the list of updates" true ',"percent":1'
+      apt-get update -q -o APT::Status-Fd=3 3> >(apt_progress 1 $((span * 10 / 100)) "Refreshing the list of updates")
+      wait $! 2>/dev/null
+      lo=$((span * 10 / 100)); hi=$((span * 92 / 100))
+      json_status "Preparing" true ",\"percent\":$lo"
+      apt-get -y -q -o APT::Status-Fd=3 -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold \
+        upgrade 3> >(apt_progress "$lo" $((hi - lo)))
+      rc=$?
+      wait $! 2>/dev/null                       # let the progress reader finish writing
+      [ $rc -eq 0 ] || { json_status "Raspberry Pi OS update failed (see $LOG)" false; exit 1; }
+      json_status "Cleaning up" true ",\"percent\":$((span * 96 / 100))"
+      apt-get -y -q autoremove
+      "$0" check-os >/dev/null
     fi
-    "$0" update-check >/dev/null
+    if [ "$kind" != os ] && [ -d "$REPO/.git" ]; then
+      KIND=plexpie; [ "$kind" = all ] && base=60 || base=0; span=$((100 - base))
+      json_status "Downloading PlexPie" true ",\"percent\":$((base + span * 3 / 100))"
+      { sudo -u "$U" git -C "$REPO" fetch -q && sudo -u "$U" git -C "$REPO" reset -q --hard @{u}; } || \
+        { json_status "PlexPie download failed (see $LOG)" false; exit 1; }   # an appliance copy: always match GitHub
+      total=$(grep -c '^step "' "$REPO/install.sh"); [ "$total" -gt 0 ] || total=10
+      json_status "Installing PlexPie" true ",\"percent\":$((base + span * 8 / 100))"
+      i=0
+      bash "$REPO/install.sh" --no-restart-ui </dev/null 2>&1 | while IFS= read -r line; do
+        printf '%s\n' "$line"
+        case "$line" in
+          "==> "*) i=$((i + 1)); p=$((base + span * 8 / 100 + i * span * 88 / 100 / total))
+            json_status "Installing PlexPie" true ",\"percent\":$p,\"detail\":\"$(printf %s "${line#==> }" | tr -cd 'A-Za-z0-9 ._+()-' | cut -c1-48)\"" ;;
+        esac
+      done
+      [ "${PIPESTATUS[0]}" -eq 0 ] || { json_status "PlexPie install failed (see $LOG)" false; exit 1; }
+      "$0" check-plexpie >/dev/null
+    fi
     reboot=false; [ -f /var/run/reboot-required ] && reboot=true
     json_status "Up to date" false ",\"percent\":100,\"reboot\":$reboot"
-    echo "=== update finished $(date)" ;;
+    echo "=== $kind update finished $(date)" ;;
   apply-run)        # reinstall with the current plexpie.conf (after restoring a backup)
     systemctl is-active --quiet plexpie-update && { echo "an update is running, try again in a few minutes" >&2; exit 1; }
     systemctl reset-failed plexpie-update 2>/dev/null
@@ -162,10 +198,11 @@ PY
   update-status)
     # A restart or power cut in the middle of an update leaves "running" behind: clear it.
     if grep -q '"running":true' "$STATE/update-run.json" 2>/dev/null && ! systemctl is-active --quiet plexpie-update; then
-      json_status "The last update was interrupted. Tap Update now to finish it" false
+      json_status "The last update was interrupted. Tap Update to finish it" false
     fi
-    cat "$STATE/update.json" 2>/dev/null || echo '{}'
+    cat "$STATE/plexpie.json" 2>/dev/null || echo '{}'
+    cat "$STATE/os.json" 2>/dev/null || echo '{}'
     cat "$STATE/update-run.json" 2>/dev/null || echo '{}' ;;
-  *) echo "usage: plexpie-admin wifi-status|wifi-on|wifi-off|wifi-scan|wifi-connect SSID|update-check|update-run|update-status|apply-run|protect-status|protect-on|protect-off" >&2
+  *) echo "usage: plexpie-admin wifi-status|wifi-on|wifi-off|wifi-scan|wifi-connect SSID|check-plexpie|check-os|update-check|update-run plexpie/os/all|update-status|apply-run|protect-status|protect-on|protect-off" >&2
      exit 2 ;;
 esac

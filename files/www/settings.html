@@ -12,348 +12,729 @@
 <meta name="apple-mobile-web-app-title" content="PlexPie">
 <meta name="theme-color" content="#0b0b0f">
 <style>
-  :root { --bg: #0b0b0f; --panel: #16161c; --line: #26262e; --text: #f4f4f7; --muted: #8e8e99; --accent: #0a84ff;
-    --ok: #30d158; --warn: #ff9f0a; }
+  :root { --bg: #000; --side: #0e0e12; --panel: #1c1c1f; --line: #2c2c30; --text: #f4f4f7; --muted: #8e8e93; --accent: #0a84ff;
+    --ok: #30d158; --warn: #ff9f0a; --sel: #0a84ff; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body { margin: 0; background: var(--bg); color: var(--text);
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden;
     font-family: "Inter", "Noto Sans", "DejaVu Sans", system-ui, -apple-system, sans-serif; }
-  .topfade { position: fixed; top: 0; left: 0; right: 0; height: env(safe-area-inset-top); background: var(--bg); z-index: 5; }
-  .wrap { max-width: 720px; margin: 0 auto; padding: calc(18px + env(safe-area-inset-top)) 16px 110px; }
-  h1 { font-size: 24px; margin: 4px 0 2px; }
-  .sub { color: var(--muted); font-size: 14px; margin-bottom: 18px; }
-  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin: 22px 4px 8px; }
-  .card { background: var(--panel); border-radius: 16px; overflow: hidden; }
-  .row { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 10px 16px; border-top: 1px solid var(--line); }
-  .row:first-child { border-top: 0; }
+  button, input, select, textarea { font: inherit; }
+  .hidden { display: none !important; }
+
+  /* ---- layout: sidebar + detail (screen, tablet, computer) or one page at a time (phone) */
+  #app { display: flex; height: 100%; }
+  #side { width: 290px; flex: none; background: var(--side); border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
+  #detail { flex: 1; min-width: 0; display: flex; flex-direction: column; min-height: 0; position: relative; }
+  .scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; min-height: 0; }
+  #side .scroll { padding: 0 12px calc(16px + env(safe-area-inset-bottom)); }
+  #detail .scroll { padding: 4px 22px calc(110px + env(safe-area-inset-bottom)); }
+  .side-head { padding: calc(14px + env(safe-area-inset-top)) 18px 10px; }
+  .side-head h1 { font-size: 30px; font-weight: 800; margin: 0; letter-spacing: -.01em; }
+  .side-head small { color: var(--muted); font-size: 13px; }
+  .bar { display: flex; align-items: center; gap: 8px; min-height: 52px; padding: calc(6px + env(safe-area-inset-top)) 14px 6px; }
+  .bar h2 { flex: 1; text-align: center; margin: 0; font-size: 17px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .back, .done { border: 0; background: none; color: var(--accent); font-size: 17px; padding: 8px 6px; min-width: 84px; text-align: left; white-space: nowrap; }
+  .done { text-align: right; font-weight: 700; }
+  .back:active, .done:active { opacity: .5; }
+  .back::before { content: "‹ "; font-size: 22px; line-height: 0; }
+
+  @media (max-width: 699px) {
+    #side { width: 100%; border: 0; background: var(--bg); }
+    #detail { position: absolute; inset: 0; background: var(--bg); }
+    body:not(.in-page) #detail { display: none; }
+    body.in-page #side { display: none; }
+    #detail .scroll { padding: 4px 16px calc(110px + env(safe-area-inset-bottom)); }
+  }
+  @media (min-width: 700px) {
+    .nav .navrow.on { background: var(--sel); }
+    .nav .navrow.on small, .nav .navrow.on .chev { color: #e6f0ff; }
+    .nav .chev { display: none; }
+    .nav .navrow .t small { display: none; }
+    #side { width: 250px; }
+    #side .done-wide { display: none; }
+  }
+
+  /* ---- grouped list rows */
+  h3 { font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 20px 16px 7px; font-weight: 600; }
+  .group { background: var(--panel); border-radius: 12px; overflow: hidden; margin-bottom: 8px; }
+  .nav .group { background: transparent; }
+  @media (max-width: 699px) { .nav .group { background: var(--panel); } }
+  .row { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 9px 16px; position: relative; }
+  .row + .row::before { content: ""; position: absolute; top: 0; left: 16px; right: 0; border-top: 1px solid var(--line); }
+  .row.ic + .row::before, .row + .row.ic::before { left: 60px; }
   .row .t { flex: 1; min-width: 0; }
-  .row .t b { display: block; font-weight: 600; font-size: 16px; }
-  .row .t small { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
+  .row .t b { display: block; font-weight: 500; font-size: 16px; }
+  .row .t small { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; line-height: 1.35; }
+  .navrow { cursor: pointer; border-radius: 10px; min-height: 48px; padding: 7px 12px; }
+  .navrow + .navrow::before { left: 56px !important; }
+  @media (min-width: 700px) { .nav .navrow + .navrow::before { display: none; } }
+  .link { cursor: pointer; }
+  .link:active, .navrow:active { background: #2a2a2e; }
+  .chev { color: #5a5a5f; font-size: 22px; line-height: 1; flex: none; }
+  .icon { width: 30px; height: 30px; border-radius: 7px; flex: none; display: grid; place-items: center; color: #fff; }
+  .icon svg { width: 19px; height: 19px; }
+  .badge { background: #ff453a; color: #fff; border-radius: 999px; font-size: 13px; font-weight: 700; padding: 1px 8px; }
+  .val { color: var(--muted); font-size: 15px; white-space: nowrap; max-width: 46%; overflow: hidden; text-overflow: ellipsis; }
+  .note { color: var(--muted); font-size: 13px; padding: 4px 16px 10px; line-height: 1.4; }
+  .note a, .t a { color: var(--accent); }
+  .page-intro { color: var(--muted); font-size: 14px; margin: 10px 4px 4px; line-height: 1.4; }
   .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); flex: none; }
   .dot.ok { background: var(--ok); } .dot.no { background: var(--warn); }
-  input[type=time] { width: 136px; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 10px; padding: 8px; font: inherit; }
+  .tag { font-size: 12px; color: var(--ok); border: 1px solid var(--ok); border-radius: 6px; padding: 0 5px; margin-left: 6px; vertical-align: 1px; white-space: nowrap; display: inline-block; }
+
+  /* ---- controls */
+  input[type=time] { width: 120px; background: #0f0f12; color: var(--text); border: 1px solid var(--line); border-radius: 10px; padding: 8px; }
   input[type=text], input[type=password], input[type=number], select {
-    width: 46%; max-width: 280px; background: #0f0f14; color: var(--text); border: 1px solid var(--line);
-    border-radius: 10px; padding: 10px 12px; font: inherit; font-size: 15px; }
+    width: 48%; max-width: 280px; background: #0f0f12; color: var(--text); border: 1px solid var(--line);
+    border-radius: 10px; padding: 9px 11px; font-size: 15px; }
   input[type=range] { width: 46%; max-width: 280px; accent-color: var(--accent); }
+  textarea { width: 100%; min-height: 110px; background: #0f0f12; color: var(--text); border: 1px solid var(--line); border-radius: 10px;
+    padding: 10px; font: 13px/1.4 ui-monospace, Menlo, monospace; }
+  .sw { position: relative; width: 51px; height: 31px; flex: none; }
+  .sw input { opacity: 0; width: 0; height: 0; }
+  .sw span { position: absolute; inset: 0; background: #39393d; border-radius: 999px; transition: .2s; }
+  .sw span::after { content: ""; position: absolute; left: 2px; top: 2px; width: 27px; height: 27px; border-radius: 50%; background: #fff; transition: .2s; }
+  .sw input:checked + span { background: var(--ok); }
+  .sw input:checked + span::after { transform: translateX(20px); }
+  .sw input:disabled + span { opacity: .4; }
+  .btn { border: 0; border-radius: 999px; padding: 7px 15px; font-size: 15px; font-weight: 600; background: #2c2c30; color: var(--accent); white-space: nowrap; }
+  .btn.primary { background: var(--accent); color: #fff; }
+  .btn:disabled { opacity: .45; }
+  .btn:active { filter: brightness(1.3); }
+  .btn.danger { color: #ff453a; }
   .bands { display: flex; justify-content: space-between; gap: 6px; padding: 8px 16px 14px; }
   .band { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
   .band input[type=range] { writing-mode: vertical-lr; direction: rtl; width: 28px; height: 120px; max-width: none; }
   .band b { color: var(--text); font-size: 13px; font-variant-numeric: tabular-nums; }
-  textarea { width: 100%; min-height: 110px; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 10px;
-    padding: 10px; font: 13px/1.4 ui-monospace, Menlo, monospace; }
   canvas#eqcurve { display: block; width: 100%; height: 120px; }
-  .sw { position: relative; width: 52px; height: 32px; flex: none; }
-  .sw input { opacity: 0; width: 0; height: 0; }
-  .sw span { position: absolute; inset: 0; background: #3a3a3d; border-radius: 999px; transition: .2s; }
-  .sw span::after { content: ""; position: absolute; left: 3px; top: 3px; width: 26px; height: 26px; border-radius: 50%;
-    background: #fff; transition: .2s; }
-  .sw input:checked + span { background: var(--ok); }
-  .sw input:checked + span::after { transform: translateX(20px); }
-  .sw input:disabled + span { opacity: .4; }
-  .btn { border: 0; border-radius: 10px; padding: 10px 14px; font: inherit; font-size: 15px; font-weight: 600;
-    background: #2a2a31; color: var(--text); }
-  .btn:active { filter: brightness(1.3); }
-  .prog { height: 8px; border-radius: 999px; background: var(--line, #26262e); overflow: hidden; margin: 2px 16px 14px; }
-  .prog b { display: block; height: 100%; width: 0; background: var(--accent); border-radius: inherit; transition: width .6s ease; }
-  .btn.danger { color: #ff6961; }
-  .bar { position: fixed; left: 0; right: 0; bottom: 0; padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
-    background: linear-gradient(transparent, var(--bg) 35%); display: flex; justify-content: center; }
-  .save { width: 100%; max-width: 720px; border: 0; border-radius: 14px; padding: 15px; font: inherit; font-size: 17px;
-    font-weight: 700; background: var(--accent); color: #fff; }
-  .save:disabled { opacity: .5; }
-  .note { color: var(--muted); font-size: 13px; padding: 8px 4px; }
-  .banner { background: #2a2210; color: #f5c451; border-radius: 12px; padding: 12px 14px; margin: 12px 0 0; font-size: 14px; line-height: 1.4; }
-  code { background: #0f0f14; padding: 2px 6px; border-radius: 6px; }
-  #login { max-width: 360px; margin: 18vh auto 0; text-align: center; padding: 0 16px; }
-  #login input { width: 100%; max-width: none; text-align: center; font-size: 28px; letter-spacing: .3em; margin: 18px 0; }
-  .hidden { display: none !important; }
-  #toast { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); background: #2a2a31; padding: 10px 16px;
-    border-radius: 12px; font-size: 15px; opacity: 0; transition: opacity .3s; pointer-events: none; }
+  code { background: #0f0f12; padding: 2px 6px; border-radius: 6px; font-size: 14px; }
+
+  /* ---- update progress */
+  .prog { height: 6px; border-radius: 999px; background: var(--line); overflow: hidden; margin: 0 16px 14px; position: relative; }
+  .prog b { display: block; height: 100%; width: 0; background: var(--accent); border-radius: inherit; transition: width 1s linear; position: relative; overflow: hidden; }
+  .prog b::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,.45), transparent);
+    animation: shine 1.4s linear infinite; transform: translateX(-100%); }
+  .prog.indet b { width: 35% !important; position: absolute; animation: slide 1.3s ease-in-out infinite; transition: none; }
+  @keyframes shine { to { transform: translateX(100%); } }
+  @keyframes slide { 0% { left: -35%; } 100% { left: 100%; } }
+  .changes { margin: -6px 16px 12px 58px; padding: 0; color: var(--muted); font-size: 13px; line-height: 1.5; list-style: "· "; }
+  .pct { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 14px; }
+
+  /* ---- QR card */
+  .qr { display: flex; gap: 18px; align-items: center; padding: 14px 16px; }
+  .qr .code { background: #fff; border-radius: 10px; padding: 8px; flex: none; line-height: 0; }
+  .qr .code svg { width: 132px; height: 132px; }
+  .qr ol { margin: 0; padding-left: 20px; color: var(--text); font-size: 14px; line-height: 1.55; }
+  .qr ol small { color: var(--muted); }
+
+  /* ---- save bar, banner, toast, login */
+  .savebar { position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 22px calc(12px + env(safe-area-inset-bottom));
+    background: linear-gradient(transparent, var(--bg) 35%); display: flex; gap: 10px; justify-content: flex-end; z-index: 4; }
+  .savebar .btn { padding: 11px 22px; font-size: 16px; }
+  @media (max-width: 699px) { .savebar { position: fixed; } .savebar .btn.primary { flex: 1; } }
+  .banner { background: #2a2210; color: #f5c451; border-radius: 12px; padding: 11px 14px; margin: 10px 0 4px; font-size: 14px; line-height: 1.4; }
+  #toast { position: fixed; top: calc(14px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); background: #2c2c30; padding: 10px 16px;
+    border-radius: 12px; font-size: 15px; opacity: 0; transition: opacity .3s; pointer-events: none; z-index: 20; }
   #toast.on { opacity: 1; }
+  #login { max-width: 360px; margin: 16vh auto 0; text-align: center; padding: 0 16px; overflow: auto; }
+  #login h1 { font-size: 28px; margin: 0 0 6px; }
+  #login .sub { color: var(--muted); font-size: 15px; line-height: 1.4; }
+  #login input { width: 100%; max-width: none; text-align: center; font-size: 28px; letter-spacing: .3em; margin: 18px 0; }
+  #login .btn { width: 100%; padding: 14px; font-size: 17px; border-radius: 14px; }
 </style>
 </head>
 <body>
-<div class="topfade"></div>
 <div id="toast"></div>
 
 <div id="login" class="hidden">
   <h1>PlexPie</h1>
-  <div class="sub">Enter the PIN shown on the player under Settings → Phone access.</div>
+  <div class="sub">Enter the PIN shown on the player's screen under Settings › Remote access. You only need it once on each device.</div>
   <input id="pin" type="password" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="••••••">
-  <button class="save" id="pinbtn">Unlock</button>
+  <button class="btn primary" id="pinbtn">Unlock</button>
   <div class="note" id="pinerr"></div>
 </div>
 
-<div class="wrap hidden" id="main">
-  <button class="btn local-only" id="home" style="float:right;margin-top:2px">Done</button>
-  <h1>Settings</h1>
-  <div class="sub" id="who"></div>
-  <div class="banner hidden" id="protbanner">Power-cut protection is on. Changes you make last until the next restart.
-    To keep changes or install updates, turn it off under System.</div>
-
-  <h2>Apps on the screen</h2>
-  <div class="card" id="apps"></div>
-
-  <h2>Accounts</h2>
-  <div class="card" id="accounts"></div>
-  <div class="note">Passwords are never stored here. Each service signs in on its own page and keeps you signed in.</div>
-
-  <h2>Screen</h2>
-  <div class="card">
-    <div class="row"><div class="t"><b>Screen sleep</b><small>After this long with no touch and nothing playing</small></div>
-      <select id="SCREEN_OFF_AFTER_SECS">
-        <option value="30">30 seconds</option><option value="60">1 minute</option><option value="120">2 minutes</option>
-        <option value="300">5 minutes</option><option value="900">15 minutes</option><option value="0">Never</option>
-      </select></div>
-    <div class="row"><div class="t"><b>Brightness</b></div><input id="SCREEN_BRIGHTNESS" type="range" min="10" max="100" step="5"></div>
-    <div class="row"><div class="t"><b>Show what's playing</b><small>Switch to the app that starts playing</small></div>
-      <label class="sw"><input type="checkbox" id="AUTO_SHOW"><span></span></label></div>
-    <div class="row"><div class="t"><b>Swipe home</b><small>From the left edge or the top edge</small></div>
-      <label class="sw"><input type="checkbox" id="SWIPE_HOME"><span></span></label></div>
-    <div class="row"><div class="t"><b>Album-art colors</b><small>Tint the screens with colors from the cover that's playing</small></div>
-      <label class="sw"><input type="checkbox" id="THEME_FROM_ART"><span></span></label></div>
-    <div class="row"><div class="t"><b>Visualizer</b><small>On the AirPlay, Spotify and Bluetooth screens. Tap the cover for full screen.</small></div>
-      <select id="VISUALIZER"><option value="bars">Spectrum bars</option><option value="vu">VU meters</option><option value="off">Off</option></select></div>
-    <div class="row"><div class="t"><b>Dim at night</b><small>Lower the brightness between these times</small></div>
-      <label class="sw"><input type="checkbox" id="NIGHT_DIM"><span></span></label></div>
-    <div class="row" id="nightrow"><div class="t"><b>From</b></div><input id="NIGHT_START" type="time">
-      <div class="t" style="flex:none"><b>to</b></div><input id="NIGHT_END" type="time"></div>
-    <div class="row" id="nightbr"><div class="t"><b>Night brightness</b></div><input id="NIGHT_BRIGHTNESS" type="range" min="5" max="60" step="5"></div>
-    <div class="row"><div class="t"><b>Follow a light sensor</b><small>Brightness follows a Home Assistant light sensor sent to this player's "Ambient light" entity</small></div>
-      <label class="sw"><input type="checkbox" id="AUTO_BRIGHTNESS"><span></span></label></div>
-  </div>
-
-  <h2>Sound</h2>
-  <div class="card">
-    <div class="row"><div class="t"><b>Equalizer</b><small>Shapes the sound for your room, speakers or headphones. Off plays lossless music untouched.</small></div>
-      <label class="sw"><input type="checkbox" id="EQ_ENABLED"><span></span></label></div>
-    <div id="eqbody">
-      <div class="row"><div class="t"><b>Preset</b></div><select id="EQ_PRESET"></select></div>
-      <div class="bands hidden" id="bands"></div>
-      <input type="hidden" id="EQ_BANDS">
-      <div class="row hidden" id="apo" style="display:block">
-        <div class="t" style="margin-bottom:8px"><b>Paste a correction</b><small>From <a href="https://autoeq.app" style="color:var(--accent)">autoeq.app</a> (pick your headphones, choose "Equalizer APO" and copy the parametric EQ), or any Equalizer APO filter list.</small></div>
-        <textarea id="EQ_CUSTOM_TEXT" placeholder="Filter 1: ON PK Fc 105 Hz Gain -3.4 dB Q 0.70"></textarea></div>
-      <div class="row" style="display:block"><canvas id="eqcurve"></canvas></div>
+<div id="app" class="hidden">
+  <!-- ======================= sidebar ======================= -->
+  <aside id="side">
+    <div class="side-head">
+      <button class="done done-wide local-only" data-done style="float:right;min-width:0;padding-top:6px">Done</button>
+      <h1>Settings</h1><small id="who"></small>
     </div>
-  </div>
+    <div class="scroll nav" id="nav"></div>
+  </aside>
 
-  <h2>Home Assistant</h2>
-  <div class="card">
-    <div class="row"><div class="t"><b>MQTT broker</b><small>Empty turns Home Assistant off</small></div>
-      <input id="MQTT_HOST" type="text" placeholder="homeassistant.local" autocapitalize="off"></div>
-    <div class="row"><div class="t"><b>Port</b></div><input id="MQTT_PORT" type="number" placeholder="1883"></div>
-    <div class="row"><div class="t"><b>Username</b></div><input id="MQTT_USER" type="text" autocapitalize="off"></div>
-    <div class="row"><div class="t"><b>Password</b><small id="passnote"></small></div>
-      <input id="MQTT_PASS" type="password" autocomplete="new-password"></div>
-    <div class="row"><div class="t"><b>Home Assistant address</b><small>For the Home Assistant tile and camera pictures in alerts</small></div>
-      <input id="HA_URL" type="text" placeholder="http://homeassistant.local:8123" autocapitalize="off"></div>
-    <div class="row"><div class="t"><b>Dashboard for the tile</b><small>The part after the address, e.g. <code>gym-screen</code>. Empty opens your main dashboard.</small></div>
-      <input id="HA_DASHBOARD" type="text" placeholder="gym-screen" autocapitalize="off"></div>
-    <div class="row"><div class="t"><b>Launcher buttons</b><small>Names, separated by commas (e.g. Gym lights). Each one becomes a switch in Home Assistant for your automations.</small></div>
-      <input id="SHORTCUTS" type="text" placeholder="Gym lights"></div>
-  </div>
+  <!-- ======================= detail ======================= -->
+  <main id="detail">
+    <div class="bar"><button class="back" id="back"></button><h2 id="ptitle"></h2>
+      <button class="done local-only" data-done>Done</button><span class="remote-only" style="min-width:84px"></span></div>
+    <div class="scroll" id="pages">
+      <div class="banner hidden" id="protbanner">Power-cut protection is on. Changes last until the next restart.
+        To keep changes or install updates, turn it off under System.</div>
 
-  <h2>Music Assistant</h2>
-  <div class="card">
-    <div class="row"><div class="t"><b>Server</b><small>Where the player connects</small></div>
-      <input id="MA_HOST" type="text" placeholder="homeassistant.local" autocapitalize="off"></div>
-    <div class="row"><div class="t"><b>Web address</b><small>Opened by the Music Assistant tile</small></div>
-      <input id="MA_URL" type="text" placeholder="http://homeassistant.local:8095" autocapitalize="off"></div>
-  </div>
+      <!-- Configuration: the list of apps -->
+      <section data-page="config">
+        <div class="page-intro">Switch apps on or off, sign in, and set each one up. Every app has step-by-step setup instructions.</div>
+        <h3>Music</h3><div class="group" id="applist-music"></div>
+        <h3>Home</h3><div class="group" id="applist-home"></div>
+      </section>
 
-  <div id="btsection" class="hidden">
-  <h2>Bluetooth</h2>
-  <div class="card">
-    <div class="row"><div class="t"><b>Pair a phone</b><small id="btsub">Makes the player visible for 2 minutes. Then pick it in your phone's Bluetooth settings.</small></div>
-      <button class="btn" id="btpair" data-noform>Pair</button></div>
-    <div id="btdevices"></div>
-  </div>
-  </div>
+      <section data-page="app-plexamp" data-parent="config" data-title="Plexamp">
+        <div class="group"><div class="row"><div class="t"><b>Plexamp</b><small>Always on: it's the heart of the player</small></div>
+          <label class="sw"><input type="checkbox" checked disabled><span></span></label></div>
+          <div class="row"><span class="dot" id="acct-plexamp-dot"></span><div class="t"><b>Plex account</b><small id="acct-plexamp"></small></div></div></div>
+        <div class="group" data-guide="plexamp"></div>
+      </section>
 
-  <h2>Updates</h2>
-  <div class="card">
-    <div class="row"><div class="t"><b id="updtitle">Checking…</b><small id="updsub"></small></div>
-      <button class="btn" id="updcheck">Check now</button></div>
-    <div class="prog hidden" id="updprog"><b id="updbar"></b></div>
-    <div class="row hidden" id="updrow"><div class="t"><b id="updwhat"></b><small>System and PlexPie updates install together. Music may stop for a minute.</small></div>
-      <button class="btn" id="updrun" style="background:var(--accent)">Update now</button></div>
-  </div>
+      <section data-page="app-apple" data-parent="config" data-title="Apple Music">
+        <div class="group"><div class="row"><div class="t"><b>Apple Music</b><small>The Apple Music web player on the screen</small></div>
+          <label class="sw"><input type="checkbox" id="ENABLE_APPLE_MUSIC_WEB"><span></span></label></div>
+          <div class="row"><span class="dot" id="acct-apple-dot"></span><div class="t"><b>Apple ID</b><small id="acct-apple"></small></div>
+            <button class="btn" data-signout="apple">Sign out</button></div></div>
+        <div class="note">Your Apple ID password is never stored by PlexPie. Apple keeps you signed in on its own page.</div>
+        <div class="group" data-guide="apple"></div>
+      </section>
 
-  <h2>Network</h2>
-  <div class="card">
-    <div class="row"><div class="t"><b>Wi-Fi</b><small id="wifisub"></small></div>
-      <label class="sw"><input type="checkbox" id="wifi" data-noform><span></span></label></div>
-    <div class="row" id="wifiscanrow"><div class="t"><b>Join a network</b><small>Pick a network, then enter its password</small></div>
-      <button class="btn" id="wifiscan">Scan</button></div>
-    <div id="wifilist"></div>
-  </div>
+      <section data-page="app-airplay" data-parent="config" data-title="AirPlay">
+        <div class="group"><div class="row"><div class="t"><b>AirPlay</b><small>Play from an iPhone, iPad or Mac</small></div>
+          <label class="sw"><input type="checkbox" id="ENABLE_AIRPLAY"><span></span></label></div>
+          <div class="row"><div class="t"><b>Shows up as</b></div><span class="val" data-name></span></div></div>
+        <div class="group" data-guide="airplay"></div>
+      </section>
 
-  <h2>Phone access</h2>
-  <div class="card">
-    <div class="row"><div class="t"><b>Settings from a phone</b><small id="phoneurl"></small></div>
-      <label class="sw"><input type="checkbox" id="PHONE_ACCESS"><span></span></label></div>
-    <div class="row local-only"><div class="t"><b>PIN</b><small>Asked once per phone</small></div>
-      <b id="pinshow" style="font-size:20px;letter-spacing:.15em"></b>
-      <button class="btn" id="newpin">New PIN</button></div>
-  </div>
+      <section data-page="app-spotify" data-parent="config" data-title="Spotify">
+        <div class="group"><div class="row"><div class="t"><b>Spotify Connect</b><small>Pick this player in the Spotify app (Premium)</small></div>
+          <label class="sw"><input type="checkbox" id="ENABLE_SPOTIFY"><span></span></label></div>
+          <div class="row"><span class="dot" id="acct-spotify-dot"></span><div class="t"><b>Now</b><small id="acct-spotify"></small></div></div></div>
+        <div class="group"><div class="row"><div class="t"><b>Spotify web player</b><small>Browse Spotify on the screen</small></div>
+          <label class="sw"><input type="checkbox" id="ENABLE_SPOTIFY_WEB"><span></span></label></div>
+          <div class="row"><div class="t"><b>Spotify account</b><small>Sign in on the screen</small></div>
+            <button class="btn" data-signout="spotify_web">Sign out</button></div></div>
+        <div class="group" data-guide="spotify"></div>
+      </section>
 
-  <h2>Backup</h2>
-  <div class="note hidden" id="backupnote">Open Settings on your phone or computer to download or restore a backup (see Phone access).</div>
-  <div class="card" id="backupcard">
-    <div class="row"><div class="t"><b>Download a backup</b><small>All your PlexPie settings in one small file, including your Home Assistant password. Keep it somewhere safe.</small></div>
-      <a class="btn" id="backup" href="/api/backup" download style="text-decoration:none">Download</a></div>
-    <div class="row"><div class="t"><b>Restore from a backup</b><small>On a new or reinstalled player. Takes about a minute; music stops meanwhile. Sign in to your apps again afterwards.</small></div>
-      <label class="btn" style="cursor:pointer">Choose file<input type="file" id="restore" accept=".json,application/json" data-noform hidden></label></div>
-  </div>
+      <section data-page="app-bluetooth" data-parent="config" data-title="Bluetooth">
+        <div class="group"><div class="row"><div class="t"><b>Bluetooth</b><small>Any phone, tablet or computer can play to it</small></div>
+          <label class="sw"><input type="checkbox" id="ENABLE_BLUETOOTH"><span></span></label></div></div>
+        <div id="btsection" class="hidden">
+          <div class="group"><div class="row"><div class="t"><b>Pair a device</b><small id="btsub"></small></div>
+            <button class="btn" id="btpair" data-noform>Pair</button></div></div>
+          <h3 id="bthead">Paired devices</h3><div class="group" id="btdevices"></div>
+        </div>
+        <div class="group" data-guide="bluetooth"></div>
+      </section>
 
-  <h2>System</h2>
-  <div class="card">
-    <div class="row hidden" id="protrow"><div class="t"><b>Power-cut protection</b><small id="protsub">Makes the memory card read-only, so pulling the plug can't damage it. Settings changes and updates need it off. Restarts the player.</small></div>
-      <label class="sw"><input type="checkbox" id="protect" data-noform><span></span></label></div>
-    <div class="row"><div class="t"><b>Restart PlexPie</b><small>Reloads the screen and the apps</small></div>
-      <button class="btn" data-sys="restart">Restart</button></div>
-    <div class="row"><div class="t"><b>Reboot the Pi</b></div><button class="btn danger" data-sys="reboot">Reboot</button></div>
-    <div class="row"><div class="t"><b>Shut down</b><small>Before unplugging or moving the player. Plug it back in to start it.</small></div>
-      <button class="btn danger" data-sys="shutdown">Shut down</button></div>
-  </div>
-  <div class="note" id="ver"></div>
+      <section data-page="app-ma" data-parent="config" data-title="Music Assistant">
+        <div class="group"><div class="row"><div class="t"><b>Music Assistant</b><small>A player for Music Assistant, plus its interface on the screen</small></div>
+          <label class="sw"><input type="checkbox" id="ENABLE_MUSIC_ASSISTANT"><span></span></label></div>
+          <div class="row"><span class="dot" id="acct-ma-dot"></span><div class="t"><b>Server</b><small id="acct-ma"></small></div></div></div>
+        <div class="group">
+          <div class="row"><div class="t"><b>Server address</b><small>Where the player connects</small></div>
+            <input id="MA_HOST" type="text" placeholder="homeassistant.local" autocapitalize="off"></div>
+          <div class="row"><div class="t"><b>Web address</b><small>Opened by the Music Assistant tile</small></div>
+            <input id="MA_URL" type="text" placeholder="http://homeassistant.local:8095" autocapitalize="off"></div></div>
+        <div class="group" data-guide="ma"></div>
+      </section>
+
+      <section data-page="app-ha" data-parent="config" data-title="Home Assistant">
+        <div class="group"><div class="row"><span class="dot" id="acct-ha-dot"></span><div class="t"><b>Connection</b><small id="acct-ha"></small></div></div></div>
+        <h3>MQTT (for controls and automations)</h3>
+        <div class="group">
+          <div class="row"><div class="t"><b>Broker</b><small>Empty turns Home Assistant off</small></div>
+            <input id="MQTT_HOST" type="text" placeholder="homeassistant.local" autocapitalize="off"></div>
+          <div class="row"><div class="t"><b>Port</b></div><input id="MQTT_PORT" type="number" placeholder="1883"></div>
+          <div class="row"><div class="t"><b>Username</b></div><input id="MQTT_USER" type="text" autocapitalize="off"></div>
+          <div class="row"><div class="t"><b>Password</b><small id="passnote"></small></div>
+            <input id="MQTT_PASS" type="password" autocomplete="new-password"></div></div>
+        <h3>Dashboard tile</h3>
+        <div class="group">
+          <div class="row"><div class="t"><b>Home Assistant tile</b><small>A dashboard on the screen</small></div>
+            <label class="sw"><input type="checkbox" id="ENABLE_HA_DASHBOARD"><span></span></label></div>
+          <div class="row"><div class="t"><b>Address</b><small>Also used for camera pictures in alerts</small></div>
+            <input id="HA_URL" type="text" placeholder="http://homeassistant.local:8123" autocapitalize="off"></div>
+          <div class="row"><div class="t"><b>Dashboard</b><small>The part after the address, e.g. <code>gym-screen</code>. Empty opens your main dashboard.</small></div>
+            <input id="HA_DASHBOARD" type="text" placeholder="gym-screen" autocapitalize="off"></div></div>
+        <h3>Launcher buttons</h3>
+        <div class="group"><div class="row"><div class="t"><b>Buttons</b><small>Names, separated by commas (e.g. Gym lights, Sound). Each one becomes a switch in Home Assistant for your automations.</small></div>
+          <input id="SHORTCUTS" type="text" placeholder="Gym lights"></div></div>
+        <div class="group" data-guide="ha"></div>
+      </section>
+
+      <section data-page="app-timer" data-parent="config" data-title="Workout timer">
+        <div class="group"><div class="row"><div class="t"><b>Workout timer</b><small>Intervals, countdown and stopwatch, with beeps</small></div>
+          <label class="sw"><input type="checkbox" id="ENABLE_TIMER"><span></span></label></div></div>
+        <div class="group" data-guide="timer"></div>
+      </section>
+
+      <!-- Screen -->
+      <section data-page="screen">
+        <div class="group">
+          <div class="row"><div class="t"><b>Screen sleep</b><small>After this long with no touch and nothing playing</small></div>
+            <select id="SCREEN_OFF_AFTER_SECS">
+              <option value="30">30 seconds</option><option value="60">1 minute</option><option value="120">2 minutes</option>
+              <option value="300">5 minutes</option><option value="900">15 minutes</option><option value="0">Never</option>
+            </select></div>
+          <div class="row"><div class="t"><b>Brightness</b></div><input id="SCREEN_BRIGHTNESS" type="range" min="10" max="100" step="5"></div></div>
+        <div class="group">
+          <div class="row"><div class="t"><b>Show what's playing</b><small>Switch to the app that starts playing</small></div>
+            <label class="sw"><input type="checkbox" id="AUTO_SHOW"><span></span></label></div>
+          <div class="row"><div class="t"><b>Swipe home</b><small>From the left edge or the top edge</small></div>
+            <label class="sw"><input type="checkbox" id="SWIPE_HOME"><span></span></label></div>
+          <div class="row"><div class="t"><b>Album-art colors</b><small>Tint the screens with colors from the cover</small></div>
+            <label class="sw"><input type="checkbox" id="THEME_FROM_ART"><span></span></label></div>
+          <div class="row"><div class="t"><b>Visualizer</b><small>On the AirPlay, Spotify and Bluetooth screens. Tap the cover for full screen.</small></div>
+            <select id="VISUALIZER"><option value="bars">Spectrum bars</option><option value="vu">VU meters</option><option value="off">Off</option></select></div></div>
+        <h3>Night</h3>
+        <div class="group">
+          <div class="row"><div class="t"><b>Dim at night</b><small>Lower the brightness between these times</small></div>
+            <label class="sw"><input type="checkbox" id="NIGHT_DIM"><span></span></label></div>
+          <div class="row" id="nightrow"><div class="t"><b>From</b></div><input id="NIGHT_START" type="time">
+            <div class="t" style="flex:none"><b>to</b></div><input id="NIGHT_END" type="time"></div>
+          <div class="row" id="nightbr"><div class="t"><b>Night brightness</b></div><input id="NIGHT_BRIGHTNESS" type="range" min="5" max="60" step="5"></div>
+          <div class="row"><div class="t"><b>Follow a light sensor</b><small>Brightness follows a Home Assistant light sensor sent to this player's "Ambient light" entity</small></div>
+            <label class="sw"><input type="checkbox" id="AUTO_BRIGHTNESS"><span></span></label></div></div>
+      </section>
+
+      <!-- Sound -->
+      <section data-page="sound">
+        <div class="group">
+          <div class="row"><div class="t"><b>Equalizer</b><small>Shapes the sound for your room, speakers or headphones. Off plays lossless music untouched.</small></div>
+            <label class="sw"><input type="checkbox" id="EQ_ENABLED"><span></span></label></div>
+          <div id="eqbody">
+            <div class="row"><div class="t"><b>Preset</b></div><select id="EQ_PRESET"></select></div>
+            <div class="bands hidden" id="bands"></div>
+            <input type="hidden" id="EQ_BANDS">
+            <div class="row hidden" id="apo" style="display:block">
+              <div class="t" style="margin-bottom:8px"><b>Paste a correction</b><small>From <a href="https://autoeq.app">autoeq.app</a> (pick your headphones, choose "Equalizer APO" and copy the parametric EQ), or any Equalizer APO filter list from REW.</small></div>
+              <textarea id="EQ_CUSTOM_TEXT" placeholder="Filter 1: ON PK Fc 105 Hz Gain -3.4 dB Q 0.70"></textarea></div>
+            <div class="row" style="display:block"><canvas id="eqcurve"></canvas></div>
+          </div></div>
+        <div class="group" data-guide="eq"></div>
+      </section>
+
+      <!-- Network -->
+      <section data-page="network">
+        <div class="group">
+          <div class="row"><div class="t"><b>Wi-Fi</b><small id="wifisub"></small></div>
+            <label class="sw"><input type="checkbox" id="wifi" data-noform><span></span></label></div>
+          <div class="row" id="wifiscanrow"><div class="t"><b>Join a network</b><small>Pick a network, then enter its password</small></div>
+            <button class="btn" id="wifiscan">Scan</button></div></div>
+        <div class="group" id="wifilist"></div>
+      </section>
+
+      <!-- Updates -->
+      <section data-page="updates">
+        <div class="page-intro">PlexPie and Raspberry Pi OS update separately. Each checks automatically twice a day.</div>
+        <div class="group" id="upd-plexpie"></div>
+        <div class="group" id="upd-os"></div>
+        <div class="note" id="updnote"></div>
+      </section>
+
+      <!-- Remote access -->
+      <section data-page="remote">
+        <div class="group">
+          <div class="row"><div class="t"><b>Settings from other devices</b><small>Any phone, tablet or computer on your Wi-Fi</small></div>
+            <label class="sw"><input type="checkbox" id="PHONE_ACCESS"><span></span></label></div>
+          <div class="row"><div class="t"><b>Address</b><small>Open <code id="phoneurl"></code> in Safari, Chrome or any browser</small></div></div>
+          <div class="row local-only"><div class="t"><b>PIN</b><small>Asked once on each device</small></div>
+            <b id="pinshow" style="font-size:20px;letter-spacing:.15em"></b>
+            <button class="btn" id="newpin">New PIN</button></div></div>
+        <div class="group local-only" id="remoteqr"></div>
+        <h3>Registered devices</h3>
+        <div class="group" id="devices"></div>
+        <div class="note">Devices stay signed in for a year after their last visit. <span class="local-only">New PIN signs every device out.</span></div>
+      </section>
+
+      <!-- Backup -->
+      <section data-page="backup">
+        <div class="page-intro">A backup is one small file with all your PlexPie settings, including your Home Assistant password. Keep it somewhere safe.</div>
+        <div class="group local-only" id="backupqr"></div>
+        <div class="group remote-only">
+          <div class="row"><div class="t"><b>Download a backup</b><small>Saves to Downloads, or Files on an iPhone or iPad</small></div>
+            <a class="btn" id="backup" href="/api/backup" download style="text-decoration:none">Download</a></div>
+          <div class="row"><div class="t"><b>Restore from a backup</b><small>On a new or reinstalled player. Takes about a minute; music stops meanwhile. Sign in to your apps again afterwards.</small></div>
+            <label class="btn" style="cursor:pointer">Choose file<input type="file" id="restore" accept=".json,application/json" data-noform hidden></label></div></div>
+        <div class="group" data-guide="backup"></div>
+      </section>
+
+      <!-- Guides -->
+      <section data-page="guides">
+        <div class="page-intro">Plain-English, step-by-step instructions with pictures. They come with the player, so they work without internet and always match this version.</div>
+        <div class="group local-only" id="guideqr"></div>
+        <div class="group remote-only"><div class="row link" data-href="/guide.pdf"><div class="icon" style="background:#ff453a"></div>
+          <div class="t"><b>Full setup guide (PDF)</b><small>Everything from the memory card to every app. Save, share or print it.</small></div><span class="chev">›</span></div></div>
+        <h3>Guides</h3><div class="group" id="guidelist"></div>
+      </section>
+
+      <!-- System -->
+      <section data-page="system">
+        <div class="group">
+          <div class="row"><div class="t"><b>Name</b></div><span class="val" data-name></span></div>
+          <div class="row"><div class="t"><b>PlexPie version</b></div><span class="val" id="ver"></span></div></div>
+        <div class="group hidden" id="protgroup"><div class="row"><div class="t"><b>Power-cut protection</b><small>Makes the memory card read-only, so pulling the plug can't damage it. Settings changes and updates need it off. Restarts the player.</small></div>
+          <label class="sw"><input type="checkbox" id="protect" data-noform><span></span></label></div></div>
+        <div class="group">
+          <div class="row"><div class="t"><b>Restart PlexPie</b><small>Reloads the screen and the apps</small></div>
+            <button class="btn" data-sys="restart">Restart</button></div>
+          <div class="row"><div class="t"><b>Reboot</b><small>Restarts the whole Raspberry Pi</small></div><button class="btn danger" data-sys="reboot">Reboot</button></div>
+          <div class="row"><div class="t"><b>Shut down</b><small>Before unplugging or moving the player. Plug it back in to start it.</small></div>
+            <button class="btn danger" data-sys="shutdown">Shut down</button></div></div>
+      </section>
+    </div>
+    <div class="savebar hidden" id="savebar"><button class="btn" id="undo">Undo</button><button class="btn primary" id="save">Save</button></div>
+  </main>
 </div>
 
-<div class="bar hidden" id="bar"><button class="save" id="save" disabled>Save</button></div>
-
+<script src="/qrcode.js"></script>
 <script>
 const $ = (id) => document.getElementById(id);
-const APPS = [
-  ["ENABLE_APPLE_MUSIC_WEB", "Apple Music", "Web player on the screen"],
-  ["ENABLE_AIRPLAY", "AirPlay", "Play from iPhone, iPad or Mac"],
-  ["ENABLE_SPOTIFY", "Spotify Connect", "Play from the Spotify app (Premium)"],
-  ["ENABLE_SPOTIFY_WEB", "Spotify web player", "Browse Spotify on the screen"],
-  ["ENABLE_MUSIC_ASSISTANT", "Music Assistant", "Player and interface for Music Assistant"],
-  ["ENABLE_BLUETOOTH", "Bluetooth", "Any phone can play to it"],
-  ["ENABLE_TIMER", "Workout timer", "Intervals, countdown and stopwatch"],
-  ["ENABLE_HA_DASHBOARD", "Home Assistant", "Your Home Assistant dashboard on the screen (needs its address under Home Assistant)"],
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
+const svg = p => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+const I = {
+  grid: svg('<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>'),
+  sun: svg('<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'),
+  sound: svg('<path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/>'),
+  wifi: svg('<path d="M2 8.8a15 15 0 0 1 20 0M5 12.6a10 10 0 0 1 14 0M8.5 16.4a5 5 0 0 1 7 0"/><circle cx="12" cy="20" r=".8" fill="currentColor"/>'),
+  update: svg('<path d="M21 12a9 9 0 1 1-2.6-6.4L21 8"/><path d="M21 3v5h-5"/>'),
+  devices: svg('<rect x="2" y="4" width="13" height="16" rx="2"/><rect x="16" y="9" width="6" height="11" rx="1.5"/><path d="M8 17h1"/>'),
+  backup: svg('<rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9M10 13h4"/>'),
+  book: svg('<path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v17H6.5A2.5 2.5 0 0 0 4 21.5z"/><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>'),
+  power: svg('<path d="M12 3v9"/><path d="M6.3 7.3a8 8 0 1 0 11.4 0"/>'),
+  note: svg('<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>'),
+  apple: svg('<path d="M12 7c-1-2-3-3-5-2-3 1-3 6-1 10 1 2 2 4 4 4 1 0 1.4-.6 2-.6s1 .6 2 .6c2 0 3.4-3 4-4.6-2-1-2.4-4.4-.4-5.6-1-1.4-2.6-2-4-1.6-.8.2-1.2.8-1.6.8z"/><path d="M12 7c0-2 1.4-3.6 3-4"/>'),
+  airplay: svg('<path d="M5 17H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-1"/><path d="m12 15 5 6H7z"/>'),
+  spotify: svg('<circle cx="12" cy="12" r="10"/><path d="M7 9.5c3.5-1 7-.6 10 1M7.5 13c3-.8 5.6-.4 8 .8M8 16.3c2.4-.6 4.4-.3 6 .6"/>'),
+  bt: svg('<path d="m7 7 10 10-5 5V2l5 5L7 17"/>'),
+  ma: svg('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3"/>'),
+  ha: svg('<path d="M3 11 12 3l9 8"/><path d="M5 9.5V20h14V9.5"/><circle cx="12" cy="14" r="2"/>'),
+  timer: svg('<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6"/>'),
+  plex: svg('<path d="M8 4h4l5 8-5 8H8l5-8z"/>'),
+  eq: svg('<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/>'),
+  pdf: svg('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 15h6M9 18h4"/>'),
+  build: svg('<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6v6H9zM9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/>'),
+  check: svg('<path d="m5 12 5 5L20 7"/>'),
+  phone: svg('<rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/>'),
+  tablet: svg('<rect x="4" y="2" width="16" height="20" rx="2"/><path d="M11 18h2"/>'),
+  laptop: svg('<rect x="4" y="4" width="16" height="11" rx="1.5"/><path d="M2 19h20"/>'),
+};
+document.querySelectorAll(".remote-only .icon").forEach(e => e.innerHTML = I.pdf);
+
+const CATS = [
+  ["config", "Configuration", I.grid, "#0a84ff", "Apps, accounts, Home Assistant"],
+  ["screen", "Screen", I.sun, "#5e5ce6"],
+  ["sound", "Sound", I.sound, "#ff375f"],
+  ["network", "Network", I.wifi, "#30b0c7"],
+  ["updates", "Updates", I.update, "#8e8e93"],
+  ["remote", "Remote access", I.devices, "#30d158", "Phones, tablets, computers"],
+  ["backup", "Backup", I.backup, "#ff9f0a"],
+  ["guides", "Setup guides", I.book, "#bf5af2"],
+  ["system", "System", I.power, "#636366"],
 ];
-const FIELDS = ["SCREEN_OFF_AFTER_SECS", "SCREEN_BRIGHTNESS", "AUTO_SHOW", "SWIPE_HOME", "MQTT_HOST", "MQTT_PORT",
+// id, name, icon, color, group, enable flag, guide id
+const APPS = [
+  ["plexamp", "Plexamp", I.plex, "#e5a00d", "music", null],
+  ["apple", "Apple Music", I.apple, "#fa2d48", "music", "ENABLE_APPLE_MUSIC_WEB"],
+  ["airplay", "AirPlay", I.airplay, "#0a84ff", "music", "ENABLE_AIRPLAY"],
+  ["spotify", "Spotify", I.spotify, "#1db954", "music", ["ENABLE_SPOTIFY", "ENABLE_SPOTIFY_WEB"]],
+  ["bluetooth", "Bluetooth", I.bt, "#0a6cff", "music", "ENABLE_BLUETOOTH"],
+  ["ma", "Music Assistant", I.ma, "#18a0e0", "music", "ENABLE_MUSIC_ASSISTANT"],
+  ["ha", "Home Assistant", I.ha, "#18bcf2", "home", null],
+  ["timer", "Workout timer", I.timer, "#ff9f0a", "home", "ENABLE_TIMER"],
+];
+const GUIDES = [
+  ["build", "Build and install", "Parts, memory card, wiring, installing", I.build, "#636366"],
+  ["plexamp", "Plexamp", "Link your Plex account and play", I.plex, "#e5a00d"],
+  ["apple", "Apple Music", "Sign in once on the screen", I.apple, "#fa2d48"],
+  ["airplay", "AirPlay", "Play from an iPhone, iPad or Mac", I.airplay, "#0a84ff"],
+  ["spotify", "Spotify", "Spotify Connect and the web player", I.spotify, "#1db954"],
+  ["bluetooth", "Bluetooth", "Pair a phone, tablet or computer", I.bt, "#0a6cff"],
+  ["ma", "Music Assistant", "Use it as a Music Assistant speaker", I.ma, "#18a0e0"],
+  ["ha", "Home Assistant", "Controls, dashboard tile, launcher buttons", I.ha, "#18bcf2"],
+  ["timer", "Workout timer", "Intervals, countdown, stopwatch", I.timer, "#ff9f0a"],
+  ["eq", "Equalizer", "Presets and room correction", I.eq, "#ff375f"],
+  ["remote", "Remote access", "Change settings from any device", I.devices, "#30d158"],
+  ["backup", "Backup and restore", "Keep your settings safe", I.backup, "#ff9f0a"],
+];
+const FIELDS = ["ENABLE_APPLE_MUSIC_WEB", "ENABLE_AIRPLAY", "ENABLE_SPOTIFY", "ENABLE_SPOTIFY_WEB", "ENABLE_MUSIC_ASSISTANT",
+  "ENABLE_BLUETOOTH", "ENABLE_TIMER", "ENABLE_HA_DASHBOARD",
+  "SCREEN_OFF_AFTER_SECS", "SCREEN_BRIGHTNESS", "AUTO_SHOW", "SWIPE_HOME", "MQTT_HOST", "MQTT_PORT",
   "MQTT_USER", "MQTT_PASS", "SHORTCUTS", "MA_HOST", "MA_URL", "PHONE_ACCESS",
   "EQ_ENABLED", "EQ_PRESET", "EQ_BANDS", "EQ_CUSTOM_TEXT", "THEME_FROM_ART", "VISUALIZER", "NIGHT_DIM",
   "NIGHT_START", "NIGHT_END", "NIGHT_BRIGHTNESS", "AUTO_BRIGHTNESS", "HA_URL", "HA_DASHBOARD"];
-let data = null;
+const INSTALL_FLAG = {apple: null, airplay: "ENABLE_AIRPLAY", spotify: "ENABLE_SPOTIFY", bluetooth: "ENABLE_BLUETOOTH", ma: "ENABLE_MUSIC_ASSISTANT"};
+let data = null, page = null, dirty = false;
+const wide = () => matchMedia("(min-width: 700px)").matches;
 
 function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("on");
   clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove("on"), 2600); }
 const api = (path, body) => fetch(path, body === undefined ? {} : {method: "POST",
   headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
-
-function row(title, small, right) {
-  return `<div class="row"><div class="t"><b>${title}</b>${small ? `<small>${small}</small>` : ""}</div>${right}</div>`;
+const baseUrl = () => (data.phone_url || "").replace(/\/settings$/, "");
+const acct = id => (data.accounts || []).find(a => a.id === id) || {};
+function qrSvg(text) {
+  if (typeof qrcode === "undefined" || !text) return "";
+  const q = qrcode(0, "M"); q.addData(text); q.make();
+  return q.createSvgTag({cellSize: 4, margin: 0, scalable: true});
 }
-function esc(s) { return String(s ?? "").replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c])); }
+function qrCard(url, title, steps) {
+  return `<div class="qr"><div class="code">${qrSvg(url)}</div><div><b>${title}</b>
+    <ol>${steps.map(s => `<li>${s}</li>`).join("")}</ol></div></div>`;
+}
+const ago = t => { if (!t) return ""; const m = Math.round((Date.now() / 1000 - t) / 60);
+  return m < 2 ? "just now" : m < 120 ? `${m} min ago` : m < 2880 ? `${Math.round(m / 60)} hours ago` : `${Math.round(m / 1440)} days ago`; };
+const day = t => { if (!t) return "";
+  const d = new Date(t * 1000), now = new Date(), y = new Date(now - 864e5);
+  if (d.toDateString() === now.toDateString()) return "today";
+  if (d.toDateString() === y.toDateString()) return "yesterday";
+  return d.toLocaleDateString(undefined, {month: "short", day: "numeric"}); };
 
+// ---------------- navigation (tap only, no swiping)
+function appState(id) {
+  const v = data.values, a = APPS.find(x => x[0] === id), f = a[5];
+  const inst = INSTALL_FLAG[id] && data.installed[INSTALL_FLAG[id]] === false;
+  if (inst) return "Not installed";
+  const on = f == null ? true : Array.isArray(f) ? f.some(k => v[k]) : !!v[f];
+  if (id === "ha") return acct("ha").status || "";
+  if (!on) return "Off";
+  const ac = acct(id);
+  if (id === "plexamp") return ac.status || "On";
+  if (id === "apple") return ac.ok ? "On · signed in" : ac.ok === false ? "On · not signed in" : "On";
+  if (id === "bluetooth") { const b = data.bluetooth || {}; return b.connected ? `On · ${b.connected}` : "On"; }
+  if (id === "ma") return ac.ok ? "On · server reachable" : "On · server not reachable";
+  return "On";
+}
+function navRow(id, name, icon, color, sub, extra = "") {
+  return `<div class="row ic navrow" data-go="${id}"><div class="icon" style="background:${color}">${icon}</div>
+    <div class="t"><b>${name}</b>${sub ? `<small>${esc(sub)}</small>` : ""}</div>${extra}<span class="chev">›</span></div>`;
+}
+function updateCount() { const u = data.updates || {};
+  return (+(u.plexpie || {}).behind ? 1 : 0) + (+(u.os || {}).count ? 1 : 0); }
+function renderNav() {
+  const n = updateCount();
+  const groups = [["config"], ["screen", "sound", "network"], ["updates", "remote", "backup"], ["guides", "system"]];
+  $("nav").innerHTML = groups.map(g => `<div class="group">${g.map(id => {
+    const c = CATS.find(x => x[0] === id);
+    return navRow(id, c[1], c[2], c[3], c[4] || "", id === "updates" && n ? `<span class="badge">${n}</span>` : "");
+  }).join("")}</div>`).join("");
+  document.querySelectorAll("#nav .navrow").forEach(r => r.classList.toggle("on", page && (page === r.dataset.go || pageParent(page) === r.dataset.go)));
+  for (const grp of ["music", "home"])
+    $("applist-" + grp).innerHTML = APPS.filter(a => a[4] === grp).map(a => navRow("app-" + a[0], a[1], a[2], a[3], appState(a[0]))).join("");
+}
+const pageEl = id => document.querySelector(`section[data-page="${id}"]`);
+const pageParent = id => (pageEl(id) || {}).dataset?.parent || null;
+function go(id, push = true) {
+  if (!pageEl(id)) id = "config";
+  page = id;
+  document.querySelectorAll("section[data-page]").forEach(s => s.classList.toggle("hidden", s.dataset.page !== id));
+  const el = pageEl(id), parent = el.dataset.parent, cat = CATS.find(c => c[0] === id);
+  $("ptitle").textContent = el.dataset.title || (cat ? cat[1] : "");
+  const backTo = parent ? CATS.find(c => c[0] === parent)[1] : (wide() ? "" : "Settings");
+  $("back").textContent = backTo; $("back").style.visibility = backTo ? "visible" : "hidden";
+  document.body.classList.add("in-page");
+  $("pages").scrollTop = 0;
+  renderNav();
+  if (id === "sound") requestAnimationFrame(() => setTimeout(drawEq, 30));
+  if (id === "updates" || id === "remote") refreshQuick();
+  if (push) history.replaceState(null, "", "#" + id);
+}
+$("back").onclick = () => {
+  const parent = pageParent(page);
+  if (parent) return go(parent);
+  document.body.classList.remove("in-page"); page = null; renderNav(); history.replaceState(null, "", location.pathname);
+};
+document.addEventListener("click", e => {
+  const g = e.target.closest("[data-go]"); if (g) return go(g.dataset.go);
+  const h = e.target.closest("[data-href]"); if (h) location.href = h.dataset.href;
+});
+document.querySelectorAll("[data-done]").forEach(b => b.onclick = () => api("/api/source", {source: "home"}));
+addEventListener("resize", () => { if (wide() && !page) go("config"); else if (page) go(page, false); });
+
+// ---------------- render
+function guideRow(id) {
+  const g = GUIDES.find(x => x[0] === id);
+  return `<div class="row ic link" data-href="/guide#${id}"><div class="icon" style="background:#bf5af2">${I.book}</div>
+    <div class="t"><b>Setup instructions</b><small>${esc(g ? g[2] : "")}</small></div><span class="chev">›</span></div>`;
+}
 function render() {
   const v = data.values;
+  document.querySelectorAll(".local-only").forEach(e => e.classList.toggle("hidden", !data.local));
+  document.querySelectorAll(".remote-only").forEach(e => e.classList.toggle("hidden", !!data.local));
+  $("who").textContent = data.player_name;
+  document.querySelectorAll("[data-name]").forEach(e => e.textContent = data.player_name);
   $("EQ_PRESET").innerHTML = Object.entries(data.eq_presets || {}).map(([k, p]) => `<option value="${k}">${esc(p.name)}</option>`).join("");
-  renderBt(data.bluetooth);
-  const pr = data.protect || {};
-  $("protrow").classList.toggle("hidden", !pr.available);
-  $("protect").checked = !!pr.active;
-  $("protbanner").classList.toggle("hidden", !pr.active);
-  $("updrun").disabled = !!pr.active;
-  $("backupcard").classList.toggle("hidden", !!data.local);
-  $("backupnote").classList.toggle("hidden", !data.local);
-  $("who").textContent = `${data.player_name} · changes apply in a few seconds`;
-  $("apps").innerHTML = row("Plexamp", "Always on", `<label class="sw"><input type="checkbox" checked disabled><span></span></label>`) +
-    APPS.map(([k, name, desc]) => {
-      const missing = k in data.installed && !data.installed[k];
-      return row(name, missing ? "Not installed: run the installer again" : desc,
-        `<label class="sw"><input type="checkbox" id="${k}" ${v[k] ? "checked" : ""} ${missing ? "disabled" : ""}><span></span></label>`);
-    }).join("");
-  $("accounts").innerHTML = data.accounts.map(a => `<div class="row"><span class="dot ${a.ok === true ? "ok" : a.ok === false ? "no" : ""}"></span>
-      <div class="t"><b>${esc(a.name)}</b><small>${esc(a.status)}</small></div>
-      ${a.action ? `<button class="btn" data-signout="${a.id}">${esc(a.action)}</button>` : ""}</div>`).join("");
   for (const k of FIELDS) {
     const el = $(k); if (!el) continue;
     if (el.type === "checkbox") el.checked = !!v[k]; else el.value = v[k] ?? "";
   }
-  if (![...$("SCREEN_OFF_AFTER_SECS").options].some(o => o.value === String(v.SCREEN_OFF_AFTER_SECS)))
-    $("SCREEN_OFF_AFTER_SECS").insertAdjacentHTML("beforeend", `<option value="${esc(v.SCREEN_OFF_AFTER_SECS)}">${esc(v.SCREEN_OFF_AFTER_SECS)} seconds</option>`), $("SCREEN_OFF_AFTER_SECS").value = v.SCREEN_OFF_AFTER_SECS;
+  for (const [id, flag] of Object.entries(INSTALL_FLAG)) {
+    if (flag && data.installed[flag] === false) { const el = $(flag); if (el) { el.disabled = true; el.checked = false; } }
+  }
+  const sel = $("SCREEN_OFF_AFTER_SECS");
+  if (![...sel.options].some(o => o.value === String(v.SCREEN_OFF_AFTER_SECS)))
+    sel.insertAdjacentHTML("beforeend", `<option value="${esc(v.SCREEN_OFF_AFTER_SECS)}">${esc(v.SCREEN_OFF_AFTER_SECS)} seconds</option>`), sel.value = v.SCREEN_OFF_AFTER_SECS;
+  for (const id of ["plexamp", "apple", "spotify", "ma", "ha"]) {
+    const a = acct(id), el = $("acct-" + id); if (!el) continue;
+    el.textContent = a.status || (id === "apple" ? "Turn Apple Music on to sign in" : "Off");
+    $("acct-" + id + "-dot").className = "dot " + (a.ok === true ? "ok" : a.ok === false ? "no" : "");
+  }
   $("passnote").textContent = v.MQTT_PASS_SET ? "Saved · leave empty to keep it" : "";
-  $("phoneurl").innerHTML = data.phone_url ? `Open <code>${esc(data.phone_url)}</code> on your phone` : "";
+  $("phoneurl").textContent = data.phone_url || "(no network)";
   $("pinshow").textContent = v.PHONE_PIN || "";
-  document.querySelectorAll(".local-only").forEach(e => e.classList.toggle("hidden", !data.local));
-  $("ver").textContent = `PlexPie ${data.version}`;
-  renderUpdates(data.updates); renderWifi(data.wifi);
-  nightUi(); buildBands(); eqUi(); requestAnimationFrame(() => setTimeout(drawEq, 30));
-  $("main").classList.remove("hidden"); $("bar").classList.remove("hidden");
-  $("save").disabled = true;
+  $("ver").textContent = data.version;
+  const pr = data.protect || {};
+  $("protgroup").classList.toggle("hidden", !pr.available);
+  $("protect").checked = !!pr.active;
+  $("protbanner").classList.toggle("hidden", !pr.active);
+  document.querySelectorAll("[data-guide]").forEach(g => g.innerHTML = guideRow(g.dataset.guide));
+  $("guidelist").innerHTML = GUIDES.map(g => `<div class="row ic link" data-href="/guide#${g[0]}"><div class="icon" style="background:${g[4]}">${g[3]}</div>
+    <div class="t"><b>${g[1]}</b><small>${g[2]}</small></div><span class="chev">›</span></div>`).join("");
+  if (data.local && data.phone_url) {
+    const scan = "Point your phone or tablet camera at the code and tap the link";
+    const pin = "If it asks, enter the PIN from Remote access (once per device)";
+    $("remoteqr").innerHTML = qrCard(data.phone_url, "Open settings on another device", [scan, pin]);
+    $("backupqr").innerHTML = qrCard(baseUrl() + "/settings#backup", "Send to a device",
+      [scan, pin, "Tap <b>Download</b> and save the file (Files, iCloud Drive or Downloads)"]) +
+      `<div class="note">To restore later, scan the same code and tap <b>Choose file</b>.</div>`;
+    $("guideqr").innerHTML = qrCard(baseUrl() + "/guide", "Send the guides to a device",
+      [scan, pin, "Read them there, or tap <b>Download PDF</b> or <b>Share</b> to save, AirDrop, email or print them"]);
+  }
+  renderDevices(data.devices); renderBt(data.bluetooth); renderUpdates(data.updates); renderWifi(data.wifi);
+  nightUi(); buildBands(); eqUi();
+  setDirty(false);
+  $("app").classList.remove("hidden");
+  renderNav();
 }
 
 function collect() {
   const out = {};
-  for (const [k] of APPS) { const el = $(k); if (el && !el.disabled) out[k] = el.checked; }
-  for (const k of FIELDS) { const el = $(k); if (el) out[k] = el.type === "checkbox" ? el.checked : el.value; }
+  for (const k of FIELDS) { const el = $(k); if (el && !el.disabled) out[k] = el.type === "checkbox" ? el.checked : el.value; }
   return out;
 }
+function setDirty(on) { dirty = on; $("savebar").classList.toggle("hidden", !on); }
+const formEvent = e => { if (e.target.closest("#pages") && !e.target.closest("[data-noform],#wifilist")) setDirty(true); };
+document.addEventListener("input", formEvent); document.addEventListener("change", formEvent);
+$("undo").onclick = () => { const p = page; render(); go(p, false); };
+$("save").onclick = async () => {
+  $("save").disabled = true; $("save").textContent = "Saving…";
+  try { await api("/api/settings", collect()); } catch (e) {}
+  toast("Saved. Applying…");
+  await waitBack(); $("save").disabled = false; $("save").textContent = "Save"; toast("Done");
+};
 
 async function load() {
   const r = await api("/api/settings");
   if (r.status === 401) { $("login").classList.remove("hidden"); return; }
-  if (r.status === 403) { document.body.innerHTML = '<div id="login"><h1>Phone access is off</h1><div class="sub">Turn it on in Settings on the player.</div></div>'; return; }
+  if (r.status === 403) { document.body.innerHTML = '<div id="login"><h1>Remote access is off</h1><div class="sub">Turn it on in Settings › Remote access on the player.</div></div>'; return; }
   data = await r.json(); render();
+  const want = location.hash.slice(1);
+  if (want) go(want); else if (wide()) go("config");
 }
-
 async function waitBack() {
   for (let i = 0; i < 30; i++) {
     await new Promise(r => setTimeout(r, 1000));
-    try { const r = await api("/api/settings"); if (r.ok) { data = await r.json(); render(); return true; } } catch (e) {}
+    try { const r = await api("/api/settings"); if (r.ok) { const p = page; data = await r.json(); render(); if (p) go(p, false); return true; } } catch (e) {}
   }
   return false;
 }
+async function refreshQuick() {         // devices and updates, without re-rendering the whole page
+  try { const r = await api("/api/devices"); if (r.ok) renderDevices(await r.json()); } catch (e) {}
+  pollUpdate();
+}
 
-document.addEventListener("input", e => { if (e.target.closest("#main") && !e.target.closest("[data-noform],#wifilist")) $("save").disabled = false; });
-document.addEventListener("change", e => { if (e.target.closest("#main") && !e.target.closest("[data-noform],#wifilist")) $("save").disabled = false; });
-
-// ---- updates
-const ago = t => { const m = Math.round((Date.now() / 1000 - t) / 60);
-  return m < 2 ? "just now" : m < 120 ? `${m} minutes ago` : `${Math.round(m / 60)} hours ago`; };
+// ---------------- updates: PlexPie and Raspberry Pi OS, each with its own button and progress
+const fmtT = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+function updCard(kind, u, run) {
+  const isPP = kind === "plexpie";
+  const busy = run.running && (run.kind === kind || run.kind === "all" && (isPP ? run.percent >= 60 : run.percent < 60));
+  const other = run.running && !busy;
+  const icon = isPP ? `<div class="icon" style="background:#e5a00d">${I.plex}</div>` : `<div class="icon" style="background:#c51a4a">${I.update}</div>`;
+  const name = isPP ? "PlexPie" : "Raspberry Pi OS";
+  const n = isPP ? +u.behind || 0 : +u.count || 0;
+  const prot = (data.protect || {}).active;
+  let title, sub, btn = "", extra = "";
+  if (busy) {
+    const pct = Math.max(1, Math.min(100, +run.percent || 1));
+    const el = run.started ? Date.now() / 1000 - run.started : 0;
+    title = `${isPP ? "Updating PlexPie" : "Updating Raspberry Pi OS"} <span class="pct">${pct}%</span>`;
+    sub = [run.step, run.detail].filter(Boolean).join(" · ") + (el > 0 ? ` · ${fmtT(el)}` : "");
+    extra = `<div class="prog${pct <= 1 ? " indet" : ""}"><b style="width:${pct}%"></b></div>`;
+  } else if (u.checking) {
+    title = name; sub = "Checking for updates…";
+    btn = `<button class="btn" disabled>Checking…</button>`;
+    extra = `<div class="prog indet"><b></b></div>`;
+  } else if (n) {
+    title = isPP ? `PlexPie ${esc(u.latest || "update")} is available` : `${n} update${n > 1 ? "s" : ""} available`;
+    sub = isPP ? `You have ${esc(u.current || data.version)}` : "Security and bug fixes for the Raspberry Pi. Music may stop for a minute.";
+    btn = `<button class="btn primary" data-upd-run="${kind}" ${other || prot ? "disabled" : ""}>Update</button>`;
+    const list = isPP ? (u.changes || []) : (u.packages || []).concat(n > 8 ? [`and ${n - 8} more`] : []);
+    if (list.length) extra = `<ul class="changes">${list.map(x => `<li>${esc(x)}</li>`).join("")}</ul>`;
+  } else {
+    title = isPP ? `PlexPie ${esc(u.current || data.version)}` : name;
+    sub = u.checked ? `Up to date · checked ${ago(u.checked)}` : "Not checked yet";
+    btn = `<button class="btn" data-upd-check="${kind}" ${other ? "disabled" : ""}>Check now</button>`;
+  }
+  if (!busy && !isPP && (u.reboot || (run.reboot && run.kind !== "plexpie"))) {
+    title = name; extra = "";
+    sub = "Updates installed · restart the player to finish";
+    btn = `<button class="btn primary" data-sys="reboot">Restart</button>`;
+  }
+  if (!busy && run.step && /failed|interrupted/i.test(run.step) && (run.kind === kind || run.kind === "all"))
+    sub = `<span style="color:var(--warn)">${esc(run.step)}</span>`;
+  return `<div class="row ic">${icon}<div class="t"><b>${title}</b><small>${sub}</small></div>${btn}</div>${extra}`;
+}
 function renderUpdates(u) {
   u = u || {}; const run = u.run || {};
-  const os = +u.os || 0, pp = +u.plexpie || 0;
-  if (run.running) {
-    const pct = run.percent == null ? null : Math.max(0, Math.min(100, +run.percent));
-    $("updtitle").textContent = pct == null ? "Updating…" : `Updating… ${pct}%`;
-    $("updsub").textContent = [run.step, run.detail].filter(Boolean).join(" · ") +
-      (run.started ? ` · started ${ago(run.started)}` : "");
-    $("updprog").classList.remove("hidden"); $("updbar").style.width = (pct ?? 3) + "%";
-    $("updrow").classList.add("hidden"); $("updcheck").disabled = true;
-    clearTimeout(renderUpdates.t); renderUpdates.t = setTimeout(pollUpdate, 3000); return;
-  }
-  $("updcheck").disabled = false; $("updprog").classList.add("hidden");
-  const parts = [];
-  if (os) parts.push(`${os} system update${os > 1 ? "s" : ""}`);
-  if (pp) parts.push("PlexPie update");
-  $("updtitle").textContent = parts.length ? "Updates available" : (u.checked ? "Up to date" : "Not checked yet");
-  let sub = u.checked ? `Checked ${ago(u.checked)}` : "Checks automatically twice a day";
-  if (run.step && run.step !== "Up to date") sub = run.step;
-  if (u.reboot || run.reboot) sub += " · restart needed to finish";
-  $("updsub").textContent = sub;
-  $("updwhat").textContent = parts.join(" · ");
-  $("updrow").classList.toggle("hidden", !parts.length);
+  data.updates = u;
+  $("upd-plexpie").innerHTML = updCard("plexpie", u.plexpie || {}, run);
+  $("upd-os").innerHTML = updCard("os", u.os || {}, run);
+  $("updnote").textContent = (data.protect || {}).active ? "Turn off power-cut protection (System) to install updates." :
+    run.running ? "You can leave this page: the update keeps going, and the player tells you when it's done." : "";
+  renderNav();
+  const active = run.running || (u.plexpie || {}).checking || (u.os || {}).checking;
+  clearTimeout(renderUpdates.t);
+  if (active) renderUpdates.t = setTimeout(pollUpdate, 1000);
 }
 async function pollUpdate() {
-  try { const r = await api("/api/system", {action: "update-status"}); renderUpdates(await r.json()); }
-  catch (e) { renderUpdates.t = setTimeout(pollUpdate, 4000); }   // PlexPie restarts during the update
+  try { const r = await api("/api/system", {action: "update-status"}); if (!r.ok) throw 0; renderUpdates(await r.json()); }
+  catch (e) {                                      // PlexPie restarts itself near the end of its update
+    const s = document.querySelector("#upd-plexpie small"); if (s && (data.updates.run || {}).running) s.textContent = "Restarting PlexPie…";
+    clearTimeout(renderUpdates.t); renderUpdates.t = setTimeout(pollUpdate, 2000);
+  }
 }
-$("updcheck").onclick = async () => {
-  $("updtitle").textContent = "Checking…"; $("updcheck").disabled = true;
-  const r = await api("/api/system", {action: "update-check"}); renderUpdates(await r.json());
-};
-$("updrun").onclick = async () => {
-  if (!confirm("Install updates now? Music may stop for a minute.")) return;
-  await api("/api/system", {action: "update-run"}); toast("Updating…"); setTimeout(pollUpdate, 1500);
-};
+document.addEventListener("click", async e => {
+  const c = e.target.closest("[data-upd-check]");
+  if (c) { c.disabled = true; c.textContent = "Checking…";
+    const r = await api("/api/system", {action: "update-check", kind: c.dataset.updCheck}); renderUpdates(await r.json()); return; }
+  const u = e.target.closest("[data-upd-run]");
+  if (u) {
+    const pp = u.dataset.updRun === "plexpie";
+    if (!confirm(pp ? "Update PlexPie now? The screen reloads at the end." : "Install Raspberry Pi OS updates now? Music may stop for a minute.")) return;
+    u.disabled = true; u.textContent = "Starting…";
+    const r = await api("/api/system", {action: "update-run", kind: u.dataset.updRun});
+    if (!r.ok) { const j = await r.json().catch(() => ({})); toast(j.error || "Couldn't start the update"); }
+    pollUpdate();
+  }
+});
 
-// ---- wi-fi
+// ---------------- registered devices
+function renderDevices(list) {
+  list = list || [];
+  const devIcon = n => /iPad|tablet/i.test(n) ? I.tablet : /iPhone|phone/i.test(n) ? I.phone : /Mac|PC|computer|Chromebook/i.test(n) ? I.laptop : I.devices;
+  $("devices").innerHTML = list.length ? list.map(d => `<div class="row ic"><div class="icon" style="background:#3a3a3f">${devIcon(d.name)}</div>
+      <div class="t"><b>${esc(d.name)}${d.this ? '<span class="tag">This device</span>' : ""}</b>
+      <small>${d.first ? `Added ${day(d.first)}` : "Signed in"}${d.last ? ` · last used ${day(d.last)}` : ""}</small></div>
+      <button class="btn danger" data-dev-out="${esc(d.id)}">Sign out</button></div>`).join("")
+    : `<div class="row"><div class="t"><small>None yet. Open the address above on a phone, tablet or computer and enter the PIN.</small></div></div>`;
+}
+document.addEventListener("click", async e => {
+  const b = e.target.closest("[data-dev-out]"); if (!b) return;
+  const me = b.closest(".row").querySelector(".tag");
+  if (!confirm(me ? "Sign this device out? You'll need the PIN to come back." : "Sign this device out? It will need the PIN again.")) return;
+  const r = await api("/api/devices", {action: "signout", id: b.dataset.devOut});
+  if (me) return location.reload();
+  renderDevices(await r.json()); toast("Signed out");
+});
+
+// ---------------- wi-fi
 function renderWifi(w) {
   w = w || {};
   const on = w.radio === "enabled";
@@ -362,11 +743,12 @@ function renderWifi(w) {
     : w.ssid ? `Connected to ${w.ssid}${w.ip ? " · " + w.ip : ""}` : "On · not connected";
   $("wifiscanrow").classList.toggle("hidden", !on);
   if (!on) $("wifilist").innerHTML = "";
+  $("wifilist").classList.toggle("hidden", !$("wifilist").innerHTML);
 }
 $("wifi").onchange = async e => {
   const on = e.target.checked;
-  if (!on && !(data.wifi || {}).eth_ip && !confirm("This Pi has no Ethernet connection. Turning Wi-Fi off takes it offline until you turn it back on here on the screen. Continue?")) { e.target.checked = true; return; }
-  if (!on && !data.local && !confirm("If your phone reaches the Pi over Wi-Fi, this page will disconnect. Continue?")) { e.target.checked = true; return; }
+  if (!on && !(data.wifi || {}).eth_ip && !confirm("This player has no network cable. Turning Wi-Fi off takes it offline until you turn it back on here on the screen. Continue?")) { e.target.checked = true; return; }
+  if (!on && !data.local && !confirm("If this device reaches the player over Wi-Fi, this page will disconnect. Continue?")) { e.target.checked = true; return; }
   await api("/api/system", {action: on ? "wifi-on" : "wifi-off"}); toast(on ? "Wi-Fi on" : "Wi-Fi off");
   setTimeout(load, 2500);
 };
@@ -378,7 +760,7 @@ $("wifiscan").onclick = async () => {
       <div class="t"><b>${esc(n.ssid)}${n.active ? " ✓" : ""}</b><small>Signal ${n.signal}%${n.secure ? " · secured" : " · open"}</small></div>
       <button class="btn" data-join="${i}">${n.active ? "Connected" : "Join"}</button></div>`).join("")
     : `<div class="row"><div class="t"><small>No networks found</small></div></div>`;
-  $("wifilist").dataset.nets = JSON.stringify(list);
+  $("wifilist").dataset.nets = JSON.stringify(list); $("wifilist").classList.remove("hidden");
 };
 document.addEventListener("click", async e => {
   const j = e.target.closest("[data-join]"); if (!j) return;
@@ -394,12 +776,8 @@ document.addEventListener("click", async e => {
   toast(r.ok ? `Connected to ${n.ssid}` : "Couldn't connect: check the password");
   setTimeout(load, 1500);
 });
-$("save").onclick = async () => {
-  $("save").disabled = true; $("save").textContent = "Saving…";
-  try { await api("/api/settings", collect()); } catch (e) {}
-  toast("Saved. Applying…");
-  await waitBack(); $("save").textContent = "Save"; toast("Done");
-};
+
+// ---------------- accounts, system, PIN, login
 document.addEventListener("click", async e => {
   const so = e.target.closest("[data-signout]");
   if (so && confirm("Sign out? You'll sign in again on the screen next time.")) {
@@ -407,27 +785,33 @@ document.addEventListener("click", async e => {
     setTimeout(load, 1500);
   }
   const sys = e.target.closest("[data-sys]");
-  const Q = {reboot: ["Reboot the Pi now?", "Rebooting…"], restart: ["Restart PlexPie?", "Restarting…"],
+  const Q = {reboot: ["Restart the whole player now?", "Restarting…"], restart: ["Restart PlexPie?", "Restarting…"],
              shutdown: ["Shut down the player? Music stops, and it stays off until you unplug it and plug it back in.", "Shutting down…"]};
   if (sys && confirm(Q[sys.dataset.sys][0])) {
     await api("/api/system", {action: sys.dataset.sys}); toast(Q[sys.dataset.sys][1]);
     if (sys.dataset.sys === "restart") waitBack();
   }
 });
-$("home").onclick = () => api("/api/source", {source: "home"});
 $("newpin").onclick = async () => {
-  if (!confirm("Make a new PIN? Phones will need to enter it again.")) return;
+  if (!confirm("Make a new PIN? Every registered device is signed out and needs the new PIN.")) return;
   await api("/api/settings", {PHONE_PIN: "new"}); toast("New PIN…"); await waitBack();
 };
+function deviceHint() {
+  const ua = navigator.userAgent;
+  if (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1) return "iPad";     // iPads say "Macintosh"
+  return "";
+}
 $("pinbtn").onclick = async () => {
-  const r = await api("/api/login", {pin: $("pin").value});
-  if (r.ok) { $("login").classList.add("hidden"); load(); }
-  else { const j = await r.json().catch(() => ({})); $("pinerr").textContent = j.error || "Wrong PIN"; }
+  const r = await api("/api/login", {pin: $("pin").value, device: deviceHint()});
+  if (r.ok) {
+    const next = new URLSearchParams(location.search).get("next");
+    if (next && /^\/(guide|settings)/.test(next)) { location.href = next + location.hash; return; }
+    $("login").classList.add("hidden"); load();
+  } else { const j = await r.json().catch(() => ({})); $("pinerr").textContent = j.error || "Wrong PIN"; }
 };
 $("pin").addEventListener("keydown", e => { if (e.key === "Enter") $("pinbtn").click(); });
-load();
 
-// ---- backup, restore, power-cut protection
+// ---------------- backup, restore, power-cut protection
 $("restore").onchange = async (e) => {
   const f = e.target.files[0]; e.target.value = "";
   if (!f) return;
@@ -438,7 +822,6 @@ $("restore").onchange = async (e) => {
   const r = await api("/api/restore", backup); const j = await r.json().catch(() => ({}));
   if (!r.ok) { toast(j.error || "Restore failed"); return; }
   toast("Restoring… the screen restarts when it's done");
-  $("updtitle").textContent = "Restoring settings…"; setTimeout(pollUpdate, 3000);
 };
 $("protect").onchange = async (e) => {
   const on = e.target.checked;
@@ -451,7 +834,7 @@ $("protect").onchange = async (e) => {
   toast("Restarting…");
 };
 
-// ---- equalizer
+// ---------------- equalizer
 const BANDS = [["LS", 60, 0.7, "60 Hz"], ["PK", 250, 1, "250 Hz"], ["PK", 1000, 1, "1 kHz"], ["PK", 4000, 1, "4 kHz"], ["HS", 10000, 0.7, "10 kHz"]];
 function bandGains() { return ($("EQ_BANDS").value || "").split(",").map(Number).concat([0, 0, 0, 0, 0]).slice(0, 5).map(x => isFinite(x) ? x : 0); }
 function buildBands() {
@@ -492,7 +875,7 @@ function drawEq() {
   c.width = W * dpr; c.height = H * dpr; const x = c.getContext("2d"); x.scale(dpr, dpr);
   const fl = currentFilters(), on = $("EQ_ENABLED").checked, R = 12;
   const fx = f => W * Math.log(f / 20) / Math.log(1000), gy = g => H / 2 - (g / R) * (H / 2 - 8);
-  x.strokeStyle = "#26262e"; x.fillStyle = "#8e8e99"; x.font = "11px system-ui"; x.lineWidth = 1;
+  x.strokeStyle = "#2c2c30"; x.fillStyle = "#8e8e93"; x.font = "11px system-ui"; x.lineWidth = 1;
   for (const f of [50, 100, 200, 500, 1000, 2000, 5000, 10000]) { x.beginPath(); x.moveTo(fx(f), 0); x.lineTo(fx(f), H); x.stroke();
     x.fillText(f >= 1000 ? f / 1000 + "k" : f, fx(f) + 3, H - 4); }
   for (const g of [-6, 0, 6]) { x.beginPath(); x.moveTo(0, gy(g)); x.lineTo(W, gy(g)); x.stroke(); x.fillText((g > 0 ? "+" : "") + g + " dB", 4, gy(g) - 3); }
@@ -512,20 +895,22 @@ function eqUi() {
 $("EQ_PRESET").addEventListener("change", eqUi); $("EQ_ENABLED").addEventListener("change", eqUi);
 addEventListener("resize", drawEq);
 
-// ---- bluetooth
+// ---------------- bluetooth
 function renderBt(b) {
   $("btsection").classList.toggle("hidden", !b || !data.values.ENABLE_BLUETOOTH);
   if (!b) return;
   const left = b.pairing_left || 0;
   $("btpair").textContent = left ? "Stop" : "Pair";
-  $("btsub").innerHTML = b.available === false ? "Bluetooth isn't ready. Try rebooting the player."
-    : left ? `Visible as <b>${esc(data.player_name)}</b> for ${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}. Pick it in your phone's Bluetooth settings.`
-    : "Makes the player visible for 2 minutes. Then pick it in your phone's Bluetooth settings.";
-  $("btdevices").innerHTML = (b.devices || []).map(d => `<div class="row"><span class="dot ${d.connected ? "ok" : ""}"></span>
+  $("btsub").innerHTML = b.available === false ? "Bluetooth isn't ready. Try restarting the player."
+    : left ? `Visible as <b>${esc(data.player_name)}</b> for ${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}. On your phone, tablet or computer, open Bluetooth settings and tap it.`
+    : "Makes the player visible for 2 minutes. Then pick it in your device's Bluetooth settings.";
+  const devs = b.devices || [];
+  $("bthead").classList.toggle("hidden", !devs.length); $("btdevices").classList.toggle("hidden", !devs.length);
+  $("btdevices").innerHTML = devs.map(d => `<div class="row"><span class="dot ${d.connected ? "ok" : ""}"></span>
     <div class="t"><b>${esc(d.name)}</b><small>${d.connected ? "Connected" : "Paired"}</small></div>
-    <button class="btn" data-btforget="${esc(d.address)}">Forget</button></div>`).join("");
+    <button class="btn danger" data-btforget="${esc(d.address)}">Forget</button></div>`).join("");
   clearTimeout(renderBt.t);
-  if (left || (b.devices || []).some(d => d.connected)) renderBt.t = setTimeout(btRefresh, 2000);
+  if (left || devs.some(d => d.connected)) renderBt.t = setTimeout(btRefresh, 2000);
 }
 async function btRefresh(action, address) {
   const r = action ? await api("/api/bluetooth", {action, address}) : await api("/api/settings");
@@ -533,12 +918,14 @@ async function btRefresh(action, address) {
 }
 $("btpair").onclick = () => btRefresh((data.bluetooth || {}).pairing_left ? "stop" : "pair");
 $("btdevices").addEventListener("click", e => { const a = e.target.dataset.btforget;
-  if (a && confirm("Forget this phone? It will need to pair again.")) btRefresh("forget", a); });
+  if (a && confirm("Forget this device? It will need to pair again.")) btRefresh("forget", a); });
 
-// ---- night dimming rows
+// ---------------- night dimming rows
 function nightUi() { const on = $("NIGHT_DIM").checked;
   ["nightrow", "nightbr"].forEach(id => $(id).classList.toggle("hidden", !on)); }
 $("NIGHT_DIM").addEventListener("change", nightUi);
+
+load();
 </script>
 </body>
 </html>

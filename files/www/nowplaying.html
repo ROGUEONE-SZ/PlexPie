@@ -81,7 +81,7 @@
     <div class="hint" id="hint"></div>
     <button class="btn" id="browse">Browse Spotify on this screen</button>
     <canvas id="viz"></canvas>
-    <button class="btn" id="pair">Pair a phone</button><button class="btn ghost" id="stoppair">Stop</button>
+    <button class="btn" id="pair">Pair a device</button><button class="btn ghost" id="stoppair">Stop</button>
   </div>
 </div>
 <script>
@@ -104,7 +104,7 @@ function renderBt(s) {
   const has = !!(b.title || b.artist);
   $("info").classList.toggle("playing", !!b.playing);
   $("status").textContent = b.playing ? "Playing via Bluetooth" : b.connected ? `Connected: ${b.connected}` : "Bluetooth";
-  $("title").textContent = has ? (b.title || "Unknown track") : (b.connected ? "Play something on your phone" : s.player_name);
+  $("title").textContent = has ? (b.title || "Unknown track") : (b.connected ? "Play something on your device" : s.player_name);
   $("artist").textContent = b.artist || "";
   $("album").textContent = b.album || "";
   const f = b.connected && b.codec ? `${b.codec} · Bluetooth · lossy` : "";
@@ -112,10 +112,10 @@ function renderBt(s) {
   const pairing = (b.pairing_left || 0) > 0;
   let hint = "";
   if (b.available === false) hint = "Bluetooth isn't ready on this player. Try <b>Settings → System → Reboot</b>.";
-  else if (pairing) hint = `Now visible as <b>${s.player_name}</b>. On your phone, open <b>Settings → Bluetooth</b> and tap <b>${s.player_name}</b>. (${mmss(b.pairing_left)})`;
+  else if (pairing) hint = `Now visible as <b>${s.player_name}</b>. On your phone, tablet or computer, open <b>Bluetooth settings</b> and tap <b>${s.player_name}</b>. (${mmss(b.pairing_left)})`;
   else if (!b.connected) hint = (b.devices || []).length
-    ? `Open <b>Settings → Bluetooth</b> on a paired phone and tap <b>${s.player_name}</b>, or pair a new phone.`
-    : "Tap <b>Pair a phone</b>, then pick this player in your phone's Bluetooth settings.";
+    ? `Open <b>Settings → Bluetooth</b> on a paired device and tap <b>${s.player_name}</b>, or pair a new one.`
+    : "Tap <b>Pair a device</b>, then pick this player in your phone, tablet or computer's Bluetooth settings.";
   $("hint").innerHTML = has ? "" : hint;
   $("pair").classList.toggle("on", b.available !== false && !pairing && !b.playing);
   $("stoppair").classList.toggle("on", pairing);
@@ -178,7 +178,7 @@ function render(s) {
   $("fmt").textContent = f;
   $("fmt").className = "fmt" + (f ? " on" : "") + (/lossless/i.test(f) ? " lossless" : "");
   $("hint").innerHTML = has ? "" : (SRC === "spotify"
-    ? `Open <b>Spotify</b> on your phone, tap the devices icon and pick <b>${s.player_name}</b>. Needs Spotify Premium.`
+    ? `Open the <b>Spotify</b> app on your phone, tablet or computer, tap the devices icon and pick <b>${s.player_name}</b>. Needs Spotify Premium.`
     : `On your iPhone or Mac, open <b>Control Center → AirPlay</b> and pick <b>${s.player_name}</b>.`);
   $("browse").classList.toggle("on", SRC === "spotify" && !!(s.spotify || {}).web);
   const url = SRC === "spotify" ? (a.art_url || "") : (a.has_art ? "/api/art?v=" + s.art_ver : "");

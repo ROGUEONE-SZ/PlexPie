@@ -106,19 +106,19 @@
     <span class="eq"><i></i><i></i><i></i></span>
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <path d="M5 17a9 9 0 1 1 14 0"/><path d="M8.5 14.5a5 5 0 1 1 7 0"/><path d="M12 15l4 6H8z"/></svg>
-    <div><div class="label">AirPlay</div><div class="sub">From your phone</div></div>
+    <div><div class="label">AirPlay</div><div class="sub">iPhone, iPad, Mac</div></div>
   </button>
   <button class="tile" data-src="spotify" style="--c: var(--spotify)">
     <span class="eq"><i></i><i></i><i></i></span>
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
       <circle cx="12" cy="12" r="9.5"/><path d="M7 9.3c3.2-1 7-.7 9.8.9M7.6 12.6c2.7-.8 5.8-.5 8.1.8M8.3 15.7c2.1-.6 4.3-.4 6.2.6"/></svg>
-    <div><div class="label">Spotify</div><div class="sub">From your phone</div></div>
+    <div><div class="label">Spotify</div><div class="sub">Spotify Connect</div></div>
   </button>
   <button class="tile" data-src="bluetooth" style="--c: var(--bt)">
     <span class="eq"><i></i><i></i><i></i></span>
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <path d="M7 7l10 10-5 5V2l5 5L7 17"/></svg>
-    <div><div class="label">Bluetooth</div><div class="sub">Any phone</div></div>
+    <div><div class="label">Bluetooth</div><div class="sub">Any device</div></div>
   </button>
   <button class="tile" data-src="ma" style="--c: var(--ma)">
     <span class="eq"><i></i><i></i><i></i></span>
@@ -162,8 +162,8 @@
 const $ = (id) => document.getElementById(id);
 const post = (path, body) => fetch(path, {method: "POST", headers: {"Content-Type": "application/json"},
   body: JSON.stringify(body || {})}).then(r => r.json()).then(j => j.state && render(j.state)).catch(() => {});
-const SUBS = {plexamp: "Your library", apple: "On this screen", airplay: "From your phone",
-              spotify: "Spotify Connect", ma: "Your speakers", timer: "Intervals · countdown", bluetooth: "Any phone", ha: "Your dashboard"};
+const SUBS = {plexamp: "Your library", apple: "On this screen", airplay: "iPhone, iPad, Mac",
+              spotify: "Spotify Connect", ma: "Your speakers", timer: "Intervals · countdown", bluetooth: "Any device", ha: "Your dashboard"};
 const ICON_PAUSE = '<rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/>';
 const ICON_PLAY = '<path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/>';
 const POWER = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v9"/><path d="M6.3 7.3a8 8 0 1 0 11.4 0"/></svg>';

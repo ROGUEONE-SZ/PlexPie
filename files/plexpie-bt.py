@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """PlexPie Bluetooth receiver helper (runs as root).
 
-- Lets phones pair only while pairing is open (Settings or the Bluetooth screen: "Pair a phone").
-  No PIN: the phone just confirms. Paired phones reconnect later without asking.
+- Lets phones, tablets and computers pair only while pairing is open ("Pair a device" in Settings or on
+  the Bluetooth screen). No PIN: the device just confirms. Paired devices reconnect later without asking.
 - Writes what's connected and playing to /run/plexpie/bt.json for the PlexPie daemon.
 - PipeWire (in the user session) receives the audio itself.
 """
@@ -164,10 +164,10 @@ def tick():
             if d and d.get("Paired"):
                 if want and not d.get("Trusted"):
                     trust(path)
-                devices.append({"address": str(d.get("Address")), "name": str(d.get("Alias") or d.get("Name") or "Phone"),
+                devices.append({"address": str(d.get("Address")), "name": str(d.get("Alias") or d.get("Name") or "Device"),
                                 "connected": bool(d.get("Connected"))})
                 if d.get("Connected"):
-                    connected = str(d.get("Alias") or d.get("Name") or "Phone")
+                    connected = str(d.get("Alias") or d.get("Name") or "Device")
             t = ifaces.get("org.bluez.MediaTransport1")
             if t:
                 codec = CODECS.get(int(t.get("Codec", 0)), "Bluetooth")

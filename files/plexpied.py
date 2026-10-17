@@ -25,7 +25,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 
-VERSION = "2.8.6"
+VERSION = "2.9.0"
 CONF_PATH = os.environ.get("PLEXPIE_CONF", "/etc/plexpie/plexpie.conf")
 WWW = os.path.join(os.path.dirname(os.path.abspath(__file__)), "www")
 HTTP_PORT = int(os.environ.get("PLEXPIE_HTTP_PORT", "8080"))
@@ -164,6 +164,8 @@ def source_for_url(url):
         return None
     host = (u.hostname or "").lower()
     if u.netloc == f"127.0.0.1:{HTTP_PORT}":
+        if u.path.startswith("/guide"):
+            return "settings"                    # the setup guides open inside the Settings tab
         for key in ("airplay", "spotify", "settings", "timer", "alert", "bluetooth"):
             if u.path.startswith("/" + key):
                 return key
@@ -1926,6 +1928,13 @@ def slow_poller():
                 if temp is not None and (ST.cpu_temp is None or abs(temp - ST.cpu_temp) >= 1):
                     ST.cpu_temp = temp
                     changed = True
+            try:                                     # update progress, for Home Assistant
+                mt = os.path.getmtime(os.path.join(UPD_DIR, "update-run.json"))
+            except OSError:
+                mt = 0
+            if mt != getattr(slow_poller, "upd_mtime", None):
+                slow_poller.upd_mtime = mt
+                changed = True
             if changed:
                 mark_changed()
         except Exception as e:
@@ -1988,15 +1997,23 @@ OPTIONAL_UNITS = {"ENABLE_AIRPLAY": "plexpie-airplay", "ENABLE_SPOTIFY": "plexpi
 OPTIONAL_DEFAULTS = {"ENABLE_AIRPLAY": "yes", "ENABLE_SPOTIFY": "no", "ENABLE_MUSIC_ASSISTANT": "yes",
                      "ENABLE_BLUETOOTH": "yes"}
 SESSIONS_FILE = os.path.join(SETTINGS_DIR, "sessions.json")
-SESSION_DAYS = 365                # a phone stays signed in for a year (renewed on every visit)
+SESSION_DAYS = 365                # a device stays signed in for a year (renewed on every visit)
 
 
 def _load_sessions():
+    """Registered devices: session token -> {exp, name, first, last}. Older versions stored just the expiry."""
     try:
         with open(SESSIONS_FILE) as f:
-            return {k: v for k, v in json.load(f).items() if v > time.time()}
+            raw = json.load(f)
     except (OSError, ValueError):
         return {}
+    out = {}
+    for k, v in raw.items():
+        if not isinstance(v, dict):
+            v = {"exp": float(v), "name": "Phone or tablet", "first": 0, "last": 0}
+        if v.get("exp", 0) > time.time():
+            out[k] = v
+    return out
 
 
 def save_sessions():
@@ -2007,10 +2024,50 @@ def save_sessions():
         os.chmod(SESSIONS_FILE + ".tmp", 0o600)
         os.replace(SESSIONS_FILE + ".tmp", SESSIONS_FILE)
     except OSError as e:
-        log.warning("could not save phone sessions: %s", e)
+        log.warning("could not save device sessions: %s", e)
 
 
-SESSIONS = _load_sessions()       # phone-browser session token -> expiry (survives restarts)
+def session_id(token):
+    import hashlib
+    return hashlib.sha256(token.encode()).hexdigest()[:12]
+
+
+def device_label(ua, hint=""):
+    """A friendly name like "iPad · Safari" from the browser's own description."""
+    ua = ua or ""
+    hint = re.sub(r"[^A-Za-z0-9 ._()'-]", "", str(hint or ""))[:24]
+    if hint:
+        kind = hint
+    elif "iPad" in ua:
+        kind = "iPad"
+    elif "iPhone" in ua:
+        kind = "iPhone"
+    elif "Android" in ua:
+        kind = "Android phone" if "Mobile" in ua else "Android tablet"
+    elif "Macintosh" in ua:
+        kind = "Mac"
+    elif "Windows" in ua:
+        kind = "Windows PC"
+    elif "CrOS" in ua:
+        kind = "Chromebook"
+    elif "Linux" in ua:
+        kind = "Linux computer"
+    else:
+        kind = "Device"
+    browser = ("Edge" if "Edg/" in ua else "Firefox" if ("Firefox" in ua or "FxiOS" in ua)
+               else "Chrome" if ("Chrome" in ua or "CriOS" in ua) else "Safari" if "Safari" in ua else "")
+    if "Home Assistant" in ua:
+        browser = "Home Assistant app"
+    return f"{kind} · {browser}" if browser else kind
+
+
+def devices_json(current=None):
+    return sorted(({"id": session_id(t), "name": v.get("name") or "Device", "first": v.get("first", 0),
+                    "last": v.get("last", 0), "this": t == current} for t, v in SESSIONS.items()),
+                  key=lambda d: -(d["last"] or d["first"]))
+
+
+SESSIONS = _load_sessions()       # registered devices (survive restarts)
 LOGIN_FAILS = {"n": 0, "until": 0.0}
 
 
@@ -2059,20 +2116,58 @@ def _json_lines(text):
     return out
 
 
+UPD_DIR = "/var/lib/plexpie"
+CHECKING = {"plexpie": 0.0, "os": 0.0}         # when a check started (0 = not checking)
+
+
+def _read_json(path):
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
 def update_info():
-    ok, out = admin("update-status", timeout=10)
-    info, run_state = (_json_lines(out) + [{}, {}])[:2]
-    if run_state.get("running") and time.time() - run_state.get("time", 0) > 3600:
-        run_state["running"] = False               # a stale marker from an interrupted update
-    return {**info, "run": run_state}
+    """PlexPie and Raspberry Pi OS update status, read straight from the root helper's files."""
+    run_state = _read_json(os.path.join(UPD_DIR, "update-run.json"))
+    if run_state.get("running") and (time.time() - run_state.get("time", 0) > 3600 or
+                                     subprocess.run(["systemctl", "is-active", "--quiet", "plexpie-update"]).returncode):
+        run_state.update(running=False, step="The last update was interrupted. Tap Update to finish it")
+    pp = _read_json(os.path.join(UPD_DIR, "plexpie.json"))
+    osu = _read_json(os.path.join(UPD_DIR, "os.json"))
+    legacy = _read_json(os.path.join(UPD_DIR, "update.json"))      # from PlexPie 2.8 and older
+    if not pp and legacy:
+        pp = {"checked": legacy.get("checked"), "behind": legacy.get("plexpie", 0)}
+    if not osu and legacy:
+        osu = {"checked": legacy.get("checked"), "count": legacy.get("os", 0), "reboot": legacy.get("reboot")}
+    now = time.time()
+    pp.update(current=VERSION, checking=bool(CHECKING["plexpie"] and now - CHECKING["plexpie"] < 900))
+    osu.update(checking=bool(CHECKING["os"] and now - CHECKING["os"] < 900))
+    if osu.get("reboot") is None:
+        osu["reboot"] = os.path.exists("/var/run/reboot-required")
+    return {"plexpie": pp, "os": osu, "run": run_state}
+
+
+def check_updates(kind):
+    """Look for updates in the background; the Settings page shows "Checking..." meanwhile."""
+    if CHECKING.get(kind):
+        return
+    CHECKING[kind] = time.time()
+    mark_changed()
+    try:
+        admin("check-" + kind, timeout=600)
+    finally:
+        CHECKING[kind] = 0.0
+        mark_changed()
 
 
 def update_checker():
-    """Look for system and PlexPie updates twice a day."""
+    """Look for PlexPie and Raspberry Pi OS updates twice a day."""
     time.sleep(120)
     while True:
-        admin("update-check", timeout=600)
-        mark_changed()
+        check_updates("plexpie")
+        check_updates("os")
         time.sleep(12 * 3600)
 
 
@@ -2153,7 +2248,7 @@ def accounts():
     return out
 
 
-def settings_json(local, host=None):
+def settings_json(local, host=None, token=None):
     vals = {}
     for k, kind in EDITABLE.items():
         if kind == "secret":
@@ -2192,7 +2287,7 @@ def settings_json(local, host=None):
         prot = {}
     return {"values": vals, "wifi": wifi, "protect": prot, "bluetooth": read_bt() if "bluetooth" in SOURCES else None,
             "eq_presets": {k: {"name": v["name"], "filters": v["filters"]} for k, v in EQ_PRESETS.items()}, "updates": update_info(), "installed": installed, "accounts": accounts(), "player_name": PLAYER_NAME,
-            "version": VERSION,
+            "version": VERSION, "devices": devices_json(token), "sources": sorted(SOURCES),
             "phone_url": f"http://{host}/settings" if host else (f"http://{addr}:{HTTP_PORT}/settings" if addr else ""),
             "local": local}
 
@@ -2221,7 +2316,7 @@ def apply_settings(data):
     if clean.get("PHONE_PIN") == "new":
         import secrets
         clean["PHONE_PIN"] = f"{secrets.randbelow(1000000):06d}"
-        SESSIONS.clear()                  # a new PIN signs every phone out
+        SESSIONS.clear()                  # a new PIN signs every device out
         save_sessions()
     save_overrides(clean)
     log.info("settings saved: %s", ", ".join(k for k in clean if k != "MQTT_PASS"))
@@ -2257,33 +2352,48 @@ class Handler(http.server.BaseHTTPRequestHandler):
         except OSError:
             self._send(404, b"not found", "text/plain")
 
-    # Phone browsers reach only the Settings page, and only with the PIN.
-    REMOTE_OPEN = ("/settings", "/api/login", "/manifest.json", "/icon.png")
-    REMOTE_AUTH = ("/api/settings", "/api/account", "/api/system", "/api/backup", "/api/restore", "/api/bluetooth")
+    # Other devices (phones, tablets, computers) reach only Settings and the guides, and only with the PIN.
+    REMOTE_OPEN = ("/settings", "/api/login", "/manifest.json", "/icon.png", "/qrcode.js")
+    REMOTE_AUTH = ("/api/settings", "/api/account", "/api/system", "/api/backup", "/api/restore", "/api/bluetooth",
+                   "/api/devices", "/guide", "/guide.pdf")
 
     def _local(self):
         return self.client_address[0] in ("127.0.0.1", "::1", "::ffff:127.0.0.1")
 
+    def _token(self):
+        for part in (self.headers.get("Cookie") or "").split(";"):
+            k, _, v = part.strip().partition("=")
+            if k == "plexpie" and v in SESSIONS:
+                return v
+        return None
+
     def _authed(self):
         if self._local():
             return True
-        for part in (self.headers.get("Cookie") or "").split(";"):
-            k, _, v = part.strip().partition("=")
-            if k == "plexpie" and SESSIONS.get(v, 0) > time.time():
-                if SESSIONS[v] - time.time() < (SESSION_DAYS - 1) * 86400:
-                    SESSIONS[v] = time.time() + SESSION_DAYS * 86400
-                    save_sessions()
-                return True
-        return False
+        t = self._token()
+        if not t or SESSIONS[t].get("exp", 0) <= time.time():
+            return False
+        now = time.time()
+        if now - SESSIONS[t].get("last", 0) > 3600:      # renew, and note when it was last used (hourly)
+            SESSIONS[t].update(exp=now + SESSION_DAYS * 86400, last=now)
+            save_sessions()
+        return True
 
     def _gate(self, path):
         if self._local():
             return True
         if not cfg_yes("PHONE_ACCESS"):
-            self._send(403, b'{"error":"phone access is off"}')
+            self._send(403, b'{"error":"remote access is off"}')
             return False
-        if path in self.REMOTE_OPEN or (path in self.REMOTE_AUTH and self._authed()):
+        if path in self.REMOTE_OPEN or (path in self.REMOTE_AUTH and self._authed()) or \
+                (path.startswith("/img/") and self._authed()):
             return True
+        if path in ("/guide", "/guide.pdf") and self.command == "GET":   # sign in first, then come back
+            self.send_response(302)
+            self.send_header("Location", "/settings?next=" + urllib.parse.quote(path))
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return False
         self._send(401 if path in self.REMOTE_AUTH else 404, b'{"error":"not allowed"}')
         return False
 
@@ -2299,6 +2409,22 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return self._file("settings.html")
         if path == "/timer":
             return self._file("timer.html")
+        if path == "/guide":
+            return self._file("guide.html")
+        if path == "/guide.pdf":
+            return self._file("guide.pdf", "application/pdf")
+        if path == "/qrcode.js":
+            return self._file("qrcode.js", "text/javascript; charset=utf-8")
+        if path.startswith("/img/") and re.fullmatch(r"/img/[a-z0-9-]+\.(png|svg)", path):
+            repo = (read_file("/etc/plexpie/repo_dir") or "").strip()      # the pictures in the docs
+            try:
+                with open(os.path.join(repo, "docs", path[5:]), "rb") as f:
+                    return self._send(200, f.read(), "image/svg+xml" if path.endswith(".svg") else "image/png",
+                                      cache=True)
+            except OSError:
+                return self._send(404, b"", "text/plain")
+        if path == "/api/devices":
+            return self._send(200, json.dumps(devices_json(self._token())).encode())
         if path == "/alert":
             return self._file("alert.html")
         if path == "/api/alert":
@@ -2315,7 +2441,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return self._file("icon.png", "image/png")
         if path == "/api/settings":
             host = None if self._local() else self.headers.get("Host")
-            return self._send(200, json.dumps(settings_json(self._local(), host)).encode())
+            return self._send(200, json.dumps(settings_json(self._local(), host, self._token())).encode())
         if path == "/api/state":
             return self._send(200, json.dumps(state_json()).encode())
         if path == "/api/backup":
@@ -2372,7 +2498,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
             if str(data.get("pin", "")) == cfg("PHONE_PIN") and cfg("PHONE_PIN"):
                 import secrets
                 token = secrets.token_urlsafe(24)
-                SESSIONS[token] = time.time() + SESSION_DAYS * 86400
+                now = time.time()
+                SESSIONS[token] = {"exp": now + SESSION_DAYS * 86400, "first": now, "last": now,
+                                   "name": device_label(self.headers.get("User-Agent"), data.get("device"))}
                 save_sessions()
                 LOGIN_FAILS["n"] = 0
                 body = b'{"ok":true}'
@@ -2400,6 +2528,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
             else:
                 ok = False
             return self._send(200 if ok else 400, json.dumps({"ok": ok, "bluetooth": read_bt()}).encode())
+        if path == "/api/devices":
+            if data.get("action") == "signout":
+                for t in [t for t in SESSIONS if session_id(t) == str(data.get("id"))]:
+                    del SESSIONS[t]
+                save_sessions()
+            return self._send(200, json.dumps(devices_json(self._token())).encode())
         if path == "/api/restore":
             ok, msg = restore_backup(data)
             return self._send(200 if ok else 400, json.dumps({"ok": ok, "error": msg}).encode())
@@ -2431,11 +2565,15 @@ class Handler(http.server.BaseHTTPRequestHandler):
                                 stdin=str(data.get("password", "")) + "\n", timeout=60)
                 return self._send(200 if ok else 500, json.dumps({"ok": ok}).encode())
             elif what == "update-check":
-                admin("update-check", timeout=600)
+                kinds = [data["kind"]] if data.get("kind") in ("plexpie", "os") else ["plexpie", "os"]
+                for k in kinds:
+                    spawn(check_updates, k)
+                time.sleep(0.2)
                 return self._send(200, json.dumps(update_info()).encode())
             elif what == "update-run":
-                ok, _ = admin("update-run", timeout=20)
-                return self._send(200 if ok else 500, json.dumps({"ok": ok}).encode())
+                kind = data.get("kind") if data.get("kind") in ("plexpie", "os") else "all"
+                ok, out = admin("update-run", kind, timeout=20)
+                return self._send(200 if ok else 500, json.dumps({"ok": ok, "error": out.strip()[-200:]}).encode())
             elif what == "update-status":
                 return self._send(200, json.dumps(update_info()).encode())
             return self._send(200, b'{"ok":true}')
@@ -2569,10 +2707,13 @@ class HomeAssistant:
                                                         "device_class": "connectivity",
                                                         "entity_category": "diagnostic",
                                                         "state_topic": f"{b}/ma_up"})
-        self.disc("update", "software", {"name": "Software", "device_class": "firmware",
+        self.disc("update", "software", {"name": "PlexPie update", "device_class": "firmware",
                                          "state_topic": f"{b}/update", "command_topic": f"{b}/update/set",
-                                         "payload_install": "install", "title": "PlexPie + Raspberry Pi OS",
+                                         "payload_install": "install", "title": "PlexPie",
                                          "release_url": "https://github.com/ROGUEONE-SZ/plexamp-raspberry-pi-install"})
+        self.disc("update", "os_update", {"name": "Raspberry Pi OS update", "icon": "mdi:raspberry-pi",
+                                          "state_topic": f"{b}/os_update", "command_topic": f"{b}/os_update/set",
+                                          "payload_install": "install", "title": "Raspberry Pi OS"})
         self.disc("sensor", "cpu_temp", {"name": "CPU temperature", "device_class": "temperature",
                                          "unit_of_measurement": "°C", "entity_category": "diagnostic",
                                          "state_topic": f"{b}/cpu_temp"})
@@ -2647,7 +2788,9 @@ class HomeAssistant:
             elif key == "restart_screen":
                 run(["pkill", "-f", "plexpie-chromium"])
             elif key == "update" and val == "install":
-                spawn(admin, "update-run")
+                spawn(admin, "update-run", "plexpie")
+            elif key == "os_update" and val == "install":
+                spawn(admin, "update-run", "os")
             elif key == "reboot":
                 sudo("/usr/sbin/reboot")
             elif key == "shutdown":
@@ -2693,15 +2836,29 @@ class HomeAssistant:
                 self.last[k] = v
         try:
             u = update_info()
-            pending = int(u.get("os") or 0) + int(u.get("plexpie") or 0)
-            upd = json.dumps({"installed_version": VERSION,
-                              "latest_version": VERSION if not pending else f"{VERSION} + {pending} updates",
-                              "in_progress": bool(u.get("run", {}).get("running")),
-                              "update_percentage": u.get("run", {}).get("percent")
-                              if u.get("run", {}).get("running") else None})
-            if self.last.get("update") != upd:
-                self.pub(f"{self.base}/update", upd)
-                self.last["update"] = upd
+            run_ = u.get("run", {})
+            pp, osu = u.get("plexpie", {}), u.get("os", {})
+            behind, count = int(pp.get("behind") or 0), int(osu.get("count") or 0)
+
+            def busy(kind):
+                return bool(run_.get("running")) and run_.get("kind") in (kind, "all")
+            states = {
+                "update": {"installed_version": VERSION,
+                           "latest_version": (pp.get("latest") or f"{VERSION} + {behind} changes") if behind else VERSION,
+                           "release_summary": "; ".join(pp.get("changes") or [])[:255] or None},
+                "os_update": {"installed_version": "Up to date",
+                              "latest_version": f"{count} update{'s' if count != 1 else ''}" if count else "Up to date",
+                              "release_summary": (", ".join(osu.get("packages") or []) +
+                                                  (" and more" if count > 8 else ""))[:255] or None},
+            }
+            for key, st in states.items():
+                kind = "plexpie" if key == "update" else "os"
+                st.update(in_progress=busy(kind),
+                          update_percentage=run_.get("percent") if busy(kind) else None)
+                val = json.dumps(st)
+                if self.last.get(key) != val:
+                    self.pub(f"{self.base}/{key}", val)
+                    self.last[key] = val
         except Exception:
             pass
         legacy = cfg("MQTT_LEGACY_TOPIC", "plexamp/state")
