@@ -323,6 +323,8 @@ rings. The [main README](../README.md#home-assistant) has the details and exampl
 
 ## 12. Something's not working?
 
+Try the quick fixes first: wait two minutes after a restart, then **Settings › System › Restart PlexPie**, then **Reboot**. The [troubleshooting guide](TROUBLESHOOTING.md) has every problem we've run into, with step-by-step fixes.
+
 | Problem | Try this |
 |---|---|
 | No sound | Check the receiver's input and volume. In Settings, make sure the app is on. Then run `bash ~/plexpie/tools/diagnose.sh`, which also plays a test tone |
@@ -330,10 +332,11 @@ rings. The [main README](../README.md#home-assistant) has the details and exampl
 | Bluetooth sound stutters | On a Pi 4, Bluetooth and Wi-Fi share one radio. Use a network cable, or keep the device closer |
 | AirPlay or Spotify doesn't show the player | Your device and the Pi must be on the same network. Some routers block this between Wi-Fi and wired devices; turn on "mDNS" or "Bonjour" forwarding in the router |
 | The screen is upside down or touches land in the wrong place | Set `TOUCH_ROTATE` in `~/plexpie/plexpie.conf`, then run `sudo bash ~/plexpie/install.sh` |
-| Plexamp keeps spinning | Settings → System → **Restart PlexPie** |
+| Plexamp blank, or album art keeps spinning | Update to 2.9.3+; if art still spins, your router is probably blocking `plex.direct` ([fix](TROUBLESHOOTING.md#album-art-keeps-spinning-music-is-slow-to-start-plexamp-cant-find-your-server)) |
+| Home screen too big / cut off | Pinch-zoom: update to 2.9.2+ and reboot |
 | Can't find the address for other devices | It's in Settings → Remote access on the player (with a QR code) |
 | The screen is black | Tap it: it's probably asleep. Still black? Unplug the power for 10 seconds |
-| Anything else | Run `bash ~/plexpie/tools/diagnose.sh` and [open an issue](https://github.com/ROGUEONE-SZ/plexamp-raspberry-pi-install/issues) with its output |
+| Anything else | See the [troubleshooting guide](TROUBLESHOOTING.md), or run `bash ~/plexpie/tools/diagnose.sh` and [open an issue](https://github.com/ROGUEONE-SZ/plexamp-raspberry-pi-install/issues) with its output |
 
 ---
 

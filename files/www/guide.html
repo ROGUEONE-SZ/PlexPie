@@ -35,6 +35,7 @@
   .tip { background: var(--tip); border-left: 4px solid var(--tipline); border-radius: 8px; padding: 10px 14px; margin: 12px 0; font-size: 15px; }
   code, .k { background: #eef0f5; border-radius: 6px; padding: 1px 6px; font: 14px ui-monospace, Menlo, monospace; word-break: break-all; }
   .k { font-family: inherit; font-weight: 600; word-break: normal; }
+  td code { word-break: normal; white-space: nowrap; }
   pre { background: #16161c; color: #f4f4f7; border-radius: 10px; padding: 12px 14px; overflow-x: auto; font: 13px/1.5 ui-monospace, Menlo, monospace; white-space: pre-wrap; word-break: break-all; }
   table { border-collapse: collapse; width: 100%; font-size: 14px; margin: 8px 0 14px; }
   td, th { border-top: 1px solid var(--line); padding: 7px 6px; text-align: left; vertical-align: top; }
@@ -318,6 +319,33 @@
       <li>The player reinstalls itself with your settings (about a minute). Sign in to Apple Music, Spotify and Home Assistant on the screen again.</li>
     </ol>
     <div class="tip">The backup includes your Home Assistant password. Keep it somewhere private.</div>
+  </section>
+  <!-- ===================================================================== help -->
+  <section class="g" id="help" data-group="3" data-sub="Quick fixes for common problems">
+    <h2>Troubleshooting</h2>
+    <p class="sub">Most problems go away with one of the quick fixes. The full list, with commands, is in TROUBLESHOOTING on GitHub.</p>
+    <h3>Quick fixes, in this order</h3>
+    <ol>
+      <li><b>Wait two minutes</b> after the player starts or updates: the apps take a moment.</li>
+      <li>Settings › System › <span class="k">Restart PlexPie</span> (a few seconds).</li>
+      <li>Settings › System › <span class="k">Reboot</span> (about a minute).</li>
+      <li>Unplug the power for 10 seconds if the screen doesn't respond.</li>
+      <li>Settings › <b>Updates</b>: many problems are fixed in newer versions.</li>
+    </ol>
+    <table>
+      <tr><th>Problem</th><th>Try this</th></tr>
+      <tr><td>Home screen too big, cut off on the right</td><td>It got pinch-zoomed. Update to 2.9.2 or newer and reboot; until then, Restart PlexPie.</td></tr>
+      <tr><td>Plexamp screen blank or "loading"</td><td>Update to 2.9.3 or newer (it reloads itself), or Restart PlexPie.</td></tr>
+      <tr><td>Album art spins, music slow to start</td><td>Your router blocks <code>plex.direct</code> (DNS rebind protection). Allow <code>plex.direct</code> in its DNS settings; on pfSense add <code>private-domain: "plex.direct"</code> under Services › DNS Resolver › Custom options.</td></tr>
+      <tr><td>Update stuck, or the version never changes</td><td>Tap Update again. On 2.8.x, update once by hand from a computer (see TROUBLESHOOTING on GitHub).</td></tr>
+      <tr><td>Screen jumps to Bluetooth by itself</td><td>A paired phone reconnected. Update to 2.9.2 or newer, or Forget the device.</td></tr>
+      <tr><td>Phone can't find the player over Bluetooth</td><td>Tap Pair a device first: it's visible for 2 minutes.</td></tr>
+      <tr><td>AirPlay or Spotify doesn't list the player</td><td>Same network (not guest Wi-Fi); turn on mDNS/Bonjour forwarding in the router.</td></tr>
+      <tr><td>Home Assistant shows "unavailable"</td><td>Wait two minutes; check the green dot in Configuration › Home Assistant.</td></tr>
+      <tr><td>Receiver or smart plug stops responding</td><td>Give it a fixed address in the router; unplug the receiver for a minute.</td></tr>
+      <tr><td>Screen black</td><td>Tap it (asleep). Still black: unplug for 10 seconds.</td></tr>
+    </table>
+    <div class="tip"><b>Report for help:</b> from a computer, run<br><code>curl -fsSL https://raw.githubusercontent.com/ROGUEONE-SZ/plexamp-raspberry-pi-install/main/tools/diag.sh | ssh USER@ADDRESS bash</code><br>and attach the output to an issue on GitHub.</div>
   </section>
 </main>
 

@@ -228,6 +228,10 @@ out, and the Pi reconnects by itself when MA comes back.
 
 ## Troubleshooting
 
+**Something not working?** The [troubleshooting guide](docs/TROUBLESHOOTING.md) lists real problems and their fixes in plain English: a cut-off or blank screen, Plexamp spinning (often the router blocking `plex.direct`), updates that don't finish, Bluetooth, Home Assistant, router settings and connecting with `ssh`. The player has a short version under Settings › Setup guides › Troubleshooting.
+
+For a read-only report from another computer: `curl -fsSL https://raw.githubusercontent.com/ROGUEONE-SZ/plexamp-raspberry-pi-install/main/tools/diag.sh | ssh USER@PI-ADDRESS bash`
+
 | Problem | Where to look |
 |---|---|
 | Full report (services, audio, logs, test tone) | `bash ~/plexpie/tools/diagnose.sh` |
