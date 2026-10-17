@@ -116,7 +116,7 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get update -q
 PKGS=(pipewire pipewire-pulse pipewire-alsa wireplumber pipewire-bin python3 python3-paho-mqtt
       python3-websocket python3-tk python3-evdev xprintidle xdotool curl git avahi-daemon xserver-xorg xinit
-      x11-xserver-utils alsa-utils nodejs fonts-dejavu-core)
+      x11-xserver-utils alsa-utils nodejs fonts-dejavu-core python3-numpy python3-pil)
 # Bluetooth receiver: BlueZ, PipeWire's Bluetooth plugin, and D-Bus bindings for the pairing helper
 yes_ "${ENABLE_BLUETOOTH:-yes}" && PKGS+=(bluez libspa-0.2-bluetooth python3-dbus python3-gi)
 # Chromium is "chromium" on Trixie and "chromium-browser" on older Raspberry Pi OS;
@@ -300,6 +300,16 @@ if [ "${POWER_BUTTON:-no}" = yes ]; then
   grep -q '^dtoverlay=gpio-shutdown' "$BOOTCFG" || { echo 'dtoverlay=gpio-shutdown' >> "$BOOTCFG"; note "power button enabled (active after a reboot)"; }
 else
   sed -i '/^dtoverlay=gpio-shutdown$/d' "$BOOTCFG" 2>/dev/null || true
+fi
+
+# Optional rotary knob: A on pin 11 (GPIO17), B on pin 13 (GPIO27), push on pin 15 (GPIO22), ground on pin 9 or 14.
+sed -i -e '/^dtoverlay=rotary-encoder,/d' -e '/^dtoverlay=gpio-key,.*PLAYPAUSE/d' "$BOOTCFG" 2>/dev/null || true
+if [ "${KNOB:-no}" = yes ]; then
+  {
+    echo "dtoverlay=rotary-encoder,pin_a=${KNOB_PIN_A:-17},pin_b=${KNOB_PIN_B:-27},relative_axis=1,steps-per-period=${KNOB_STEPS:-2}"
+    echo "dtoverlay=gpio-key,gpio=${KNOB_PIN_PUSH:-22},keycode=164,label=\"PLAYPAUSE\",gpio_pull=up"
+  } >> "$BOOTCFG"
+  note "rotary knob enabled (active after a reboot)"
 fi
 
 # Let the daemon restart its own services and reboot, nothing else.

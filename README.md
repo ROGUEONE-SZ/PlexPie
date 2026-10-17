@@ -13,7 +13,7 @@ on one launcher and all controllable from **Home Assistant**.
   <img src="docs/airplay.png" width="49%" alt="AirPlay now-playing screen with cover, track and stream format">
 </p>
 <p>
-  <img src="docs/timer-running.png" width="49%" alt="Workout timer counting down a work interval">
+  <img src="docs/visualizer.png" width="49%" alt="Full-screen spectrum visualizer tinted with the album art's color">
   <img src="docs/alert.png" width="49%" alt="Doorbell alert with camera picture">
 </p>
 
@@ -35,7 +35,12 @@ How it behaves:
 - **On-screen keyboard.** A keyboard slides up when you tap a text field (sign-ins, search), and the app shrinks to fit above it.
 - **Screen sleep.** The screen sleeps when nothing is playing. The first tap only wakes it.
 - **Self-healing.** A crashed app is restarted automatically.
-- **Equalizer.** Presets (less boomy bass, loudness, clearer voices…), a 5-band custom EQ, or paste a headphone correction from AutoEQ. Off by default, so lossless music plays untouched.
+- **Equalizer and room correction.** Presets (less boomy bass, loudness, clearer voices…), a 5-band custom EQ, or paste filters from AutoEQ (headphones) or REW (your room, see the [room-correction guide](docs/ROOM-CORRECTION.md)). Off by default, so lossless music plays untouched.
+- **Visualizer.** Spectrum bars or VU meters on the AirPlay, Spotify and Bluetooth screens; tap the cover for full screen.
+- **Album-art colors.** The screens take their accent color from the cover that's playing.
+- **Night dimming and auto-brightness.** Dim on a schedule, or follow a Home Assistant light sensor.
+- **Home Assistant tile.** Your dashboard on the screen.
+- **Optional knob and power button.** A $3 rotary knob for volume and play/pause, and a push button to shut down and start ([wiring](docs/gpio.svg)).
 - **Sleep timer.** The zᶻ button next to the clock stops the music after 15 to 90 minutes, fading out over the last minute.
 - **Backup and restore.** Download all your settings as one file from your phone, and restore them on a new memory card.
 - **Power-cut protection.** An optional read-only mode, so pulling the plug can't damage the memory card.
@@ -133,6 +138,7 @@ your MQTT password, so it's never committed to git. A few you might want:
 | `CHROMIUM_SCALE` | Zoom for all apps, for screens that aren't 800×480 |
 | `SWIPE_HOME`, `TOUCH_ROTATE` | Edge swipes to go home; rotation if the screen is mounted rotated |
 | `POWER_BUTTON` | `yes` if you wire a push button to pins 5 and 6: press to shut down, press again to start |
+| `KNOB`, `KNOB_STEP` | `yes` if you wire a rotary knob ([wiring](docs/gpio.svg)); volume change per click |
 
 ## Home Assistant
 
@@ -145,6 +151,19 @@ With MQTT set up, the Pi appears automatically under **Settings → Devices** wi
 - **Volume.**
 - **Buttons:** **Pause all**, **Restart screen**, **Reboot**, **Shut down**.
 - **Sleep timer:** minutes left; set a number to start it, 0 to cancel.
+- **Ambient light:** send a light sensor's lux here (and turn on **Follow a light sensor**) to set the screen brightness automatically:
+
+  ```yaml
+  triggers:
+    - trigger: state
+      entity_id: sensor.<your_room>_illuminance
+  actions:
+    - action: number.set_value
+      target:
+        entity_id: number.<your_pi>_ambient_light
+      data:
+        value: "{{ trigger.to_state.state | float(0) }}"
+  ```
 - **AirPlay artwork:** an image entity.
 - **Diagnostics:** CPU temperature, and whether Music Assistant is reachable.
 - **Screen alert:** a notify entity that puts a message on the screen with a chime.

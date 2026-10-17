@@ -52,6 +52,14 @@
     font-size: 15px; font-weight: 700; color: #0b0b0f; background: var(--accent); }
   .btn.on { display: inline-block; }
   body.bluetooth { --accent: #7b8cff; }
+  body.themed { --accent: var(--art) !important; }
+  #viz { display: none; width: 100%; height: 64px; margin-top: 16px; }
+  body.viz #viz { display: block; }
+  body.full .art, body.full .album, body.full .hint, body.full .btn, body.full .fmt { display: none !important; }
+  body.full .wrap { flex-direction: column; justify-content: flex-end; align-items: stretch; padding: 24px 36px 30px; }
+  body.full .info { display: flex; flex-direction: column; height: 100%; }
+  body.full #viz { order: 9; flex: 1; height: auto; margin-top: 18px; }
+  body.full h1 { font-size: 30px; margin: 10px 0 4px; }
   body.bluetooth .art { background: linear-gradient(145deg, #2a3170, #101018); }
   .btn.ghost { background: rgba(255,255,255,.1); color: var(--text); margin-left: 8px; }
 </style>
@@ -72,6 +80,7 @@
     <div class="fmt" id="fmt"></div>
     <div class="hint" id="hint"></div>
     <button class="btn" id="browse">Browse Spotify on this screen</button>
+    <canvas id="viz"></canvas>
     <button class="btn" id="pair">Pair a phone</button><button class="btn ghost" id="stoppair">Stop</button>
   </div>
 </div>
@@ -112,7 +121,50 @@ function renderBt(s) {
   $("stoppair").classList.toggle("on", pairing);
 }
 
+// ---- album-art color and visualizer
+let es = null, mode = "bars", frame = null, lastFrame = 0;
+function theme(s) {
+  document.body.classList.toggle("themed", !!s.accent);
+  if (s.accent) document.body.style.setProperty("--art", s.accent);
+  mode = s.visualizer || "bars";
+  const playing = !!((SRC === "bluetooth" ? s.bluetooth : SRC === "spotify" ? s.spotify : s.airplay) || {}).playing;
+  const want = mode !== "off" && playing;
+  document.body.classList.toggle("viz", want);
+  if (!want) document.body.classList.remove("full");
+  if (want && !es) { es = new EventSource("/api/meter"); es.onmessage = e => { frame = JSON.parse(e.data); lastFrame = Date.now(); }; }
+  if (!want && es) { es.close(); es = null; frame = null; }
+}
+$("art").addEventListener("click", () => { if (document.body.classList.contains("viz")) document.body.classList.add("full"); });
+$("viz").addEventListener("click", () => document.body.classList.toggle("full"));
+function draw() {
+  requestAnimationFrame(draw);
+  const c = $("viz"); if (!document.body.classList.contains("viz") || !c.clientWidth) return;
+  const dpr = devicePixelRatio || 1, W = c.clientWidth, H = c.clientHeight;
+  if (c.width !== W * dpr || c.height !== H * dpr) { c.width = W * dpr; c.height = H * dpr; }
+  const x = c.getContext("2d"); x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, W, H);
+  const col = getComputedStyle(document.body).getPropertyValue("--accent").trim() || "#3b8cf6";
+  const f = (Date.now() - lastFrame < 1500 && frame) || {};
+  if (mode === "vu" || !(f.bands || []).length) {
+    const bars = [["L", f.l], ["R", f.r]], h = Math.min(18, H / 3);
+    bars.forEach(([lab, db], i) => {
+      const y = H / 2 - h - 4 + i * (h + 8), lvl = Math.max(0, Math.min(1, ((db ?? -60) + 60) / 60));
+      x.fillStyle = "rgba(255,255,255,.08)"; x.fillRect(22, y, W - 22, h);
+      const g = x.createLinearGradient(22, 0, W, 0); g.addColorStop(0, col); g.addColorStop(.8, col); g.addColorStop(.92, "#ffd166"); g.addColorStop(1, "#ff5a4f");
+      x.fillStyle = g; x.fillRect(22, y, (W - 22) * lvl, h);
+      x.fillStyle = "rgba(255,255,255,.6)"; x.font = "bold 12px system-ui"; x.fillText(lab, 4, y + h - 4);
+    });
+    return;
+  }
+  const b = f.bands, n = b.length, gap = Math.max(2, W / n * 0.22), bw = (W - gap * (n - 1)) / n;
+  x.fillStyle = col;
+  b.forEach((v, i) => { const bh = Math.max(2, v * H); x.globalAlpha = 0.55 + 0.45 * v;
+    x.beginPath(); x.roundRect ? x.roundRect(i * (bw + gap), H - bh, bw, bh, Math.min(3, bw / 2)) : x.rect(i * (bw + gap), H - bh, bw, bh); x.fill(); });
+  x.globalAlpha = 1;
+}
+requestAnimationFrame(draw);
+
 function render(s) {
+  theme(s);
   if (SRC === "bluetooth") return renderBt(s);
   const a = (SRC === "spotify" ? s.spotify : s.airplay) || {};
   const has = !!(a.title || a.artist);

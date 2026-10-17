@@ -175,6 +175,15 @@ from any app, **swipe right from the left edge** of the screen, or **swipe down 
 <img src="spotify.png" width="49%" alt="Spotify Connect now playing"> <img src="timer.png" width="49%" alt="Workout timer">
 <img src="bluetooth-pair.png" width="49%" alt="Pairing a phone over Bluetooth"> <img src="bluetooth.png" width="49%" alt="Playing from a phone over Bluetooth">
 
+- **Home Assistant:** if you entered your Home Assistant address, a tile opens your dashboard on the
+  screen. Sign in once.
+
+<img src="visualizer.png" width="49%" alt="Full-screen visualizer"> <img src="vu.png" width="49%" alt="VU meters">
+
+**While music plays** on AirPlay, Spotify or Bluetooth, the screen shows a live spectrum (or VU
+meters, see Settings → Screen) tinted with the album cover's color. Tap the cover for a full-screen
+visualizer; tap again to go back.
+
 Good to know:
 
 - **One thing plays at a time.** Starting music from one app pauses the others, and the screen
@@ -204,10 +213,13 @@ default output. If the sound comes out of the wrong one, connect to the Pi (step
 `wpctl status`, note the number next to the output you want under "Sinks", and run
 `wpctl set-default <number>`.
 
+**Want to correct your room properly?** See the [room-correction guide](ROOM-CORRECTION.md): measure
+with a USB microphone and the free REW app, then paste the result into PlexPie's equalizer.
+
 **Too much bass, or too little?** Open **Settings → Sound** and turn on the **Equalizer**. Pick a
 preset like **Less boomy bass** (great for basements) or **Loudness** (for quiet listening), or choose
 **Custom** and drag the five sliders while music plays. The curve shows what it does. With headphones,
-pick **Headphones (paste AutoEQ)**, find your model on [autoeq.app](https://autoeq.app), choose
+pick **Pasted filters (AutoEQ or REW)**, find your model on [autoeq.app](https://autoeq.app), choose
 "Equalizer APO", and paste the result. If your receiver has its own room calibration (Onkyo AccuEQ,
 Denon/Marantz Audyssey, Yamaha YPAO…), run that first; it measures your actual room. Leave the
 equalizer off if you want lossless music to reach your DAC untouched.
@@ -230,7 +242,11 @@ Here you can:
 - set the screen brightness and sleep time,
 - join a Wi-Fi network, or turn Wi-Fi off,
 - install updates with one button,
-- connect Home Assistant and add home-screen buttons for it.
+- connect Home Assistant and add home-screen buttons for it,
+- dim the screen at night, or let a Home Assistant light sensor set the brightness,
+- choose the visualizer and turn album-art colors on or off.
+
+<img src="phone-screen.png" width="30%" alt="Screen settings: album-art colors, visualizer, night dimming">
 
 **From your phone:** under **Phone access**, Settings shows an address like
 `http://192.168.1.42:8080/settings` and a **PIN**. Open that address on your phone (on the same
@@ -281,9 +297,15 @@ rings. The [main README](../README.md#home-assistant) has the details and exampl
 - **Turn it off:** **Settings → System → Shut down**. Wait about 15 seconds, until the green light on
   the Pi stops blinking, then unplug it. (Some screens stay lit after the Pi is off; that's normal.) Plug it back in to start it. Don't just pull the plug while
   it's running: that can damage the memory card.
-- **Want a real power button?** Wire a small push button to pins 5 and 6 of the Pi (the third pair
-  of pins from the end nearest the memory card), set `POWER_BUTTON="yes"` in `~/plexpie/plexpie.conf`, run
-  `sudo bash ~/plexpie/install.sh` and reboot. Press it to shut down, press again to start.
+- **Want a real power button or a volume knob?** Both are optional and cost a few dollars. Wire them
+  with jumper wires as shown below (no soldering), then in `~/plexpie/plexpie.conf` set
+  `POWER_BUTTON="yes"` and/or `KNOB="yes"`, run `sudo bash ~/plexpie/install.sh` and reboot.
+  - **Power button:** any push button between pins 5 and 6. Press to shut down, press again to start.
+  - **Rotary knob:** a "KY-040" rotary encoder module. Turn for volume, press to pause or play, hold
+    to go back to the home screen.
+  - Skip these if a DAC board sits on top of your Pi (a "HAT"); it may use the same pins.
+
+  <img src="gpio.svg" width="100%" alt="Which pins to use for the power button and the rotary knob">
 - **Uninstall:** run `sudo bash ~/plexpie/rollback.sh`, then `sudo reboot`. The Pi goes back to how
   it was before PlexPie.
 

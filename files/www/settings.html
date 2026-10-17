@@ -30,6 +30,7 @@
   .row .t small { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
   .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); flex: none; }
   .dot.ok { background: var(--ok); } .dot.no { background: var(--warn); }
+  input[type=time] { width: 136px; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 10px; padding: 8px; font: inherit; }
   input[type=text], input[type=password], input[type=number], select {
     width: 46%; max-width: 280px; background: #0f0f14; color: var(--text); border: 1px solid var(--line);
     border-radius: 10px; padding: 10px 12px; font: inherit; font-size: 15px; }
@@ -109,6 +110,17 @@
       <label class="sw"><input type="checkbox" id="AUTO_SHOW"><span></span></label></div>
     <div class="row"><div class="t"><b>Swipe home</b><small>From the left edge or the top edge</small></div>
       <label class="sw"><input type="checkbox" id="SWIPE_HOME"><span></span></label></div>
+    <div class="row"><div class="t"><b>Album-art colors</b><small>Tint the screens with colors from the cover that's playing</small></div>
+      <label class="sw"><input type="checkbox" id="THEME_FROM_ART"><span></span></label></div>
+    <div class="row"><div class="t"><b>Visualizer</b><small>On the AirPlay, Spotify and Bluetooth screens. Tap the cover for full screen.</small></div>
+      <select id="VISUALIZER"><option value="bars">Spectrum bars</option><option value="vu">VU meters</option><option value="off">Off</option></select></div>
+    <div class="row"><div class="t"><b>Dim at night</b><small>Lower the brightness between these times</small></div>
+      <label class="sw"><input type="checkbox" id="NIGHT_DIM"><span></span></label></div>
+    <div class="row" id="nightrow"><div class="t"><b>From</b></div><input id="NIGHT_START" type="time">
+      <div class="t" style="flex:none"><b>to</b></div><input id="NIGHT_END" type="time"></div>
+    <div class="row" id="nightbr"><div class="t"><b>Night brightness</b></div><input id="NIGHT_BRIGHTNESS" type="range" min="5" max="60" step="5"></div>
+    <div class="row"><div class="t"><b>Follow a light sensor</b><small>Brightness follows a Home Assistant light sensor sent to this player's "Ambient light" entity</small></div>
+      <label class="sw"><input type="checkbox" id="AUTO_BRIGHTNESS"><span></span></label></div>
   </div>
 
   <h2>Sound</h2>
@@ -134,6 +146,8 @@
     <div class="row"><div class="t"><b>Username</b></div><input id="MQTT_USER" type="text" autocapitalize="off"></div>
     <div class="row"><div class="t"><b>Password</b><small id="passnote"></small></div>
       <input id="MQTT_PASS" type="password" autocomplete="new-password"></div>
+    <div class="row"><div class="t"><b>Home Assistant address</b><small>For the Home Assistant tile and camera pictures in alerts</small></div>
+      <input id="HA_URL" type="text" placeholder="http://homeassistant.local:8123" autocapitalize="off"></div>
     <div class="row"><div class="t"><b>Launcher buttons</b><small>Names, separated by commas (e.g. Gym lights). Each one becomes a switch in Home Assistant for your automations.</small></div>
       <input id="SHORTCUTS" type="text" placeholder="Gym lights"></div>
   </div>
@@ -216,10 +230,12 @@ const APPS = [
   ["ENABLE_MUSIC_ASSISTANT", "Music Assistant", "Player and interface for Music Assistant"],
   ["ENABLE_BLUETOOTH", "Bluetooth", "Any phone can play to it"],
   ["ENABLE_TIMER", "Workout timer", "Intervals, countdown and stopwatch"],
+  ["ENABLE_HA_DASHBOARD", "Home Assistant", "Your Home Assistant dashboard on the screen (needs its address under Home Assistant)"],
 ];
 const FIELDS = ["SCREEN_OFF_AFTER_SECS", "SCREEN_BRIGHTNESS", "AUTO_SHOW", "SWIPE_HOME", "MQTT_HOST", "MQTT_PORT",
   "MQTT_USER", "MQTT_PASS", "SHORTCUTS", "MA_HOST", "MA_URL", "PHONE_ACCESS",
-  "EQ_ENABLED", "EQ_PRESET", "EQ_BANDS", "EQ_CUSTOM_TEXT"];
+  "EQ_ENABLED", "EQ_PRESET", "EQ_BANDS", "EQ_CUSTOM_TEXT", "THEME_FROM_ART", "VISUALIZER", "NIGHT_DIM",
+  "NIGHT_START", "NIGHT_END", "NIGHT_BRIGHTNESS", "AUTO_BRIGHTNESS", "HA_URL"];
 let data = null;
 
 function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("on");
@@ -265,7 +281,7 @@ function render() {
   document.querySelectorAll(".local-only").forEach(e => e.classList.toggle("hidden", !data.local));
   $("ver").textContent = `PlexPie ${data.version}`;
   renderUpdates(data.updates); renderWifi(data.wifi);
-  buildBands(); eqUi(); requestAnimationFrame(() => setTimeout(drawEq, 30));
+  nightUi(); buildBands(); eqUi(); requestAnimationFrame(() => setTimeout(drawEq, 30));
   $("main").classList.remove("hidden"); $("bar").classList.remove("hidden");
   $("save").disabled = true;
 }
@@ -516,6 +532,11 @@ async function btRefresh(action, address) {
 $("btpair").onclick = () => btRefresh((data.bluetooth || {}).pairing_left ? "stop" : "pair");
 $("btdevices").addEventListener("click", e => { const a = e.target.dataset.btforget;
   if (a && confirm("Forget this phone? It will need to pair again.")) btRefresh("forget", a); });
+
+// ---- night dimming rows
+function nightUi() { const on = $("NIGHT_DIM").checked;
+  ["nightrow", "nightbr"].forEach(id => $(id).classList.toggle("hidden", !on)); }
+$("NIGHT_DIM").addEventListener("change", nightUi);
 </script>
 </body>
 </html>

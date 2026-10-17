@@ -25,7 +25,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 
-VERSION = "2.7.0"
+VERSION = "2.8.0"
 CONF_PATH = os.environ.get("PLEXPIE_CONF", "/etc/plexpie/plexpie.conf")
 WWW = os.path.join(os.path.dirname(os.path.abspath(__file__)), "www")
 HTTP_PORT = int(os.environ.get("PLEXPIE_HTTP_PORT", "8080"))
@@ -63,6 +63,8 @@ SETTINGS_ENV = os.path.join(SETTINGS_DIR, "settings.env")      # read by the sys
 EDITABLE = {
     "ENABLE_APPLE_MUSIC_WEB": "bool", "ENABLE_AIRPLAY": "bool", "ENABLE_SPOTIFY": "bool",
     "ENABLE_SPOTIFY_WEB": "bool", "ENABLE_MUSIC_ASSISTANT": "bool", "ENABLE_TIMER": "bool", "SHORTCUTS": "str",
+    "VISUALIZER": "str", "THEME_FROM_ART": "bool", "NIGHT_DIM": "bool", "NIGHT_START": "str", "NIGHT_END": "str",
+    "NIGHT_BRIGHTNESS": "int", "AUTO_BRIGHTNESS": "bool", "ENABLE_HA_DASHBOARD": "bool", "HA_URL": "str",
     "ENABLE_BLUETOOTH": "bool", "EQ_ENABLED": "bool", "EQ_PRESET": "str", "EQ_BANDS": "str", "EQ_CUSTOM": "str",
     "SCREEN_OFF_AFTER_SECS": "int", "SCREEN_BRIGHTNESS": "int", "AUTO_SHOW_SOURCES": "str",
     "SWIPE_HOME": "bool", "MA_HOST": "str", "MA_URL": "str",
@@ -114,6 +116,7 @@ def cfg_int(key, default):
 
 
 PLAYER_NAME = cfg("PLAYER_NAME", socket.gethostname())
+HA_BASE = (cfg("HA_URL") or (f"http://{cfg('HA_HOST')}:8123" if cfg("HA_HOST") else "")).rstrip("/")
 MA_URL = cfg("MA_URL", "http://homeassistant.local:8095").rstrip("/")
 
 SOURCES = {
@@ -129,6 +132,8 @@ SOURCES = {
     "alert": {"name": "Alert", "url": f"http://127.0.0.1:{HTTP_PORT}/alert", "hidden": True},
     "settings": {"name": "Settings", "url": f"http://127.0.0.1:{HTTP_PORT}/settings", "hidden": True},
 }
+if HA_BASE and cfg_yes("ENABLE_HA_DASHBOARD", "yes"):
+    SOURCES["ha"] = {"name": "Home Assistant", "url": HA_BASE + "/"}
 for key, flag, default in (("airplay", "ENABLE_AIRPLAY", "yes"), ("ma", "ENABLE_MUSIC_ASSISTANT", "yes"),
                            ("apple", "ENABLE_APPLE_MUSIC_WEB", "yes"), ("spotify", "ENABLE_SPOTIFY", "no"),
                            ("spotify_web", "ENABLE_SPOTIFY_WEB", "no"), ("timer", "ENABLE_TIMER", "yes"),
@@ -137,7 +142,7 @@ for key, flag, default in (("airplay", "ENABLE_AIRPLAY", "yes"), ("ma", "ENABLE_
         SOURCES.pop(key)
 if "spotify" not in SOURCES:
     SOURCES.pop("spotify_web", None)
-WEB_APPS = ("plexamp", "apple", "ma", "spotify_web", "settings")     # pages that may need the keyboard
+WEB_APPS = ("plexamp", "apple", "ma", "spotify_web", "settings", "ha")     # pages that may need the keyboard
 SPOTIFY_API = "http://127.0.0.1:3678"
 
 NAME_TO_KEY = {v["name"]: k for k, v in SOURCES.items()}
@@ -170,6 +175,8 @@ def source_for_url(url):
         return "apple"
     if MA_NETLOC and u.netloc == MA_NETLOC:
         return "ma"
+    if "ha" in SOURCES and u.netloc == urllib.parse.urlparse(HA_BASE).netloc:
+        return "ha"
     return None
 
 
@@ -231,7 +238,9 @@ class State:
         self.quiet_until = 0.0          # during an alert: no auto-pause, no auto-show
         self.alert = {}
         self.alert_n = 0
-        self.bt = {}                    # Bluetooth: connected phone, pairing, codec
+        self.bt = {}
+        self.accent = None              # color picked from the current album art
+        self.ambient = None             # brightness from Home Assistant's light sensor (percent)                    # Bluetooth: connected phone, pairing, codec
         self.sleep_until = 0.0          # sleep timer: pause everything at this time (0 = off)
         self.changed = threading.Event()
 
@@ -243,6 +252,31 @@ class State:
 
 
 ST = State()
+
+
+def hhmm(s, default):
+    try:
+        h, m = (int(x) for x in str(s).split(":")[:2])
+        return h * 60 + m
+    except ValueError:
+        return default
+
+
+def night_now():
+    if not cfg_yes("NIGHT_DIM", "no"):
+        return False
+    t = time.localtime()
+    now, a, b = t.tm_hour * 60 + t.tm_min, hhmm(cfg("NIGHT_START", "22:00"), 1320), hhmm(cfg("NIGHT_END", "07:00"), 420)
+    return a <= now < b if a < b else (now >= a or now < b)
+
+
+def effective_brightness():
+    pct = ST.brightness
+    if cfg_yes("AUTO_BRIGHTNESS", "no") and ST.ambient is not None:
+        pct = ST.ambient
+    if night_now():
+        pct = min(pct, max(5, cfg_int("NIGHT_BRIGHTNESS", 20)))
+    return pct
 
 
 def mark_changed():
@@ -283,6 +317,8 @@ def state_json():
             "bluetooth": dict({k: v for k, v in ST.bt.items() if k != "player"},
                               playing=bool(ST.playing.get("bluetooth"))),
             "eq": cfg_yes("EQ_ENABLED", "no"),
+            "accent": ST.accent if cfg_yes("THEME_FROM_ART") else None,
+            "visualizer": cfg("VISUALIZER", "bars"),
             "sleep_left": max(0, round(ST.sleep_until - time.time())) if ST.sleep_until else 0,
         }
 
@@ -579,6 +615,12 @@ class Plexamp:
         except Exception as e:
             log.warning("plexamp pause failed: %s", e)
 
+    def play(self):
+        try:
+            self._q("/player/playback/play?type=music")
+        except Exception as e:
+            log.warning("plexamp play failed: %s", e)
+
     def healthy(self):
         try:
             http_get(PLEXAMP + "/", 4)
@@ -607,7 +649,7 @@ class Screen:
 
     def apply(self):
         with ST.lock:
-            on, pct = ST.screen_on, ST.brightness
+            on, pct = ST.screen_on, effective_brightness()
         if self.bl:
             if on:
                 if os.path.exists(f"{self.bl}/bl_power"):
@@ -736,7 +778,6 @@ def switch_source(src):
 
 # ------------------------------------------------------------------------ alerts
 CHIME = "/tmp/plexpie-chime.wav"
-HA_BASE = (cfg("HA_URL") or (f"http://{cfg('HA_HOST')}:8123" if cfg("HA_HOST") else "")).rstrip("/")
 
 
 def make_chime():
@@ -934,7 +975,7 @@ EQ_PRESETS = {
     "vocal": {"name": "Clearer voices", "filters": [["PK", 250, -2, 1.0], ["PK", 3000, 3, 1.0]]},
     "soft_treble": {"name": "Softer treble", "filters": [["HS", 6000, -3, 0.7]]},
     "custom": {"name": "Custom", "filters": []},
-    "headphones": {"name": "Headphones (paste AutoEQ)", "filters": []},
+    "headphones": {"name": "Pasted filters (AutoEQ or REW)", "filters": []},
 }
 EQ_BAND_DEF = [("LS", 60, 0.7), ("PK", 250, 1.0), ("PK", 1000, 1.0), ("PK", 4000, 1.0), ("HS", 10000, 0.7)]
 EQ_LABEL = {"PK": "bq_peaking", "LS": "bq_lowshelf", "HS": "bq_highshelf"}
@@ -1139,6 +1180,242 @@ def restore_backup(data):
     log.info("restored %d settings from a backup, reinstalling", len(new))
     ok, out = admin("apply-run", timeout=20)
     return ok, "" if ok else (out.strip() or "Could not start the installer.")
+
+
+# -------------------------------------------------------------- dimming, theme
+def dim_loop():
+    last = None
+    while True:
+        try:
+            eff = effective_brightness()
+            if eff != last:
+                if last is not None:
+                    log.info("screen brightness now %s%%", eff)
+                last = eff
+                SCREEN.apply()
+        except Exception as e:
+            log.warning("dimming: %s", e)
+        time.sleep(20)
+
+
+def lux_to_brightness(lux):
+    import math
+    return int(max(8, min(100, 8 + 92 * math.log10(max(0.0, lux) + 1) / math.log10(400))))
+
+
+def accent_from(data):
+    """A lively, readable color from album art (None if it's all grey)."""
+    try:
+        import colorsys, io
+        from PIL import Image
+        img = Image.open(io.BytesIO(data)).convert("RGB").resize((40, 40))
+        best, score = None, 0
+        for count, (r, g, b) in img.quantize(8).convert("RGB").getcolors(4096) or []:
+            h, s, v = colorsys.rgb_to_hsv(r / 255, g / 255, b / 255)
+            sc = count * (s ** 1.5) * (0.3 + v) * (0.2 if v < 0.18 else 1)
+            if sc > score:
+                best, score = (h, s, v), sc
+        if not best or best[1] < 0.18:
+            return None
+        h, s, v = best
+        r, g, b = colorsys.hsv_to_rgb(h, max(0.45, min(0.85, s)), max(0.8, v))
+        return "#%02x%02x%02x" % (int(r * 255), int(g * 255), int(b * 255))
+    except Exception:
+        return None
+
+
+def theme_loop():
+    cache = {}
+    while True:
+        time.sleep(2)
+        try:
+            with ST.lock:
+                src = ST.now_source() or ST.source
+                key, data, url = None, None, None
+                if src == "airplay" and ST.art:
+                    key, data = ("airplay", ST.art_ver), ST.art
+                elif src in ("spotify",):
+                    url = (ST.np.get("spotify") or {}).get("art_url")
+                    key = url
+            if url and url not in cache:
+                try:
+                    data = http_get(url, 5)
+                except Exception:
+                    data = None
+            if key is None:
+                accent = None
+            elif key in cache:
+                accent = cache[key]
+            else:
+                accent = cache[key] = accent_from(data) if data else None
+                if len(cache) > 50:
+                    cache.clear()
+            with ST.lock:
+                changed = accent != ST.accent
+                ST.accent = accent
+            if changed:
+                mark_changed()
+        except Exception as e:
+            log.warning("theme: %s", e)
+
+
+# -------------------------------------------------------------- visualizer
+METER = {"clients": 0, "frame": None, "seq": 0, "running": False}
+METER_COND = threading.Condition()
+METER_BANDS = 32
+
+
+def meter_worker():
+    """Listen to what the speakers play and turn it into levels and a spectrum."""
+    import math
+    import struct
+    try:
+        import numpy as np
+    except ImportError:
+        np = None
+    rate, n = 22050, 1024
+    edges = [40 * (10000 / 40) ** (i / METER_BANDS) for i in range(METER_BANDS + 1)]
+    fake = os.environ.get("PLEXPIE_FAKE_METER")
+    proc = None
+    smooth = [0.0] * METER_BANDS
+    try:
+        if not fake:
+            proc = subprocess.Popen(["pw-record", "-P", "{ stream.capture.sink=true node.description=\"PlexPie visualizer\" }",
+                                     "--rate", str(rate), "--channels", "2", "--format", "s16", "-"],
+                                    stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+            head = proc.stdout.read(44)
+            if head[:4] != b"RIFF":                # raw output: keep what was read
+                leftover = head
+            else:
+                leftover = b""
+        t0 = time.time()
+        while METER["clients"] > 0:
+            if fake:
+                time.sleep(n / rate)
+                t = time.time() - t0
+                bands = [max(0.0, min(1.0, 0.75 - i / 55 + 0.25 * math.sin(t * 3 + i * 0.7) * math.sin(t * 1.3 + i / 5)))
+                         for i in range(METER_BANDS)]
+                l = r = 0.6 + 0.3 * math.sin(t * 4)
+                peak = max(l, r)
+            else:
+                need = n * 4
+                buf = leftover + proc.stdout.read(need - len(leftover))
+                leftover = b""
+                if len(buf) < need:
+                    break
+                if np is not None:
+                    a = np.frombuffer(buf, dtype="<i2").astype(np.float32).reshape(-1, 2) / 32768.0
+                    l, r = (float(np.sqrt(np.mean(a[:, c] ** 2))) for c in (0, 1))
+                    peak = float(np.max(np.abs(a)))
+                    spec = np.abs(np.fft.rfft(a.mean(axis=1) * np.hanning(n))) / (n / 4)
+                    freqs = np.fft.rfftfreq(n, 1 / rate)
+                    bands = []
+                    for i in range(METER_BANDS):
+                        sel = spec[(freqs >= edges[i]) & (freqs < edges[i + 1])]
+                        v = float(sel.max()) if sel.size else 0.0
+                        db = 20 * math.log10(v + 1e-9)
+                        bands.append(max(0.0, min(1.0, (db + 60) / 60)))
+                else:
+                    s = struct.unpack("<%dh" % (n * 2), buf)
+                    l = math.sqrt(sum(x * x for x in s[0::2]) / n) / 32768
+                    r = math.sqrt(sum(x * x for x in s[1::2]) / n) / 32768
+                    peak, bands = max(abs(x) for x in s) / 32768, []
+            for i, v in enumerate(bands):
+                smooth[i] = v if v > smooth[i] else smooth[i] * 0.82 + v * 0.18
+            db = lambda x: max(-60.0, 20 * math.log10(x + 1e-9))
+            frame = {"l": round(db(l), 1), "r": round(db(r), 1), "peak": round(db(peak), 1),
+                     "bands": [round(x, 3) for x in smooth[:len(bands)]]}
+            with METER_COND:
+                METER["frame"] = frame
+                METER["seq"] += 1
+                METER_COND.notify_all()
+    except Exception as e:
+        log.warning("visualizer: %s", e)
+    finally:
+        if proc and proc.poll() is None:
+            proc.terminate()
+        with METER_COND:
+            METER["running"] = False
+            METER_COND.notify_all()
+
+
+def meter_subscribe(delta):
+    with METER_COND:
+        METER["clients"] = max(0, METER["clients"] + delta)
+        if delta >= 0 and METER["clients"] > 0 and not METER["running"]:
+            METER["running"] = True
+            spawn(meter_worker)
+
+
+# --------------------------------------------------------------- rotary knob
+def knob_reader():
+    """Optional rotary knob (KNOB=yes): turn for volume, press to pause/play, hold to go home."""
+    if not cfg_yes("KNOB", "no"):
+        return
+    try:
+        import evdev
+        import select
+    except ImportError:
+        return
+    step = max(1, cfg_int("KNOB_STEP", 2))
+    while True:
+        devs = []
+        for path in evdev.list_devices():
+            try:
+                d = evdev.InputDevice(path)
+                caps = d.capabilities()
+                if evdev.ecodes.REL_X in caps.get(evdev.ecodes.EV_REL, []) and "rotary" in d.name.lower():
+                    devs.append(d)
+                elif evdev.ecodes.KEY_PLAYPAUSE in caps.get(evdev.ecodes.EV_KEY, []) and \
+                        any(x in d.name.lower() for x in ("button", "gpio", "key")):
+                    devs.append(d)
+            except OSError:
+                pass
+        if not devs:
+            time.sleep(10)
+            continue
+        log.info("knob: %s", ", ".join(d.name for d in devs))
+        pressed_at = None
+        try:
+            while True:
+                r, _, _ = select.select(devs, [], [], 1.0)
+                if pressed_at and time.time() - pressed_at > 0.8:      # held: go home
+                    pressed_at = None
+                    SCREEN.wake("knob")
+                    switch_source("home")
+                for d in r:
+                    for ev in d.read():
+                        if ev.type == evdev.ecodes.EV_REL and ev.code == evdev.ecodes.REL_X and ev.value:
+                            SCREEN.wake("knob")
+                            cur = ST.volume if ST.volume is not None else (get_volume() or 0)
+                            set_volume(cur + step * (1 if ev.value > 0 else -1))
+                        elif ev.type == evdev.ecodes.EV_KEY and ev.code == evdev.ecodes.KEY_PLAYPAUSE:
+                            if ev.value == 1:
+                                pressed_at = time.time()
+                            elif ev.value == 0 and pressed_at:
+                                pressed_at = None
+                                was_off = not ST.screen_on
+                                SCREEN.wake("knob")
+                                if not was_off:
+                                    spawn(toggle_play)
+        except OSError as e:
+            log.warning("knob lost (%s), looking again", e)
+            time.sleep(2)
+
+
+def toggle_play():
+    with ST.lock:
+        playing = ST.now_source() is not None
+        last = ST.order[-1] if ST.order else None
+    if playing:
+        pause_all()
+    elif last == "plexamp" or last is None:
+        PLEX.play()
+    elif last == "spotify":
+        try:
+            http_get(SPOTIFY_API + "/player/resume", 3, method="POST")
+        except Exception as e:
+            log.warning("spotify resume failed: %s", e)
 
 
 def end_alert():
@@ -1882,6 +2159,7 @@ def settings_json(local, host=None):
             vals[k + "_SET"] = bool(cfg(k))
         elif kind == "bool":
             vals[k] = cfg_yes(k, {"ENABLE_SPOTIFY": "no", "ENABLE_SPOTIFY_WEB": "no", "EQ_ENABLED": "no",
+                                  "NIGHT_DIM": "no", "AUTO_BRIGHTNESS": "no",
                                   "PHONE_ACCESS": "yes"}.get(k, "yes"))
         else:
             vals[k] = cfg(k)
@@ -1890,6 +2168,12 @@ def settings_json(local, host=None):
         vals["PHONE_PIN"] = ""                  # the PIN is only shown on the player itself
     vals["AUTO_SHOW"] = bool(cfg("AUTO_SHOW_SOURCES", "plexamp airplay ma spotify bluetooth").strip())
     vals["EQ_PRESET"] = vals.get("EQ_PRESET") or "flat"
+    vals["VISUALIZER"] = vals.get("VISUALIZER") or "bars"
+    vals["SCREEN_OFF_AFTER_SECS"] = vals.get("SCREEN_OFF_AFTER_SECS") or "60"
+    vals["NIGHT_START"] = vals.get("NIGHT_START") or "22:00"
+    vals["NIGHT_END"] = vals.get("NIGHT_END") or "07:00"
+    vals["NIGHT_BRIGHTNESS"] = vals.get("NIGHT_BRIGHTNESS") or "20"
+    vals["HA_URL"] = vals.get("HA_URL") or HA_BASE
     vals["EQ_CUSTOM_TEXT"] = filters_to_apo(parse_compact(cfg("EQ_CUSTOM")))
     installed = {flag: subprocess.run(["systemctl", "cat", unit], capture_output=True).returncode == 0
                  for flag, unit in OPTIONAL_UNITS.items()}
@@ -2041,6 +2325,27 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             return self.wfile.write(body)
+        if path == "/api/meter":
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Cache-Control", "no-cache")
+            self.end_headers()
+            meter_subscribe(1)
+            seq = -1
+            try:
+                while True:
+                    with METER_COND:
+                        METER_COND.wait_for(lambda: METER["seq"] != seq or not METER["running"], timeout=2)
+                        frame, seq = METER["frame"], METER["seq"]
+                        if not METER["running"]:
+                            meter_subscribe(0)
+                    self.wfile.write(b"data: " + json.dumps(frame or {}).encode() + b"\n\n")
+                    self.wfile.flush()
+            except (BrokenPipeError, ConnectionResetError, OSError):
+                pass
+            finally:
+                meter_subscribe(-1)
+            return
         if path == "/api/art":
             with ST.lock:
                 art, typ = ST.art, ST.art_type
@@ -2268,6 +2573,10 @@ class HomeAssistant:
                                          "state_topic": f"{b}/cpu_temp"})
         self.disc("notify", "alert", {"name": "Screen alert", "icon": "mdi:message-alert",
                                       "command_topic": f"{b}/alert/set"})
+        self.disc("number", "ambient_light", {"name": "Ambient light", "icon": "mdi:brightness-auto", "min": 0,
+                                              "max": 100000, "step": 1, "unit_of_measurement": "lx", "mode": "box",
+                                              "entity_category": "config",
+                                              "state_topic": f"{b}/ambient_light", "command_topic": f"{b}/ambient_light/set"})
         self.disc("number", "sleep_timer", {"name": "Sleep timer", "icon": "mdi:sleep", "min": 0, "max": 180,
                                             "step": 5, "unit_of_measurement": "min", "mode": "box",
                                             "state_topic": f"{b}/sleep", "command_topic": f"{b}/sleep/set"})
@@ -2327,6 +2636,12 @@ class HomeAssistant:
                 spawn(shutdown)
             elif key == "sleep":
                 set_sleep(float(val))
+            elif key == "ambient_light":
+                lux = float(val)
+                with ST.lock:
+                    ST.ambient = lux_to_brightness(lux)
+                self.pub(f"{self.base}/ambient_light", str(round(lux)))
+                SCREEN.apply()
         except ValueError:
             log.warning("bad value for %s: %s", key, val)
 
@@ -2403,7 +2718,7 @@ def main():
     if "airplay" in SOURCES:
         spawn(airplay_reader)
     for fn in (fast_poller, slow_poller, focus_poller, gesture_reader, screen_loop, watchdog, update_checker,
-               sleep_loop, eq_manager):
+               sleep_loop, eq_manager, dim_loop, theme_loop, knob_reader):
         spawn(fn)
     HA.start()
     while True:

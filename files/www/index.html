@@ -7,7 +7,7 @@
 <style>
   :root {
     --bg: #0b0b0f; --panel: #16161c; --line: #26262e; --text: #f4f4f7; --muted: #8e8e99;
-    --plexamp: #f5a524; --apple: #fa3c5a; --airplay: #3b8cf6; --ma: #19c2a8; --spotify: #1ed760; --timer: #ff5a4f; --bt: #7b8cff; --lamp: #ffd166;
+    --plexamp: #f5a524; --apple: #fa3c5a; --airplay: #3b8cf6; --ma: #19c2a8; --spotify: #1ed760; --timer: #ff5a4f; --bt: #7b8cff; --ha: #41bdf5; --lamp: #ffd166;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden;
@@ -16,6 +16,10 @@
     padding: 0 var(--pad, 14px); font-size: var(--fs, 16px); }
 
   header, footer { zoom: var(--z, 1); }
+  body { transition: background-color .8s; }
+  body.themed { background: radial-gradient(130% 75% at 50% -10%, color-mix(in srgb, var(--art) 30%, transparent), transparent 70%), var(--bg); }
+  body.themed .np .chip { background: color-mix(in srgb, var(--art) 30%, var(--panel)); color: var(--art); }
+  body.themed .bar b { background: var(--art); }
   header { display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--line); }
   .name { font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
   .np { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; justify-content: center; }
@@ -122,6 +126,11 @@
       <path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M14 13v4"/><circle cx="12.5" cy="17" r="1.5"/></svg>
     <div><div class="label">Music Assistant</div><div class="sub">Checking…</div></div>
   </button>
+  <button class="tile" data-src="ha" style="--c: var(--ha)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 11.5L12 4l9 7.5"/><path d="M5.5 9.5V20h13V9.5"/><circle cx="12" cy="14" r="2"/><path d="M12 16v4M10.5 12.6L8.5 11M13.5 12.6l2-1.6"/></svg>
+    <div><div class="label">Home Assistant</div><div class="sub">Your dashboard</div></div>
+  </button>
   <button class="tile" data-src="timer" style="--c: var(--timer)">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9.5 2h5M12 2v3"/></svg>
@@ -154,7 +163,7 @@ const $ = (id) => document.getElementById(id);
 const post = (path, body) => fetch(path, {method: "POST", headers: {"Content-Type": "application/json"},
   body: JSON.stringify(body || {})}).then(r => r.json()).then(j => j.state && render(j.state)).catch(() => {});
 const SUBS = {plexamp: "Your library", apple: "On this screen", airplay: "From your phone",
-              spotify: "Spotify Connect", ma: "Your speakers", timer: "Intervals · countdown", bluetooth: "Any phone"};
+              spotify: "Spotify Connect", ma: "Your speakers", timer: "Intervals · countdown", bluetooth: "Any phone", ha: "Your dashboard"};
 const BULB = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg>';
 let scKey = "";
 function renderShortcuts(list) {
@@ -191,6 +200,8 @@ function render(s) {
   });
   fit(Math.max(shown, 1));
   renderShortcuts(s.shortcuts || []);
+  document.body.classList.toggle("themed", !!s.accent);
+  if (s.accent) document.body.style.setProperty("--art", s.accent);
 
   if (s.playing) {
     $("npchip").textContent = s.now_source_name;

@@ -25,6 +25,23 @@ EQ_ENABLED="no"
 EQ_PRESET="flat"
 EQ_BANDS=""
 EQ_CUSTOM=""
+# Rotary knob (KY-040 style): turn for volume, press to pause/play, hold to go home.
+# Wiring: A -> pin 11, B -> pin 13, push -> pin 15, + -> pin 1 (3.3 V), GND -> pin 9. Reboot after changing.
+KNOB="no"
+KNOB_STEP="2"
+# Visualizer on the now-playing screens: bars, vu or off
+VISUALIZER="bars"
+# Color the screens from the album art
+THEME_FROM_ART="yes"
+# Dim the screen at night (24-hour times) and how bright it is then (percent)
+NIGHT_DIM="no"
+NIGHT_START="22:00"
+NIGHT_END="07:00"
+NIGHT_BRIGHTNESS="20"
+# Follow a Home Assistant light sensor (send lux to the "Ambient light" entity)
+AUTO_BRIGHTNESS="no"
+# Home Assistant tile on the home screen (needs HA_HOST or HA_URL)
+ENABLE_HA_DASHBOARD="yes"
 # Workout timer tile on the launcher
 ENABLE_TIMER="yes"
 # Settings from a phone browser at http://<pi>:8080/settings (PIN shown on the player)
