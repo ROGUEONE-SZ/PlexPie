@@ -594,6 +594,15 @@ function render() {
   const vnc = data.vnc || {};
   $("vncsub").innerHTML = vnc.on ? `On · connect to <code>vnc://${esc(vnc.address)}</code> with your Remote access PIN`
     : v.SCREEN_SHARING ? "Starting…" : "See and use this screen from a Mac, iPad or iPhone on your Wi-Fi";
+  clearTimeout(render.vncT);
+  const vncCheck = async () => {            // keep checking until screen sharing is up
+    try {
+      const j = await (await api("/api/settings")).json(); data.vnc = j.vnc;
+      if (j.vnc && j.vnc.on) { $("vncsub").innerHTML = `On · connect to <code>vnc://${esc(j.vnc.address)}</code> with your Remote access PIN`; return; }
+    } catch (e) {}
+    render.vncT = setTimeout(vncCheck, 4000);
+  };
+  if (v.SCREEN_SHARING && !vnc.on) render.vncT = setTimeout(vncCheck, 4000);
   const ac = data.address_change || {};
   $("addrbanner").classList.toggle("hidden", !ac.new);
   $("addrbanner").textContent = ac.new ? `This player's address changed (${ac.old} → ${ac.new}). If the Plexamp screen spins, tap Reset below.` : "";
