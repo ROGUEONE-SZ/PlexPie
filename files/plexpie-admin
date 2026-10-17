@@ -28,8 +28,15 @@ apt_progress() {  # reads apt's Status-Fd and reports an overall percent between
     p=$((b + pct * sp / 100))
     [ "$p" = "$last" ] && continue
     last=$p
+    [ "$kind" = pmstatus ] || pkg=""                 # dlstatus gives a file number, not a package
     json_status "$lab" true ",\"percent\":$p,\"detail\":\"$(printf %s "$pkg" | tr -cd 'A-Za-z0-9._+-' | cut -c1-40)\""
   done
+}
+
+wait_reader() {   # let the progress reader finish writing ($! may be unset: never fail on it)
+  [ -n "${!:-}" ] && wait "$!" 2>/dev/null
+  sleep 0.3
+  return 0
 }
 
 protect_active() { grep -Eq 'boot=overlay|overlayroot=tmpfs' /proc/cmdline; }
@@ -88,7 +95,7 @@ print(json.dumps(sorted(seen.values(), key=lambda n: -n["signal"])[:20]))' ;;
     cat "$STATE/plexpie.json" ;;
   check-os)         # how many Raspberry Pi OS packages can be updated? (refreshes the package list)
     apt-get update -qq >/dev/null 2>&1
-    pk=$(apt-get -s -o Debug::NoLocking=1 upgrade 2>/dev/null | awk '/^Inst /{print $2}')
+    pk=$(apt-get -s -o Debug::NoLocking=1 full-upgrade 2>/dev/null | awk '/^Inst /{print $2}')
     n=$(printf '%s\n' "$pk" | grep -c .)
     names=$(printf '%s\n' "$pk" | head -8 | python3 -c 'import json,sys; print(json.dumps([l.strip() for l in sys.stdin if l.strip()]))')
     reboot=false; [ -f /var/run/reboot-required ] && reboot=true
@@ -115,13 +122,13 @@ print(json.dumps(sorted(seen.values(), key=lambda n: -n["signal"])[:20]))' ;;
       KIND=os; [ "$kind" = all ] && span=60 || span=100     # "all" = OS first (0-60%), then PlexPie (60-100%)
       json_status "Refreshing the list of updates" true ',"percent":1'
       apt-get update -q -o APT::Status-Fd=3 3> >(apt_progress 1 $((span * 10 / 100)) "Refreshing the list of updates")
-      wait $! 2>/dev/null
+      wait_reader
       lo=$((span * 10 / 100)); hi=$((span * 92 / 100))
       json_status "Preparing" true ",\"percent\":$lo"
       apt-get -y -q -o APT::Status-Fd=3 -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold \
-        upgrade 3> >(apt_progress "$lo" $((hi - lo)))
+        full-upgrade 3> >(apt_progress "$lo" $((hi - lo)))
       rc=$?
-      wait $! 2>/dev/null                       # let the progress reader finish writing
+      wait_reader
       [ $rc -eq 0 ] || { json_status "Raspberry Pi OS update failed (see $LOG)" false; exit 1; }
       json_status "Cleaning up" true ",\"percent\":$((span * 96 / 100))"
       apt-get -y -q autoremove
