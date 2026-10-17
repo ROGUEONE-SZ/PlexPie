@@ -25,7 +25,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 
-VERSION = "2.10.1"
+VERSION = "2.10.2"
 CONF_PATH = os.environ.get("PLEXPIE_CONF", "/etc/plexpie/plexpie.conf")
 WWW = os.path.join(os.path.dirname(os.path.abspath(__file__)), "www")
 HTTP_PORT = int(os.environ.get("PLEXPIE_HTTP_PORT", "8080"))
@@ -2289,11 +2289,21 @@ def screen_share_loop():
                 if subprocess.run(["xset", "q"], env=env, capture_output=True).returncode == 0:   # screen is up
                     subprocess.run(["x11vnc", "-storepasswd", cfg("PHONE_PIN"), VNC_PASS], capture_output=True)
                     os.chmod(VNC_PASS, 0o600)
+                    # Same X login cookie that "xset q" just used (startx keeps it in ~/.Xauthority)
+                    xauth = os.environ.get("XAUTHORITY") or os.path.expanduser("~/.Xauthority")
+                    auth = ["-auth", xauth] if os.path.exists(xauth) else []
                     VNC["proc"] = subprocess.Popen(
-                        ["x11vnc", "-display", ":0", "-auth", "guess", "-rfbauth", VNC_PASS, "-forever", "-shared",
+                        ["x11vnc", "-display", ":0", *auth, "-rfbauth", VNC_PASS, "-forever", "-shared",
                          "-noxdamage", "-rfbport", "5900", "-allow", "192.168.,10.,172.,127.", "-o", VNC_LOG],
                         env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                    log.info("screen sharing on (vnc://%s)", lan_address())
+                    time.sleep(3)
+                    if screen_sharing_on():
+                        log.info("screen sharing on (vnc://%s)", lan_address())
+                    else:                           # say why once, then retry slowly instead of every few seconds
+                        last = (read_file(VNC_LOG) or "").strip().splitlines()[-1:] or ["?"]
+                        log.warning("screen sharing didn't start: %s", last[0][-200:])
+                        VNC["proc"] = None
+                        time.sleep(60)
                     mark_changed()
             elif not want and screen_sharing_on():
                 VNC["proc"].terminate()
