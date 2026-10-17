@@ -25,7 +25,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 
-VERSION = "2.9.2"
+VERSION = "2.9.3"
 CONF_PATH = os.environ.get("PLEXPIE_CONF", "/etc/plexpie/plexpie.conf")
 WWW = os.path.join(os.path.dirname(os.path.abspath(__file__)), "www")
 HTTP_PORT = int(os.environ.get("PLEXPIE_HTTP_PORT", "8080"))
@@ -1966,7 +1966,7 @@ def screen_loop():
 
 
 def watchdog():
-    plex_fail = 0
+    plex_fail = plex_blank = 0
     browser_down_since = None
     while True:
         time.sleep(15)
@@ -1974,6 +1974,17 @@ def watchdog():
             # Plexamp backend
             if PLEX.healthy():
                 plex_fail = 0
+                # The Plexamp page stays blank for good if it loaded while Plexamp was restarting
+                # (its script failed to download). Reload it once Plexamp answers again.
+                exists, nodes = BROWSER.evaluate("plexamp", "document.getElementsByTagName('*').length")
+                if exists and isinstance(nodes, (int, float)) and nodes < 60:
+                    plex_blank += 1
+                    if plex_blank >= 2:
+                        log.warning("Plexamp screen is blank, reloading it")
+                        BROWSER.evaluate("plexamp", "location.reload()")
+                        plex_blank = 0
+                else:
+                    plex_blank = 0
             else:
                 plex_fail += 1
                 if plex_fail >= 3:
