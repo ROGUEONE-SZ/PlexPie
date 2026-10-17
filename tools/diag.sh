@@ -4,6 +4,7 @@
 redact() { sed -E 's/(X-Plex-Token=|[Tt]oken["=: ]+|authToken["=: ]+)[A-Za-z0-9_.~-]{6,}/\1(hidden)/g; s/((password|passwd|psk|secret)["=: ]+)[^ ",]+/\1(hidden)/Ig'; }
 {
 echo "== PlexPie $(sed -n 's/^VERSION = "\(.*\)"/\1/p' /opt/plexpie/plexpied.py) on $(hostname), up $(uptime -p)"
+echo "== memory card: $(df -Ph / | awk 'NR==2{print $2" total, "$4" free"}')"
 echo "== chromium: $(chromium --version 2>/dev/null)"
 echo "== screen"; DISPLAY=:0 xrandr 2>/dev/null | grep -E "Screen|\*" | head -4
 grep -E "^(CHROMIUM_SCALE|APPLE_MUSIC_ZOOM|TOUCH_ROTATE|SCREEN_ROTATE)" /etc/plexpie/plexpie.conf 2>/dev/null

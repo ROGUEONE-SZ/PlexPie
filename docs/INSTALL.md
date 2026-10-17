@@ -30,7 +30,7 @@ things on its own.
 |---|---|---|
 | **Raspberry Pi** | Raspberry Pi 4 (2 GB or more) or Raspberry Pi 5 | A Pi 4 with 4 GB is plenty |
 | **Power supply** | The official Raspberry Pi USB-C power supply for your model | Cheap phone chargers cause random freezes |
-| **Memory card** | microSD card, 32 GB or larger, "A1" or "A2" rated | SanDisk or Samsung are reliable |
+| **Memory card** | microSD card, 32 GB or larger, "A1" or "A2" rated | SanDisk or Samsung are reliable. A 16 GB card works; on an 8 GB card use Raspberry Pi OS **Lite** |
 | **Touchscreen** | The official Raspberry Pi 7" Touch Display, or any HDMI touchscreen | Any size works; the screen adapts |
 | **Case** | A case that holds your Pi and screen together | Optional, but it makes it look like a real device |
 | **Audio** | A **USB DAC** (recommended), or use HDMI / the headphone jack | See [section 2](#2-connect-the-hardware) |

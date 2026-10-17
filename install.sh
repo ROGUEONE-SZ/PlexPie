@@ -112,6 +112,11 @@ fi
 
 # -------------------------------------------------------------- 2. packages
 step "Installing packages"
+free_mb=$(df -Pm / | awk 'NR==2{print $4}')
+if [ "${free_mb:-0}" -lt 2500 ]; then
+  note "only ${free_mb} MB free on the memory card; the first install needs about 2.5 GB."
+  note "Use a bigger card, or Raspberry Pi OS Lite on a small one, if this runs out of space."
+fi
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -q
 PKGS=(pipewire pipewire-pulse pipewire-alsa wireplumber pipewire-bin python3 python3-paho-mqtt
@@ -412,6 +417,8 @@ fi
 
 sleep 4
 step "Status"
+apt-get clean >/dev/null 2>&1 || true              # downloaded package files aren't needed any more
+echo "    free space on the memory card: $(df -Ph / | awk 'NR==2{print $4}')"
 for unit in plexamp plexpie plexpie-airplay plexpie-squeezelite plexpie-spotify nqptp; do
   printf '    %-22s %s\n' "$unit" "$(systemctl is-active "$unit" 2>/dev/null || true)"
 done
