@@ -155,6 +155,7 @@
       <li>On your phone or tablet, open the <b>Plexamp</b> app, tap the speaker icon and pick <b data-name>your player</b>. Your phone becomes the remote.</li>
     </ol>
     <figure><img src="/img/launcher.png" alt="The PlexPie home screen"></figure>
+    <div class="tip"><b>Music plays but the screen spins or shows no "now playing"?</b> Settings › Configuration › Plexamp › <b>Reset the Plexamp screen</b>, then sign in to Plex once on the screen. This happens after the player's network address changes.</div>
     <div class="tip"><b>Linked to the wrong account, or not linked?</b> Run the installer again from a computer (Build and install, step 4). It asks for a new claim code.</div>
   </section>
 
@@ -337,6 +338,7 @@
       <tr><td>Home screen too big, cut off on the right</td><td>It got pinch-zoomed. Update to 2.9.2 or newer and reboot; until then, Restart PlexPie.</td></tr>
       <tr><td>Plexamp screen blank or "loading"</td><td>Update to 2.9.3 or newer (it reloads itself), or Restart PlexPie.</td></tr>
       <tr><td>Album art spins, music slow to start</td><td>Your router blocks <code>plex.direct</code> (DNS rebind protection). Allow <code>plex.direct</code> in its DNS settings; on pfSense add <code>private-domain: "plex.direct"</code> under Services › DNS Resolver › Custom options.</td></tr>
+      <tr><td>Music plays, but the Plexamp screen spins or shows no now playing</td><td>The player's address changed. Settings › Configuration › Plexamp › <b>Reset the Plexamp screen</b>, then sign in to Plex once on the screen.</td></tr>
       <tr><td>Update stuck, or the version never changes</td><td>Tap Update again. On 2.8.x, update once by hand from a computer (see TROUBLESHOOTING on GitHub).</td></tr>
       <tr><td>Screen jumps to Bluetooth by itself</td><td>A paired phone reconnected. Update to 2.9.2 or newer, or Forget the device.</td></tr>
       <tr><td>Phone can't find the player over Bluetooth</td><td>Tap Pair a device first: it's visible for 2 minutes.</td></tr>

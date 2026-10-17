@@ -183,6 +183,9 @@
         <div class="group"><div class="row"><div class="t"><b>Plexamp</b><small>Always on: it's the heart of the player</small></div>
           <label class="sw"><input type="checkbox" checked disabled><span></span></label></div>
           <div class="row"><span class="dot" id="acct-plexamp-dot"></span><div class="t"><b>Plex account</b><small id="acct-plexamp"></small></div></div></div>
+        <div class="banner hidden" id="addrbanner"></div>
+        <div class="group"><div class="row"><div class="t"><b>Reset the Plexamp screen</b><small>If music plays but the Plexamp screen spins or shows no "now playing" (usually after the player's network address changed). You'll sign in to Plex once on the screen; your music and playlists aren't affected.</small></div>
+          <button class="btn" id="plexreset">Reset</button></div></div>
         <div class="group" data-guide="plexamp"></div>
       </section>
 
@@ -498,7 +501,7 @@ function appState(id) {
   if (id === "ha") return acct("ha").status || "";
   if (!on) return "Off";
   const ac = acct(id);
-  if (id === "plexamp") return ac.status || "On";
+  if (id === "plexamp") return (data.address_change || {}).new ? "Address changed: open to fix" : (ac.status || "On");
   if (id === "apple") return ac.ok ? "On · signed in" : ac.ok === false ? "On · not signed in" : "On";
   if (id === "bluetooth") { const b = data.bluetooth || {}; return b.connected ? `On · ${b.connected}` : "On"; }
   if (id === "ma") return ac.ok ? "On · server reachable" : "On · server not reachable";
@@ -582,6 +585,9 @@ function render() {
   $("phoneurl").textContent = data.phone_url || "(no network)";
   $("pinshow").textContent = v.PHONE_PIN || "";
   $("ver").textContent = data.version;
+  const ac = data.address_change || {};
+  $("addrbanner").classList.toggle("hidden", !ac.new);
+  $("addrbanner").textContent = ac.new ? `This player's address changed (${ac.old} → ${ac.new}). If the Plexamp screen spins, tap Reset below.` : "";
   const pr = data.protect || {};
   $("protgroup").classList.toggle("hidden", !pr.available);
   $("protect").checked = !!pr.active;
@@ -794,6 +800,11 @@ document.addEventListener("click", async e => {
     if (sys.dataset.sys === "restart") waitBack();
   }
 });
+$("plexreset").onclick = async () => {
+  if (!confirm("Reset the Plexamp screen? It reloads, and Plex asks you to sign in once on the screen. Music keeps playing.")) return;
+  await api("/api/system", {action: "plexamp-reset"});
+  toast(data.local ? "Resetting… sign in to Plex when it asks" : "Done: sign in to Plex on the player's screen");
+};
 $("newpin").onclick = async () => {
   if (!confirm("Make a new PIN? Every registered device is signed out and needs the new PIN.")) return;
   await api("/api/settings", {PHONE_PIN: "new"}); toast("New PIN…"); await waitBack();

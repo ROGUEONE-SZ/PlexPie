@@ -25,7 +25,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 
-VERSION = "2.9.4"
+VERSION = "2.9.5"
 CONF_PATH = os.environ.get("PLEXPIE_CONF", "/etc/plexpie/plexpie.conf")
 WWW = os.path.join(os.path.dirname(os.path.abspath(__file__)), "www")
 HTTP_PORT = int(os.environ.get("PLEXPIE_HTTP_PORT", "8080"))
@@ -2268,6 +2268,49 @@ def accounts():
     return out
 
 
+PLEXAMP_ORIGIN = "http://127.0.0.1:32500"
+PLEXAMP_SCREEN_BACKUP = os.path.join(SETTINGS_DIR, "plexamp-screen-backup.json")
+ADDRESS_FILE = os.path.join(SETTINGS_DIR, "last_address")
+ADDRESS_CHANGE = {}                 # {"old": ..., "new": ...} when this player's address changed
+
+
+def check_address_change():
+    """The Plexamp screen remembers this player by address: note when the address changes."""
+    new = lan_address()
+    if not new:
+        return
+    old = (read_file(ADDRESS_FILE) or "").strip()
+    if old and old != new:
+        ADDRESS_CHANGE.update(old=old, new=new)
+        log.info("this player's address changed from %s to %s", old, new)
+    try:
+        os.makedirs(SETTINGS_DIR, exist_ok=True)
+        with open(ADDRESS_FILE, "w") as f:
+            f.write(new)
+    except OSError:
+        pass
+
+
+def reset_plexamp_screen():
+    """Clear what the screen's browser saved for the Plexamp page (it reconnects at the current
+    address; Plex asks to sign in once). Keeps a copy first."""
+    _, saved = BROWSER.evaluate("plexamp", "JSON.stringify(Object.fromEntries(Object.entries(localStorage)))")
+    if isinstance(saved, str):
+        try:
+            os.makedirs(SETTINGS_DIR, exist_ok=True)
+            with open(PLEXAMP_SCREEN_BACKUP, "w") as f:
+                f.write(saved)
+            os.chmod(PLEXAMP_SCREEN_BACKUP, 0o600)
+        except OSError as e:
+            log.warning("could not save the Plexamp screen data: %s", e)
+    browser_call("Storage.clearDataForOrigin", {"origin": PLEXAMP_ORIGIN,
+                                                "storageTypes": "local_storage,indexeddb,cache_storage,service_workers"})
+    BROWSER.evaluate("plexamp", "location.reload()")
+    switch_source("plexamp")
+    ADDRESS_CHANGE.clear()
+    log.info("reset the Plexamp screen")
+
+
 def settings_json(local, host=None, token=None):
     vals = {}
     for k, kind in EDITABLE.items():
@@ -2307,7 +2350,7 @@ def settings_json(local, host=None, token=None):
         prot = {}
     return {"values": vals, "wifi": wifi, "protect": prot, "bluetooth": read_bt() if "bluetooth" in SOURCES else None,
             "eq_presets": {k: {"name": v["name"], "filters": v["filters"]} for k, v in EQ_PRESETS.items()}, "updates": update_info(), "installed": installed, "accounts": accounts(), "player_name": PLAYER_NAME,
-            "version": VERSION, "devices": devices_json(token), "sources": sorted(SOURCES),
+            "version": VERSION, "devices": devices_json(token), "address_change": dict(ADDRESS_CHANGE), "sources": sorted(SOURCES),
             "phone_url": f"http://{host}/settings" if host else (f"http://{addr}:{HTTP_PORT}/settings" if addr else ""),
             "local": local}
 
@@ -2569,6 +2612,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 spawn(lambda: (time.sleep(0.5), sudo("/usr/sbin/reboot")))
             elif what == "shutdown":
                 spawn(shutdown)
+            elif what == "plexamp-reset":
+                spawn(reset_plexamp_screen)
             elif what in ("protect-on", "protect-off"):
                 ok, out = admin(what, timeout=180)
                 if ok:
@@ -2902,6 +2947,7 @@ def main():
                         format="%(asctime)s %(levelname)s %(message)s")
     log.info("PlexPie %s starting, sources: %s", VERSION, ", ".join(SOURCES))
     ensure_pin()
+    spawn(lambda: (time.sleep(20), check_address_change()))
     bind = "0.0.0.0" if cfg_yes("PHONE_ACCESS") else "127.0.0.1"
     server = Server((bind, HTTP_PORT), Handler)
     tabs = BROWSER.tabs() or []                 # after a settings restart, keep what is on screen

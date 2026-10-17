@@ -154,6 +154,39 @@ then falls back to slow routes through the internet, or fails. The Plexamp check
 
 Then Settings › System › Restart PlexPie.
 
+### Music plays, but the Plexamp screen spins or shows no "now playing"
+
+**Cause:** the Plexamp screen remembers the player by its network address. If the player's address
+changed (for example after you gave it a fixed address in your router), the screen keeps trying the
+old one and spins, even though your phone finds the player and music plays. Picking the player under
+the cast icon doesn't help, because it still uses the old address.
+
+**Fix (2.9.5 and newer):** Settings › Configuration › Plexamp › **Reset the Plexamp screen**, then
+sign in to Plex once on the screen. PlexPie also notices when its address changes and points you
+there.
+
+**Older versions:** with Plexamp open on the screen, run this from another computer:
+
+```
+curl -fsSL https://raw.githubusercontent.com/ROGUEONE-SZ/plexamp-raspberry-pi-install/main/tools/plexamp-reset.sh | ssh USER@192.168.1.42 bash -s fix
+```
+
+It lists the addresses the screen remembered, saves a copy, clears what the screen's browser saved
+for Plexamp, and reloads it. **Sign in to Plex once on the screen** when it asks; now playing and
+album art come back. Your library, playlists and the player itself aren't affected. To undo, run the
+same command with `undo` instead of `fix`.
+
+Tip: give the player its fixed address **before** you start using it, so this never comes up.
+
+### See exactly what the screen shows
+
+`tools/screenshot.sh` saves a picture of a screen tab to your computer and prints what Plexamp says
+it's playing:
+
+```
+curl -fsSL https://raw.githubusercontent.com/ROGUEONE-SZ/plexamp-raspberry-pi-install/main/tools/screenshot.sh | ssh USER@192.168.1.42 bash -s plexamp > plexpie-screen.png
+```
+
 ### Plexamp says it isn't linked, or is linked to the wrong Plex account
 
 Run the installer again from a computer: `sudo bash ~/plexpie/install.sh`. It asks for a new claim
