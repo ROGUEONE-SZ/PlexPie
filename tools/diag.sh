@@ -21,7 +21,7 @@ try:
                 m = json.loads(w.recv())
                 if m.get("id") == 1:
                     break
-            print(t["url"][:70], "|", m.get("result", {}).get("result", {}).get("value"))
+            print(t["url"].split("?")[0][:70], "|", m.get("result", {}).get("result", {}).get("value"))
             w.close()
         except Exception as e:
             print(t["url"][:70], "| error", e)

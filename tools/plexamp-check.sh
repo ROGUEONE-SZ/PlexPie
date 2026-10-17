@@ -15,7 +15,7 @@ for src in $(printf '%s' "$html" | grep -oE '(src|href)="[^"]+\.(js|css)"' | cut
 done
 echo "== reloading the Plexamp page and listening for 12 seconds"
 python3 - <<'PY'
-import json, time, urllib.request, websocket
+import json, re, time, urllib.request, websocket
 tabs = [t for t in json.load(urllib.request.urlopen("http://127.0.0.1:9222/json", timeout=3))
         if t.get("type") == "page" and ":32500" in t.get("url", "")]
 if not tabs:
@@ -53,6 +53,7 @@ while time.time() < end:
     elif meth == "Network.responseReceived" and p["response"].get("status", 200) >= 400:
         out = f"HTTP {p['response']['status']} " + p["response"].get("url", "")[:150]
     if out and out not in seen:
+        out = re.sub(r"(X-Plex-Token=)[^&\s]+", r"\1(hidden)", out)
         seen.add(out); print(out)
 send("Runtime.evaluate", {"expression": "document.body ? document.body.innerText.length + ' chars, ' + document.getElementsByTagName('*').length + ' elements' : 'no body'", "returnByValue": True})
 end = time.time() + 3
@@ -62,6 +63,6 @@ while time.time() < end:
         print("after reload:", m.get("result", {}).get("result", {}).get("value")); break
 print(f"({len(reqs)} requests, images loaded: {imgs['ok']}, images failed: {imgs['bad']})")
 for u in sorted(set(v for v in reqs.values() if "plex.direct" in v or ":32400" in v))[:6]:
-    print("server request:", u[:140])
+    print("server request:", u.split("?")[0][:140])      # no query strings: they carry the Plex token
 PY
 echo "== plexamp log"; journalctl -u plexamp -n 40 --no-pager -o cat | cut -c1-200
