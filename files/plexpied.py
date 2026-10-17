@@ -25,7 +25,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 
-VERSION = "2.8.1"
+VERSION = "2.8.2"
 CONF_PATH = os.environ.get("PLEXPIE_CONF", "/etc/plexpie/plexpie.conf")
 WWW = os.path.join(os.path.dirname(os.path.abspath(__file__)), "www")
 HTTP_PORT = int(os.environ.get("PLEXPIE_HTTP_PORT", "8080"))
@@ -64,7 +64,7 @@ EDITABLE = {
     "ENABLE_APPLE_MUSIC_WEB": "bool", "ENABLE_AIRPLAY": "bool", "ENABLE_SPOTIFY": "bool",
     "ENABLE_SPOTIFY_WEB": "bool", "ENABLE_MUSIC_ASSISTANT": "bool", "ENABLE_TIMER": "bool", "SHORTCUTS": "str",
     "VISUALIZER": "str", "THEME_FROM_ART": "bool", "NIGHT_DIM": "bool", "NIGHT_START": "str", "NIGHT_END": "str",
-    "NIGHT_BRIGHTNESS": "int", "AUTO_BRIGHTNESS": "bool", "ENABLE_HA_DASHBOARD": "bool", "HA_URL": "str",
+    "NIGHT_BRIGHTNESS": "int", "AUTO_BRIGHTNESS": "bool", "ENABLE_HA_DASHBOARD": "bool", "HA_URL": "str", "HA_DASHBOARD": "str",
     "ENABLE_BLUETOOTH": "bool", "EQ_ENABLED": "bool", "EQ_PRESET": "str", "EQ_BANDS": "str", "EQ_CUSTOM": "str",
     "SCREEN_OFF_AFTER_SECS": "int", "SCREEN_BRIGHTNESS": "int", "AUTO_SHOW_SOURCES": "str",
     "SWIPE_HOME": "bool", "MA_HOST": "str", "MA_URL": "str",
@@ -133,7 +133,8 @@ SOURCES = {
     "settings": {"name": "Settings", "url": f"http://127.0.0.1:{HTTP_PORT}/settings", "hidden": True},
 }
 if HA_BASE and cfg_yes("ENABLE_HA_DASHBOARD", "yes"):
-    SOURCES["ha"] = {"name": "Home Assistant", "url": HA_BASE + "/"}
+    SOURCES["ha"] = {"name": "Home Assistant",
+                     "url": HA_BASE + "/" + cfg("HA_DASHBOARD").strip().strip("/")}
 for key, flag, default in (("airplay", "ENABLE_AIRPLAY", "yes"), ("ma", "ENABLE_MUSIC_ASSISTANT", "yes"),
                            ("apple", "ENABLE_APPLE_MUSIC_WEB", "yes"), ("spotify", "ENABLE_SPOTIFY", "no"),
                            ("spotify_web", "ENABLE_SPOTIFY_WEB", "no"), ("timer", "ENABLE_TIMER", "yes"),
@@ -1314,7 +1315,7 @@ def meter_worker():
                         sel = spec[(freqs >= edges[i]) & (freqs < edges[i + 1])]
                         v = float(sel.max()) if sel.size else 0.0
                         db = 20 * math.log10(v + 1e-9)
-                        bands.append(max(0.0, min(1.0, (db + 60) / 60)))
+                        bands.append(max(0.0, min(1.0, (db + 50) / 44)))
                 else:
                     s = struct.unpack("<%dh" % (n * 2), buf)
                     l = math.sqrt(sum(x * x for x in s[0::2]) / n) / 32768

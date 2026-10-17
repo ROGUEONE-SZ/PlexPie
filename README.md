@@ -39,7 +39,7 @@ How it behaves:
 - **Visualizer.** Spectrum bars or VU meters on the AirPlay, Spotify and Bluetooth screens; tap the cover for full screen.
 - **Album-art colors.** The screens take their accent color from the cover that's playing.
 - **Night dimming and auto-brightness.** Dim on a schedule, or follow a Home Assistant light sensor.
-- **Home Assistant tile.** Your dashboard on the screen.
+- **Home Assistant tile.** A Home Assistant dashboard on the screen; tip: make a small one just for this screen and set it under Settings → Home Assistant.
 - **Optional knob and power button.** A $3 rotary knob for volume and play/pause, and a push button to shut down and start ([wiring](docs/gpio.svg)).
 - **Sleep timer.** The zᶻ button next to the clock stops the music after 15 to 90 minutes, fading out over the last minute.
 - **Backup and restore.** Download all your settings as one file from your phone, and restore them on a new memory card.

@@ -159,6 +159,8 @@ NIGHT_BRIGHTNESS="${NIGHT_BRIGHTNESS:-20}"
 AUTO_BRIGHTNESS="${AUTO_BRIGHTNESS:-no}"
 # Home Assistant tile on the home screen (needs HA_HOST or HA_URL)
 ENABLE_HA_DASHBOARD="${ENABLE_HA_DASHBOARD:-yes}"
+# Which dashboard the tile opens, e.g. "gym-screen" (empty = your main dashboard)
+HA_DASHBOARD="${HA_DASHBOARD:-}"
 # Workout timer tile on the launcher
 ENABLE_TIMER="${ENABLE_TIMER:-yes}"
 # Settings from a phone browser at http://<pi>:8080/settings (PIN shown on the player)
