@@ -157,7 +157,7 @@ Settings is laid out like an iPad: categories on the left, details on the right 
 - **Remote access:** the address, a QR code to scan, the PIN, and the list of **registered devices** (e.g. "iPad · Safari, last used today") with **Sign out** for each.
 - **Backup:** on the screen, scan the QR code to download the backup on your phone, tablet or computer; restore from the same page.
 - **Setup guides:** step-by-step instructions with pictures for every app; **Send the guides to a device** by QR code, then save as PDF, share or print.
-- **System:** power-cut protection, restart, reboot, shut down.
+- **System:** screen sharing (see and use the player's screen from a Mac, iPad or iPhone, password = your PIN), power-cut protection, restart, reboot, shut down.
 
 From another device, only Settings and the guides are reachable, and only with the PIN. Five wrong tries pause logins for a minute. A device stays signed in for a year (renewed each visit); **New PIN** signs every device out.
 

@@ -25,7 +25,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 
-VERSION = "2.9.5"
+VERSION = "2.10.0"
 CONF_PATH = os.environ.get("PLEXPIE_CONF", "/etc/plexpie/plexpie.conf")
 WWW = os.path.join(os.path.dirname(os.path.abspath(__file__)), "www")
 HTTP_PORT = int(os.environ.get("PLEXPIE_HTTP_PORT", "8080"))
@@ -69,7 +69,7 @@ EDITABLE = {
     "SCREEN_OFF_AFTER_SECS": "int", "SCREEN_BRIGHTNESS": "int", "AUTO_SHOW_SOURCES": "str",
     "SWIPE_HOME": "bool", "MA_HOST": "str", "MA_URL": "str",
     "MQTT_HOST": "str", "MQTT_PORT": "int", "MQTT_USER": "str", "MQTT_PASS": "secret",
-    "PHONE_ACCESS": "bool", "PHONE_PIN": "str",
+    "PHONE_ACCESS": "bool", "PHONE_PIN": "str", "SCREEN_SHARING": "bool",
 }
 
 
@@ -2268,6 +2268,43 @@ def accounts():
     return out
 
 
+VNC = {"proc": None}
+VNC_PASS = os.path.join(SETTINGS_DIR, "vnc-pass")
+VNC_LOG = os.path.join(SETTINGS_DIR, "x11vnc.log")
+
+
+def screen_sharing_on():
+    return VNC["proc"] is not None and VNC["proc"].poll() is None
+
+
+def screen_share_loop():
+    """Screen sharing (VNC): mirror and control the screen from a Mac, iPad or iPhone on the home
+    network. Off by default; the password is the Remote access PIN."""
+    import shutil
+    while True:
+        try:
+            want = cfg_yes("SCREEN_SHARING", "no") and bool(cfg("PHONE_PIN")) and shutil.which("x11vnc")
+            if want and not screen_sharing_on():
+                env = dict(os.environ, DISPLAY=":0")
+                if subprocess.run(["xset", "q"], env=env, capture_output=True).returncode == 0:   # screen is up
+                    subprocess.run(["x11vnc", "-storepasswd", cfg("PHONE_PIN"), VNC_PASS], capture_output=True)
+                    os.chmod(VNC_PASS, 0o600)
+                    VNC["proc"] = subprocess.Popen(
+                        ["x11vnc", "-display", ":0", "-auth", "guess", "-rfbauth", VNC_PASS, "-forever", "-shared",
+                         "-noxdamage", "-rfbport", "5900", "-allow", "192.168.,10.,172.,127.", "-o", VNC_LOG],
+                        env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    log.info("screen sharing on (vnc://%s)", lan_address())
+                    mark_changed()
+            elif not want and screen_sharing_on():
+                VNC["proc"].terminate()
+                VNC["proc"] = None
+                log.info("screen sharing off")
+                mark_changed()
+        except Exception as e:
+            log.warning("screen sharing: %s", e)
+        time.sleep(8)
+
+
 PLEXAMP_ORIGIN = "http://127.0.0.1:32500"
 PLEXAMP_SCREEN_BACKUP = os.path.join(SETTINGS_DIR, "plexamp-screen-backup.json")
 ADDRESS_FILE = os.path.join(SETTINGS_DIR, "last_address")
@@ -2320,7 +2357,7 @@ def settings_json(local, host=None, token=None):
         elif kind == "bool":
             vals[k] = cfg_yes(k, {"ENABLE_SPOTIFY": "no", "ENABLE_SPOTIFY_WEB": "no", "EQ_ENABLED": "no",
                                   "NIGHT_DIM": "no", "AUTO_BRIGHTNESS": "no",
-                                  "PHONE_ACCESS": "yes"}.get(k, "yes"))
+                                  "PHONE_ACCESS": "yes", "SCREEN_SHARING": "no"}.get(k, "yes"))
         else:
             vals[k] = cfg(k)
     vals["MA_HOST"] = vals.get("MA_HOST") or cfg("HA_HOST")
@@ -2350,7 +2387,8 @@ def settings_json(local, host=None, token=None):
         prot = {}
     return {"values": vals, "wifi": wifi, "protect": prot, "bluetooth": read_bt() if "bluetooth" in SOURCES else None,
             "eq_presets": {k: {"name": v["name"], "filters": v["filters"]} for k, v in EQ_PRESETS.items()}, "updates": update_info(), "installed": installed, "accounts": accounts(), "player_name": PLAYER_NAME,
-            "version": VERSION, "devices": devices_json(token), "address_change": dict(ADDRESS_CHANGE), "sources": sorted(SOURCES),
+            "version": VERSION, "devices": devices_json(token), "address_change": dict(ADDRESS_CHANGE),
+            "vnc": {"on": screen_sharing_on(), "address": addr}, "sources": sorted(SOURCES),
             "phone_url": f"http://{host}/settings" if host else (f"http://{addr}:{HTTP_PORT}/settings" if addr else ""),
             "local": local}
 
@@ -2959,7 +2997,7 @@ def main():
     if "airplay" in SOURCES:
         spawn(airplay_reader)
     for fn in (fast_poller, slow_poller, focus_poller, gesture_reader, screen_loop, watchdog, update_checker,
-               sleep_loop, eq_manager, dim_loop, theme_loop, knob_reader):
+               sleep_loop, eq_manager, dim_loop, theme_loop, knob_reader, screen_share_loop):
         spawn(fn)
     HA.start()
     while True:

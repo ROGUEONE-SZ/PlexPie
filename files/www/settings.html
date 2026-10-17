@@ -374,6 +374,10 @@
         <div class="group">
           <div class="row"><div class="t"><b>Name</b></div><span class="val" data-name></span></div>
           <div class="row"><div class="t"><b>PlexPie version</b></div><span class="val" id="ver"></span></div></div>
+        <div class="group">
+          <div class="row"><div class="t"><b>Screen sharing</b><small id="vncsub">See and use this screen from a Mac, iPad or iPhone on your Wi-Fi</small></div>
+            <label class="sw"><input type="checkbox" id="SCREEN_SHARING"><span></span></label></div>
+          <div class="row link" data-href="/guide#screen"><div class="t"><b>How to connect</b><small>Mac: Screen Sharing · iPad and iPhone: RealVNC Viewer</small></div><span class="chev">›</span></div></div>
         <div class="group hidden" id="protgroup"><div class="row"><div class="t"><b>Power-cut protection</b><small>Makes the memory card read-only, so pulling the plug can't damage it. Settings changes and updates need it off. Restarts the player.</small></div>
           <label class="sw"><input type="checkbox" id="protect" data-noform><span></span></label></div></div>
         <div class="group">
@@ -456,6 +460,7 @@ const GUIDES = [
   ["timer", "Workout timer", "Intervals, countdown, stopwatch", I.timer, "#ff9f0a"],
   ["eq", "Equalizer", "Presets and room correction", I.eq, "#ff375f"],
   ["remote", "Remote access", "Change settings from any device", I.devices, "#30d158"],
+  ["screen", "Screen sharing", "See and use the screen from a Mac, iPad or iPhone", I.laptop, "#636366"],
   ["backup", "Backup and restore", "Keep your settings safe", I.backup, "#ff9f0a"],
   ["help", "Troubleshooting", "Quick fixes for common problems", I.update, "#8e8e93"],
 ];
@@ -464,7 +469,7 @@ const FIELDS = ["ENABLE_APPLE_MUSIC_WEB", "ENABLE_AIRPLAY", "ENABLE_SPOTIFY", "E
   "SCREEN_OFF_AFTER_SECS", "SCREEN_BRIGHTNESS", "AUTO_SHOW", "SWIPE_HOME", "MQTT_HOST", "MQTT_PORT",
   "MQTT_USER", "MQTT_PASS", "SHORTCUTS", "MA_HOST", "MA_URL", "PHONE_ACCESS",
   "EQ_ENABLED", "EQ_PRESET", "EQ_BANDS", "EQ_CUSTOM_TEXT", "THEME_FROM_ART", "VISUALIZER", "NIGHT_DIM",
-  "NIGHT_START", "NIGHT_END", "NIGHT_BRIGHTNESS", "AUTO_BRIGHTNESS", "HA_URL", "HA_DASHBOARD"];
+  "NIGHT_START", "NIGHT_END", "NIGHT_BRIGHTNESS", "AUTO_BRIGHTNESS", "HA_URL", "HA_DASHBOARD", "SCREEN_SHARING"];
 const INSTALL_FLAG = {apple: null, airplay: "ENABLE_AIRPLAY", spotify: "ENABLE_SPOTIFY", bluetooth: "ENABLE_BLUETOOTH", ma: "ENABLE_MUSIC_ASSISTANT"};
 let data = null, page = null, dirty = false;
 const wide = () => matchMedia("(min-width: 700px)").matches;
@@ -585,6 +590,9 @@ function render() {
   $("phoneurl").textContent = data.phone_url || "(no network)";
   $("pinshow").textContent = v.PHONE_PIN || "";
   $("ver").textContent = data.version;
+  const vnc = data.vnc || {};
+  $("vncsub").innerHTML = vnc.on ? `On · connect to <code>vnc://${esc(vnc.address)}</code> with your Remote access PIN`
+    : v.SCREEN_SHARING ? "Starting…" : "See and use this screen from a Mac, iPad or iPhone on your Wi-Fi";
   const ac = data.address_change || {};
   $("addrbanner").classList.toggle("hidden", !ac.new);
   $("addrbanner").textContent = ac.new ? `This player's address changed (${ac.old} → ${ac.new}). If the Plexamp screen spins, tap Reset below.` : "";

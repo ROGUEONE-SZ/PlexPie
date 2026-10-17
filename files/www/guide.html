@@ -349,6 +349,17 @@
     </table>
     <div class="tip"><b>Report for help:</b> from a computer, run<br><code>curl -fsSL https://raw.githubusercontent.com/ROGUEONE-SZ/plexamp-raspberry-pi-install/main/tools/diag.sh | ssh USER@ADDRESS bash</code><br>and attach the output to an issue on GitHub.</div>
   </section>
+  <!-- ===================================================================== screen sharing -->
+  <section class="g" id="screen" data-group="3" data-sub="See and use the screen from a Mac, iPad or iPhone">
+    <h2>Screen sharing</h2>
+    <p class="sub">Mirror the player's screen on your Mac, iPad or iPhone and use it as if you were standing in front of it.</p>
+    <ol>
+      <li>On the player: Settings › <b>System</b> › switch on <b>Screen sharing</b> and tap <span class="k">Save</span>. It shows the address, like <code data-vnc>vnc://192.168.1.42</code>.</li>
+      <li><b>Mac:</b> in Finder choose <b>Go › Connect to Server</b>, type the address and click <span class="k">Connect</span>. Enter your <b>Remote access PIN</b> as the password. Clicks work as taps.</li>
+      <li><b>iPad or iPhone:</b> install the free <b>RealVNC Viewer</b> app, tap <span class="k">+</span>, enter the address without <code>vnc://</code>, and use your PIN as the password. Tap and swipe on the picture.</li>
+    </ol>
+    <div class="tip">Screen sharing only works on your home network, and the password is your PIN: <b>New PIN</b> under Remote access changes it too. Switch it off when you don't need it.</div>
+  </section>
 </main>
 
 <script>
@@ -360,6 +371,7 @@ let info = {name: "", url: "", version: ""};
 function fill() {
   document.querySelectorAll("[data-name]").forEach(e => { if (info.name) e.textContent = info.name; });
   document.querySelectorAll("[data-url]").forEach(e => { if (info.url) e.textContent = info.url; });
+  document.querySelectorAll("[data-vnc]").forEach(e => { if (info.url) e.textContent = "vnc://" + info.url.replace(/^https?:\/\//, "").replace(/[:/].*$/, ""); });
   document.querySelectorAll("[data-ver]").forEach(e => e.textContent = info.version ? "Version " + info.version : "");
 }
 function toc() {

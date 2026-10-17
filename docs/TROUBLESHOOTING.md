@@ -200,6 +200,15 @@ Remove Plexamp's saved server list and restart it:
 
 ---
 
+### Screen sharing won't connect
+
+- Turn it on first: Settings › System › **Screen sharing**, then Save. The row shows the address
+  (`vnc://…`) once it's running.
+- The password is your **Remote access PIN** (Settings › Remote access). New PIN changes it.
+- Your Mac, iPad or iPhone must be on the same home network. It doesn't work over the internet, by design.
+- Installed before 2.10? Update PlexPie (it installs the screen-sharing app, `x11vnc`). The
+  log is in `~/.config/plexpie/x11vnc.log`.
+
 ## Bluetooth, AirPlay and Spotify
 
 ### "Bluetooth isn't ready on this player"
