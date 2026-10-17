@@ -16,7 +16,7 @@ try:
         try:
             w = websocket.create_connection(t["webSocketDebuggerUrl"], timeout=3, suppress_origin=True)
             w.send(json.dumps({"id": 1, "method": "Runtime.evaluate", "params": {"returnByValue": True,
-                "expression": "[innerWidth, innerHeight, screen.width, screen.height, devicePixelRatio, 'zoom', (window.visualViewport||{}).scale].join(' ')"}}))
+                "expression": "[innerWidth, innerHeight, screen.width, screen.height, devicePixelRatio, 'zoom', (window.visualViewport||{}).scale, '|', document.readyState, JSON.stringify(document.title), 'text', (document.body ? document.body.innerText.length : -1), 'nodes', document.getElementsByTagName('*').length].join(' ')"}}))
             while True:
                 m = json.loads(w.recv())
                 if m.get("id") == 1:
@@ -32,5 +32,6 @@ echo "== bluetooth"; cat /run/plexpie/bt.json 2>/dev/null; echo
 echo "== packages upgraded today"; grep " upgrade " /var/log/dpkg.log 2>/dev/null | grep "$(date +%F)" | awk '{print $4}' | tr '\n' ' '; echo
 echo "== update log"; tail -4 /var/log/plexpie-update.log 2>/dev/null
 echo "== plexpie log"; journalctl -u plexpie -n 12 --no-pager -o cat 2>/dev/null | cut -c1-160
-echo "== plexamp log"; journalctl -u plexamp -n 6 --no-pager -o cat 2>/dev/null | cut -c1-160
-echo "== session log"; tail -6 ~/.local/state/plexpie/session.log 2>/dev/null
+echo "== plexamp web"; curl -s -o /dev/null -w "HTTP %{http_code} in %{time_total}s\n" --max-time 5 http://127.0.0.1:32500/
+echo "== plexamp log"; journalctl -u plexamp -n 25 --no-pager -o cat 2>/dev/null | cut -c1-160
+echo "== session log"; grep -v DEPRECATED_ENDPOINT ~/.local/state/plexpie/session.log | tail -12 2>/dev/null
