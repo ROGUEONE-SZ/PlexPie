@@ -25,7 +25,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 
-VERSION = "2.9.1"
+VERSION = "2.9.2"
 CONF_PATH = os.environ.get("PLEXPIE_CONF", "/etc/plexpie/plexpie.conf")
 WWW = os.path.join(os.path.dirname(os.path.abspath(__file__)), "www")
 HTTP_PORT = int(os.environ.get("PLEXPIE_HTTP_PORT", "8080"))
@@ -920,6 +920,9 @@ def read_bt():
         return {"available": False}
 
 
+BT_PLAY = {"since": 0.0}
+
+
 def poll_bluetooth(n):
     bt = read_bt()
     md = {k: bt.get(k, "") for k in ("title", "artist", "album")}
@@ -930,7 +933,13 @@ def poll_bluetooth(n):
             ST.np["bluetooth"] = md
     if changed:
         mark_changed()
-    set_playing("bluetooth", bool(bt.get("playing")))
+    # A phone that reconnects by itself opens the audio link for a moment (and plays its own
+    # clicks): only count Bluetooth as playing once it has kept playing for a few seconds.
+    if bt.get("playing"):
+        BT_PLAY["since"] = BT_PLAY["since"] or time.time()
+    else:
+        BT_PLAY["since"] = 0.0
+    set_playing("bluetooth", bool(BT_PLAY["since"]) and time.time() - BT_PLAY["since"] >= 4)
     if bt.get("connected") and n % 3 == 0:
         ensure_bt_loopback()
     elif not bt.get("connected") and BT_LOOP["proc"]:

@@ -16,7 +16,7 @@ try:
         try:
             w = websocket.create_connection(t["webSocketDebuggerUrl"], timeout=3, suppress_origin=True)
             w.send(json.dumps({"id": 1, "method": "Runtime.evaluate", "params": {"returnByValue": True,
-                "expression": "[innerWidth, innerHeight, screen.width, screen.height, devicePixelRatio, document.documentElement.scrollWidth].join(' ')"}}))
+                "expression": "[innerWidth, innerHeight, screen.width, screen.height, devicePixelRatio, 'zoom', (window.visualViewport||{}).scale].join(' ')"}}))
             while True:
                 m = json.loads(w.recv())
                 if m.get("id") == 1:

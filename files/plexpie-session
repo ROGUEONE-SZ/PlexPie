@@ -74,6 +74,7 @@ PY
     --disable-backgrounding-occluded-windows \
     --disable-features=Translate,MediaRouter \
     --overscroll-history-navigation=0 \
+    --disable-pinch \
     --check-for-update-interval=31536000 \
     "$LAUNCHER"
   log "chromium exited ($?), restarting in 2s"
