@@ -55,7 +55,12 @@ echo
 # ------------------------------------------------------------------ basics
 DEF_USER="${APPLIANCE_USER:-${SUDO_USER:-$(id -un)}}"
 [ "$DEF_USER" = root ] && DEF_USER=$(getent passwd 1000 | cut -d: -f1 || echo pi)
-ask APPLIANCE_USER "Linux user that runs the screen (logged in automatically)" "$DEF_USER"
+while :; do
+  ask APPLIANCE_USER "Linux user that runs the screen (logged in automatically)" "$DEF_USER"
+  id "$APPLIANCE_USER" >/dev/null 2>&1 && break
+  echo "  There's no user called '$APPLIANCE_USER' on this Pi. Press Enter to use '$DEF_USER' (the one you're logged in as)."
+  [ "$NONINTERACTIVE" = yes ] && { APPLIANCE_USER=$DEF_USER; break; }
+done
 ask PLAYER_NAME "Player name (shown in Plexamp, AirPlay and Music Assistant)" "${PLAYER_NAME:-PlexPie}"
 AIRPLAY_NAME="${AIRPLAY_NAME:-$PLAYER_NAME}"
 

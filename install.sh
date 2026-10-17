@@ -42,7 +42,12 @@ fi
 # shellcheck disable=SC1091
 . "$REPO/plexpie.conf"
 U="${APPLIANCE_USER:-${SUDO_USER:-$(getent passwd 1000 | cut -d: -f1)}}"
-id "$U" >/dev/null 2>&1 || { echo "User '$U' does not exist"; exit 1; }
+if ! id "$U" >/dev/null 2>&1; then
+  echo "The setup wizard saved '$U' as the screen user, but there's no such user on this Pi."
+  echo "Fix it by running the wizard again (press Enter to accept your own username), then the installer:"
+  echo "  bash $REPO/configure.sh && sudo bash $REPO/install.sh"
+  exit 1
+fi
 AUID=$(id -u "$U")
 UHOME=$(getent passwd "$U" | cut -d: -f6)
 PLAYER_NAME="${PLAYER_NAME:-PlexPie}"
