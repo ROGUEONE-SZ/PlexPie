@@ -139,9 +139,9 @@
 </main>
 
 <footer>
-  <button class="btn" id="pause" title="Pause everything">
-    <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
-    Pause all
+  <button class="btn" id="pause" title="Pause everything, or play again">
+    <svg viewBox="0 0 24 24" fill="currentColor" id="pauseicon"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
+    <span id="pauselabel">Pause all</span>
   </button>
   <div class="vol">
     <button class="btn" id="voldown" aria-label="Volume down">
@@ -164,13 +164,19 @@ const post = (path, body) => fetch(path, {method: "POST", headers: {"Content-Typ
   body: JSON.stringify(body || {})}).then(r => r.json()).then(j => j.state && render(j.state)).catch(() => {});
 const SUBS = {plexamp: "Your library", apple: "On this screen", airplay: "From your phone",
               spotify: "Spotify Connect", ma: "Your speakers", timer: "Intervals · countdown", bluetooth: "Any phone", ha: "Your dashboard"};
+const ICON_PAUSE = '<rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/>';
+const ICON_PLAY = '<path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/>';
+const POWER = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v9"/><path d="M6.3 7.3a8 8 0 1 0 11.4 0"/></svg>';
+const SPEAKER = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2.5" width="14" height="19" rx="2.5"/><circle cx="12" cy="14.5" r="3.5"/><circle cx="12" cy="7" r="1"/></svg>';
+const iconFor = (name) => /sound|audio|speaker|receiver|onkyo|amp|sub/i.test(name) ? SPEAKER
+  : /power|tv|fan|plug/i.test(name) ? POWER : BULB;
 const BULB = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg>';
 let scKey = "";
 function renderShortcuts(list) {
   const key = list.map(x => x.id).join(",");
   if (key !== scKey) {
     scKey = key;
-    $("shortcuts").innerHTML = list.map(x => `<button class="btn sc" data-sc="${x.id}" style="display:inline-flex">${BULB}<span></span></button>`).join("");
+    $("shortcuts").innerHTML = list.map(x => `<button class="btn sc" data-sc="${x.id}" style="display:inline-flex">${iconFor(x.name)}<span></span></button>`).join("");
     $("shortcuts").querySelectorAll(".sc").forEach(b => b.onclick = () => post("/api/shortcut", {id: b.dataset.sc}));
   }
   list.forEach(x => { const b = $("shortcuts").querySelector(`[data-sc="${x.id}"]`);
@@ -200,6 +206,8 @@ function render(s) {
   });
   fit(Math.max(shown, 1));
   renderShortcuts(s.shortcuts || []);
+  $("pauseicon").innerHTML = s.playing ? ICON_PAUSE : ICON_PLAY;
+  $("pauselabel").textContent = s.playing ? "Pause all" : (s.resume === "spotify" ? "Play Spotify" : "Play");
   document.body.classList.toggle("themed", !!s.accent);
   if (s.accent) document.body.style.setProperty("--art", s.accent);
 
@@ -255,7 +263,7 @@ function clock() {
 
 document.querySelectorAll(".tile").forEach(t =>
   t.addEventListener("click", () => post("/api/source", {source: t.dataset.src})));
-$("pause").onclick = () => post("/api/pause_all");
+$("pause").onclick = () => post("/api/playpause");
 $("volup").onclick = () => post("/api/volume", {delta: 5});
 $("voldown").onclick = () => post("/api/volume", {delta: -5});
 $("screenoff").onclick = () => post("/api/screen", {on: false});

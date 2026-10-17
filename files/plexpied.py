@@ -25,7 +25,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 
-VERSION = "2.8.4"
+VERSION = "2.8.5"
 CONF_PATH = os.environ.get("PLEXPIE_CONF", "/etc/plexpie/plexpie.conf")
 WWW = os.path.join(os.path.dirname(os.path.abspath(__file__)), "www")
 HTTP_PORT = int(os.environ.get("PLEXPIE_HTTP_PORT", "8080"))
@@ -320,6 +320,7 @@ def state_json():
             "eq": cfg_yes("EQ_ENABLED", "no"),
             "accent": ST.accent if cfg_yes("THEME_FROM_ART") else None,
             "visualizer": cfg("VISUALIZER", "bars"),
+            "resume": next((s for s in reversed(ST.order) if s in ("plexamp", "spotify")), "plexamp"),
             "sleep_left": max(0, round(ST.sleep_until - time.time())) if ST.sleep_until else 0,
         }
 
@@ -2455,6 +2456,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 spawn(VIEWPORT.shrink, int(data.get("height") or 228))
             else:
                 spawn(VIEWPORT.restore)
+        elif path == "/api/playpause":
+            spawn(toggle_play)
         elif path == "/api/pause_all":
             spawn(pause_all)
         elif path == "/api/alert":
