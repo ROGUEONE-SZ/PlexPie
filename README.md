@@ -47,6 +47,39 @@ How it behaves:
 - **Power-cut protection.** An optional read-only mode, so pulling the plug can't damage the memory card.
 - **Settings screen.** The gear on the launcher opens Settings, organised by category like an iPad: Configuration (every app and account), Screen, Sound, Network, Updates, Remote access, Backup, Setup guides and System. The same page opens on any phone, tablet or computer at `http://<pi-address>:8080/settings`, protected by a PIN shown on the player.
 
+## Before you build: what to expect
+
+PlexPie is a free hobby project. I built it for the home gym in my basement and shared it because
+it turned out nicer than I expected. Please read this before you start:
+
+- **Tested hardware:** Raspberry Pi 4 or 5, the official 7" touchscreen or an HDMI touchscreen, and a
+  USB DAC. That's what I own and test every release on. Other boards (Pi 3, Pi Zero), SPI screens that
+  need their own drivers, and DAC HATs that sit on the pins may work, but they're community-supported.
+- **Apps change under us.** Plex, Apple, Spotify and Raspberry Pi OS update on their own schedule, and
+  sometimes that breaks a tile until someone fixes it. One broken app doesn't take down the others.
+- **Use at your own risk.** It's provided as-is, with no warranty. Back up your settings (Settings ›
+  Backup) and keep the memory card you started from if you're nervous.
+- **Getting help:** the [troubleshooting guide](docs/TROUBLESHOOTING.md) covers every problem I've hit.
+  Questions, setup and network/router problems go to
+  [Discussions](https://github.com/ROGUEONE-SZ/plexamp-raspberry-pi-install/discussions), where other
+  builders can help. Bugs go to Issues, with the diagnostics report the form asks for.
+
+## How this was built
+
+PlexPie is my design: I knew exactly what I wanted for my gym,
+and I built it with **[Claude](https://claude.ai)** (Anthropic's AI) writing most of the code, while I
+drove the design, made the calls and tested everything on my own Pi, receiver and network.
+
+What that means for you:
+
+- **Every feature runs on real hardware** (Raspberry Pi 4, 7" screen, SMSL DAC, Onkyo receiver, Home
+  Assistant) before it's released. The bugs we found that way, and how they were fixed, are in the
+  [troubleshooting guide](docs/TROUBLESHOOTING.md) and the commit history.
+- **The code is plain and readable:** Python 3 and bash, no frameworks, comments that explain why. Read
+  it before you run it; reviews and pull requests are welcome (see [CONTRIBUTING](CONTRIBUTING.md)).
+- **No accounts, no cloud, no telemetry.** PlexPie never stores your music-service passwords, and runs
+  entirely on your home network.
+
 ## What you need
 
 - **Raspberry Pi 4 or 5** with **Raspberry Pi OS 64-bit** (Bookworm or Trixie, Lite or Desktop).
@@ -270,14 +303,33 @@ PlexPie glues together other people's excellent work:
 Plexamp, Apple Music, AirPlay and Spotify are trademarks of their owners; this project isn't
 affiliated with Plex, Apple or Spotify.
 
+## Credits
+
+PlexPie is the glue; these projects do the heavy lifting. Each is installed from its official source
+and keeps its own license and terms:
+
+- [Plexamp](https://www.plex.tv/plexamp/) (headless) by Plex, downloaded from Plex during install
+- [shairport-sync](https://github.com/mikebrady/shairport-sync) and [nqptp](https://github.com/mikebrady/nqptp) by Mike Brady, for AirPlay 2
+- [go-librespot](https://github.com/devgianlu/go-librespot), an unofficial Spotify Connect client
+- [Squeezelite](https://github.com/ralph-irving/squeezelite) and [Music Assistant](https://music-assistant.io)
+- [PipeWire](https://pipewire.org), WirePlumber, [BlueZ](https://www.bluez.org), Chromium and Raspberry Pi OS
+- [QR Code Generator](https://github.com/kazuhikoarase/qrcode-generator) by Kazuhiko Arase (MIT), included in `files/www/qrcode.js`
+- Ideas and inspiration from years of Raspberry Pi audio projects, including Volumio, moOde and the
+  headless-Plexamp installers that came before
+
+Plexamp, AirPlay, Spotify and Apple Music are trademarks of their owners. PlexPie isn't affiliated with or
+endorsed by any of them.
+
 ## License
 
 **Free for personal, non-commercial use** under the [PolyForm Noncommercial License 1.0.0](LICENSE.md):
-use it at home, change it, share it with friends, learn from it.
+use it at home, change it, share it with friends, learn from it. The license covers PlexPie's own code
+only, not the projects it installs.
 
 **Commercial use is not allowed without permission.** That includes selling devices or kits
 with PlexPie on them, offering it as a paid service, or building it into a product. If you'd
-like to do that, open an issue to ask about a commercial license.
+like to do that, start a [Discussion](https://github.com/ROGUEONE-SZ/plexamp-raspberry-pi-install/discussions)
+titled "Commercial license".
 
-PlexPie installs other projects (Plexamp, shairport-sync, go-librespot, Squeezelite, Chromium
-and more) from their official sources. Those keep their own licenses and terms.
+Contributions are welcome under the terms in [CONTRIBUTING](CONTRIBUTING.md). Security problems:
+see [SECURITY](SECURITY.md).

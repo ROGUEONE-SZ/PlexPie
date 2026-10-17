@@ -6,6 +6,9 @@ U="${SUDO_USER:-$USER}"
 AUID=$(id -u "$U")
 export XDG_RUNTIME_DIR="/run/user/$AUID"
 sec() { echo; echo "===== $* ====="; }
+# Never print sign-in tokens or passwords, so the report is safe to paste into a GitHub issue.
+redact() { sed -E 's/(X-Plex-Token=|[Tt]oken["=: ]+|authToken["=: ]+)[A-Za-z0-9_.~-]{6,}/\1(hidden)/g; s/((password|passwd|psk|secret)["=: ]+)[^ ",]+/\1(hidden)/Ig'; }
+{
 
 sec VERSIONS
 /usr/local/bin/shairport-sync -V 2>&1
@@ -69,3 +72,4 @@ echo "Playing a 'front left / front right' voice through the default output now.
 timeout 15 speaker-test -D default -c 2 -t wav -l 1 2>&1 | tail -5
 echo "speaker-test exit: $?"
 echo; echo "===== DONE ====="
+} 2>&1 | redact

@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions, setup help, network and router problems
+    url: https://github.com/ROGUEONE-SZ/plexamp-raspberry-pi-install/discussions
+    about: Ask here. Other builders can help, and answers stay findable for the next person.
+  - name: Troubleshooting guide
+    url: https://github.com/ROGUEONE-SZ/plexamp-raspberry-pi-install/blob/main/docs/TROUBLESHOOTING.md
+    about: Fixes for the problems people have run into so far.
+  - name: Report a security problem privately
+    url: https://github.com/ROGUEONE-SZ/plexamp-raspberry-pi-install/security/advisories/new
+    about: Please don't post security problems in public issues.

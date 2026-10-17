@@ -1,0 +1,10 @@
+name: Idea
+description: Suggest something new (better still, start it in Discussions first)
+labels: ["idea"]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like PlexPie to do, and why?
+    validations:
+      required: true

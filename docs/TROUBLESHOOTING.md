@@ -305,6 +305,10 @@ A command wasn't finished (usually a missing quote). Press **Ctrl + C** and past
 
 ## Still stuck?
 
-Run the report from [Getting a report from the player](#getting-a-report-from-the-player) and
-[open an issue](https://github.com/ROGUEONE-SZ/plexamp-raspberry-pi-install/issues) with its output.
-Remove anything private first; the report doesn't include passwords.
+- **Questions, setup help, network or router problems:** ask in
+  [Discussions](https://github.com/ROGUEONE-SZ/plexamp-raspberry-pi-install/discussions). Other builders
+  can help, and the answer helps the next person.
+- **A bug on supported hardware:** run the report from
+  [Getting a report from the player](#getting-a-report-from-the-player) and
+  [open an issue](https://github.com/ROGUEONE-SZ/plexamp-raspberry-pi-install/issues/new/choose) with its
+  output. The reports hide passwords and sign-in tokens, but have a look before you paste.

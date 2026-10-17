@@ -1,0 +1,52 @@
+name: Bug report
+description: Something in PlexPie is broken on supported hardware (a report is required)
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping make PlexPie better. Before you open a bug:
+        - Try the quick fixes and the [troubleshooting guide](https://github.com/ROGUEONE-SZ/plexamp-raspberry-pi-install/blob/main/docs/TROUBLESHOOTING.md).
+        - Questions, network or router problems (AirPlay not showing up, addresses, Wi-Fi) and setup help belong in [Discussions](https://github.com/ROGUEONE-SZ/plexamp-raspberry-pi-install/discussions), where other builders can help too.
+        - PlexPie is a hobby project, tested on a Raspberry Pi 4/5 with an official or HDMI touchscreen and a USB DAC. Other hardware is welcome but community-supported.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+      placeholder: "I tapped AirPlay, picked the player on my iPhone, and the screen stayed on the home screen."
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to make it happen again
+      placeholder: "1. ...  2. ...  3. ..."
+    validations:
+      required: true
+  - type: input
+    id: hardware
+    attributes:
+      label: Hardware
+      placeholder: "Raspberry Pi 4 (4 GB), official 7-inch display, SMSL USB DAC"
+    validations:
+      required: true
+  - type: textarea
+    id: report
+    attributes:
+      label: Report (required)
+      description: |
+        From another computer, run this (use your username and your player's address) and paste everything it prints:
+        `curl -fsSL https://raw.githubusercontent.com/ROGUEONE-SZ/plexamp-raspberry-pi-install/main/tools/diag.sh | ssh USER@PLAYER-ADDRESS bash`
+        Or, on the Pi: `bash ~/plexpie/tools/diagnose.sh`. Both hide passwords and sign-in tokens, but have a look before you paste.
+      render: text
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I'm on the latest PlexPie (Settings › Updates › PlexPie › Check now)
+          required: true
+        - label: I read the troubleshooting guide
+          required: true

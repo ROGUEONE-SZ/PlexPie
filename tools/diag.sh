@@ -1,6 +1,8 @@
 #!/bin/bash
 # PlexPie diagnostics: prints what's needed to troubleshoot the screen. Changes nothing.
 # Run from another computer:  curl -fsSL https://raw.githubusercontent.com/ROGUEONE-SZ/plexamp-raspberry-pi-install/main/tools/diag.sh | ssh USER@PI bash
+redact() { sed -E 's/(X-Plex-Token=|[Tt]oken["=: ]+|authToken["=: ]+)[A-Za-z0-9_.~-]{6,}/\1(hidden)/g; s/((password|passwd|psk|secret)["=: ]+)[^ ",]+/\1(hidden)/Ig'; }
+{
 echo "== PlexPie $(sed -n 's/^VERSION = "\(.*\)"/\1/p' /opt/plexpie/plexpied.py) on $(hostname), up $(uptime -p)"
 echo "== chromium: $(chromium --version 2>/dev/null)"
 echo "== screen"; DISPLAY=:0 xrandr 2>/dev/null | grep -E "Screen|\*" | head -4
@@ -35,3 +37,4 @@ echo "== plexpie log"; journalctl -u plexpie -n 12 --no-pager -o cat 2>/dev/null
 echo "== plexamp web"; curl -s -o /dev/null -w "HTTP %{http_code} in %{time_total}s\n" --max-time 5 http://127.0.0.1:32500/
 echo "== plexamp log"; journalctl -u plexamp -n 25 --no-pager -o cat 2>/dev/null | cut -c1-160
 echo "== session log"; grep -av DEPRECATED_ENDPOINT ~/.local/state/plexpie/session.log | tail -12 2>/dev/null
+} 2>&1 | redact

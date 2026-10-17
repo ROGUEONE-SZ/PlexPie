@@ -1,0 +1,46 @@
+# Bug reports need the diagnostics report. Without one, label the issue and ask for it politely;
+# close it if it's still missing after a week (reopening is one click once the report is added).
+name: Bug report check
+on:
+  issues:
+    types: [opened, edited]
+  schedule:
+    - cron: "17 6 * * *"
+permissions:
+  issues: write
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const NEED = "needs-report";
+            const hasReport = (body) => /== PlexPie \d|===== VERSIONS =====|PlexPie \d+\.\d+\.\d+ on /.test(body || "");
+            const msg = "Thanks for the report! It's missing the diagnostics output, which is the fastest way to find the problem. " +
+              "From another computer, run:\n\n```\ncurl -fsSL https://raw.githubusercontent.com/ROGUEONE-SZ/plexamp-raspberry-pi-install/main/tools/diag.sh | ssh USER@PLAYER-ADDRESS bash\n```\n\n" +
+              "and paste the output into the issue (edit it, no need for a new one). Network and setup questions are best in Discussions. " +
+              "Issues without a report are closed after a week; adding the report reopens the conversation.";
+            const { owner, repo } = context.repo;
+            if (context.eventName === "issues") {
+              const issue = context.payload.issue;
+              const isBug = (issue.labels || []).some(l => l.name === "bug");
+              if (!isBug) return;
+              const has = (issue.labels || []).some(l => l.name === NEED);
+              if (hasReport(issue.body)) {
+                if (has) await github.rest.issues.removeLabel({ owner, repo, issue_number: issue.number, name: NEED }).catch(() => {});
+              } else if (!has) {
+                await github.rest.issues.addLabels({ owner, repo, issue_number: issue.number, labels: [NEED] });
+                await github.rest.issues.createComment({ owner, repo, issue_number: issue.number, body: msg });
+              }
+              return;
+            }
+            const week = Date.now() - 7 * 24 * 3600 * 1000;
+            const open = await github.paginate(github.rest.issues.listForRepo, { owner, repo, state: "open", labels: NEED });
+            for (const i of open) {
+              if (new Date(i.updated_at).getTime() < week) {
+                await github.rest.issues.createComment({ owner, repo, issue_number: i.number,
+                  body: "Closing for now because the diagnostics report is still missing. Add it and reopen anytime." });
+                await github.rest.issues.update({ owner, repo, issue_number: i.number, state: "closed", state_reason: "not_planned" });
+              }
+            }
