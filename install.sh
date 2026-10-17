@@ -103,7 +103,11 @@ if [ ! -f "$BACKUP_DIR/original.tar.gz" ]; then
            /etc/lightdm/lightdm.conf "$UHOME/.local/share/Plexamp"; do
     [ -e "$p" ] && paths+=("${p#/}")
   done
-  tar -czpf "$BACKUP_DIR/original.tar.gz" -C / "${paths[@]}"
+  if [ ${#paths[@]} -gt 0 ]; then
+    tar -czpf "$BACKUP_DIR/original.tar.gz" --ignore-failed-read -C / "${paths[@]}"
+  else
+    tar -czf "$BACKUP_DIR/original.tar.gz" --files-from /dev/null   # a fresh Pi: nothing to back up yet
+  fi
   {
     for unit in lightdm display-control; do
       echo "$unit $(systemctl is-enabled "$unit" 2>/dev/null || true)"
