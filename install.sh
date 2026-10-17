@@ -359,6 +359,21 @@ ok "PlexPie files in /opt/plexpie, settings in /etc/plexpie/plexpie.conf"
 
 # ------------------------------------------------------------ 7. session
 step "Touchscreen session"
+# Raspberry Pi OS Lite has no X display config: on a Pi 4/5, X can pick the 3D chip (which has no
+# screen) and show only a white or black screen. Point it at the display chip (the Desktop image
+# ships the same file).
+if [ ! -e /usr/share/X11/xorg.conf.d/99-vc4.conf ] && [ ! -e /etc/X11/xorg.conf.d/99-vc4.conf ]; then
+  mkdir -p /etc/X11/xorg.conf.d
+  cat > /etc/X11/xorg.conf.d/99-vc4.conf <<'XEOF'
+Section "OutputClass"
+  Identifier "vc4"
+  MatchDriver "vc4"
+  Driver "modesetting"
+  Option "PrimaryGPU" "true"
+EndSection
+XEOF
+  ok "display set to the Raspberry Pi's display chip"
+fi
 systemctl disable --now display-control.service >/dev/null 2>&1 || true
 systemctl disable lightdm.service >/dev/null 2>&1 || true
 cat > "$UHOME/.xinitrc" <<'EOF'
