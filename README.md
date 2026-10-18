@@ -12,6 +12,8 @@ on one launcher and all controllable from **Home Assistant**.
   <img src="docs/launcher.png" width="49%" alt="Home screen playing Hotel California by Eagles in Plexamp">
   <img src="docs/airplay.png" width="49%" alt="AirPlay now-playing screen with cover, track and stream format">
 </p>
+<p><img src="docs/launcher-wide.png" width="99%" alt="The same home screen on an ultrawide monitor over HDMI"></p>
+
 <p>
   <img src="docs/visualizer.png" width="49%" alt="Full-screen spectrum visualizer tinted with the album art's color">
   <img src="docs/alert.png" width="49%" alt="Doorbell alert with camera picture">
@@ -45,6 +47,10 @@ How it behaves:
 - **Backup and restore.** Send all your settings as one file to a registered phone, tablet or computer (scan a QR code on the screen), and restore them on a new memory card.
 - **Setup guides built in.** Plain-English, step-by-step instructions for every app, on the player itself (offline, always matching your version). Save one as a PDF, share it, or download the [full setup guide (PDF)](docs/PlexPie-Setup-Guide.pdf).
 - **Power-cut protection.** An optional read-only mode, so pulling the plug can't damage the memory card.
+- **Screen sharing.** See and use the player's screen from a Mac (Screen Sharing), iPad or iPhone (RealVNC Viewer); off by default, home network only, password = your PIN.
+- **Works with a mouse, keyboard or any monitor.** A Home tab appears for a mouse or screen sharing, the Home key or Esc twice go home, the pointer hides for touch, and the screen fills anything from a 7" touchscreen to an ultrawide.
+- **Exit to the desktop.** Settings › System › Exit switches to the Raspberry Pi desktop (or the command line on Lite) until the next restart; the Back to PlexPie icon or `plexpie` brings it back.
+- **Self-checks and fixes.** Updates with real progress, a blank Plexamp screen reloads itself, the player notices when its network address changes, and read-only reports (`tools/diag.sh`) for troubleshooting.
 - **Settings screen.** The gear on the launcher opens Settings, organised by category like an iPad: Configuration (every app and account), Screen, Sound, Network, Updates, Remote access, Backup, Setup guides and System. The same page opens on any phone, tablet or computer at `http://<pi-address>:8080/settings`, protected by a PIN shown on the player.
 
 ## Before you build: what to expect
@@ -85,7 +91,7 @@ What that means for you:
 ## What you need
 
 - **Raspberry Pi 4 or 5** with **Raspberry Pi OS 64-bit** (Bookworm or Trixie, Lite or Desktop).
-- **A touchscreen**, any size or shape: the launcher picks its grid for the screen (one row on wide screens, a 2–3 row grid of near-square tiles on square or portrait screens) and scales up on big displays.
+- **A touchscreen or a monitor**, any size or shape (tested on the official 7" display and a 34" ultrawide over HDMI): the launcher picks its grid for the screen (one row on wide screens, a 2–3 row grid of near-square tiles on square or portrait screens) and scales up on big displays.
 - **Audio output:** a USB DAC, which is picked automatically, or HDMI / the headphone jack.
 - **Accounts:**
   - a **Plex** account for Plexamp
@@ -136,7 +142,7 @@ Tap the gear on the launcher, or open `http://<pi-address>:8080/settings` on any
 
 Settings is laid out like an iPad: categories on the left, details on the right (on a phone, tap a category and use **‹ Settings** to go back). Nothing slides or swipes; **Done** returns to the home screen, and **Save** appears only when you've changed something.
 
-<img src="docs/settings.png" width="60%" alt="Settings: categories on the left, Configuration on the right"> <img src="docs/phone-settings.png" width="22%" alt="Settings on a phone">
+<img src="docs/settings.png" width="60%" alt="Settings: categories on the left, Configuration on the right"> <img src="docs/system.png" width="38%" alt="Settings › System: screen sharing, exit to desktop"> <img src="docs/phone-settings.png" width="22%" alt="Settings on a phone">
 
 <p>
   <img src="docs/updates.png" width="49%" alt="Updates: PlexPie and Raspberry Pi OS, each with its own progress bar">

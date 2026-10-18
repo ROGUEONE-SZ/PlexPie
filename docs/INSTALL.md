@@ -74,8 +74,9 @@ Don't plug in the power yet.
    [raspberrypi.com/software](https://www.raspberrypi.com/software/).
 2. Put the microSD card in your computer and open Raspberry Pi Imager.
 3. **Choose Device:** pick your Pi (Raspberry Pi 4 or 5).
-4. **Choose OS:** pick **Raspberry Pi OS (64-bit)**. Either the normal version or "Lite" (under
-   *Raspberry Pi OS (other)*) works; Lite starts faster.
+4. **Choose OS:** pick **Raspberry Pi OS (64-bit)**. Either the normal version (with desktop) or
+   "Lite" (under *Raspberry Pi OS (other)*) works; Lite starts faster and fits on an 8 GB card. The
+   normal version lets you switch to the Raspberry Pi desktop now and then (Settings › System › Exit).
 5. **Choose Storage:** pick your microSD card. Double-check it's the card, not another drive.
 6. Click **Next**. When it asks *"Would you like to apply OS customisation settings?"*, click
    **Edit Settings** and fill in:
@@ -149,7 +150,8 @@ Partway through, the installer stops and asks for a **claim code**:
 5. When Plexamp says it's ready, press <kbd>Ctrl</kbd> + <kbd>C</kbd>. The installer carries on.
 
 When the installer finishes, the touchscreen restarts and shows the PlexPie home screen.
-You can close the terminal.
+If your Pi was showing the Raspberry Pi desktop, the installer asks you to restart once
+(`sudo reboot`) to switch the screen to PlexPie. You can close the terminal.
 
 ## 7. First use: play some music
 
@@ -247,7 +249,7 @@ on the left, and its settings show on the right. Tap **Done** to go back to the 
 | **Remote access** | The address, QR code and PIN, and your registered devices |
 | **Backup** | Send a backup to your phone, tablet or computer; restore |
 | **Setup guides** | Step-by-step instructions for every app, as a PDF too |
-| **System** | Power-cut protection, restart, shut down |
+| **System** | Screen sharing, exit to the desktop, power-cut protection, restart, shut down |
 
 <img src="updates.png" width="49%" alt="Updates with progress"> <img src="settings-ha.png" width="49%" alt="Configuration › Home Assistant">
 
@@ -257,6 +259,15 @@ type the address in any browser, on the same Wi-Fi) and enter the PIN once. That
 signed in and appears under **Registered devices**, where you can sign it out later.
 
 <img src="phone-pin.png" width="24%" alt="Enter the PIN"> <img src="phone-settings.png" width="24%" alt="Settings on a phone"> <img src="phone-config.png" width="24%" alt="Configuration"> <img src="phone-remote.png" width="24%" alt="Registered devices">
+
+**Using a mouse, keyboard, monitor or screen sharing:** swipes only work on a touchscreen, so a small
+**Home tab** (a house) appears on the left edge when a mouse or a screen-sharing viewer is connected.
+The **Home** key, **Esc** twice, or the mouse's **Back** button also go home. Screen sharing
+(**Settings › System**) shows the player's screen on your Mac, iPad or iPhone. To use the Pi as a
+computer for a while: **Settings › System › Exit to the Raspberry Pi desktop**; the **Back to
+PlexPie** icon, typing `plexpie`, or a restart brings PlexPie back.
+
+<img src="system.png" width="60%" alt="Settings › System: screen sharing, exit to desktop, restart">
 
 **Setup guides:** every app has step-by-step instructions on the player itself (they work offline
 and always match your version). On the screen, **Settings › Setup guides › Send the guides to a
