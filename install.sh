@@ -135,7 +135,7 @@ PKGS=(pipewire pipewire-pulse pipewire-alsa wireplumber pipewire-bin python3 pyt
 yes_ "${ENABLE_BLUETOOTH:-yes}" && PKGS+=(bluez libspa-0.2-bluetooth python3-dbus python3-gi rfkill)
 # Chromium is "chromium" on Trixie and "chromium-browser" on older Raspberry Pi OS;
 # Widevine (needed by the Apple Music web player) comes from Raspberry Pi's repository.
-for alts in "chromium chromium-browser" "libwidevinecdm0"; do
+for alts in "chromium chromium-browser" "libwidevinecdm0" "unclutter-xfixes"; do
   # shellcheck disable=SC2086
   p=$(pick_pkg $alts)
   [ -n "$p" ] && PKGS+=("$p")
@@ -391,7 +391,8 @@ cat > "$UHOME/.bash_profile" <<'EOF'
 
 # PlexPie: start the touchscreen session on the local console only
 if [ -z "$DISPLAY" ] && [ "$(tty)" = "/dev/tty1" ]; then
-  startx -- -nocursor
+  # unclutter hides the pointer for touch and shows it for a mouse; without it, no pointer at all
+  if command -v unclutter >/dev/null; then startx; else startx -- -nocursor; fi
   logout
 fi
 EOF

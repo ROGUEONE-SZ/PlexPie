@@ -202,5 +202,11 @@ $("browse").onclick = () => fetch("/api/source", {method: "POST", headers: {"Con
 function poll() { fetch("/api/state").then(r => r.json()).then(render).catch(() => {}); }
 poll(); setInterval(poll, 1000);
 </script>
+<script>/* plexpie-homekeys: Home key, Esc twice or the mouse Back button go home */
+(() => { let last = 0; const home = () => fetch("/api/source", {method: "POST", headers: {"Content-Type": "application/json"}, body: '{"source":"home"}'});
+  const typing = (el) => el && (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable);
+  addEventListener("keydown", e => { if (e.key === "Home" && !typing(e.target)) home();
+    if (e.key === "Escape") { const n = Date.now(); if (n - last < 600) home(); last = n; } });
+  addEventListener("mouseup", e => { if (e.button === 3) home(); }); })();</script>
 </body>
 </html>

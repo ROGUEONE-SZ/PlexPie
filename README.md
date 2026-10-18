@@ -31,7 +31,7 @@ on one launcher and all controllable from **Home Assistant**.
 How it behaves:
 
 - **One source at a time.** Starting one source pauses the others, and the screen switches to the app that started playing.
-- **Swipe home.** Swipe right from the left edge, or down from the top edge, to get back to the launcher from any app.
+- **Swipe home.** Swipe right from the left edge, or down from the top edge, to get back to the launcher from any app. With a mouse, keyboard or screen sharing: a small Home tab on the left edge, the Home key (or Esc twice), or the mouse's Back button.
 - **On-screen keyboard.** A keyboard slides up when you tap a text field (sign-ins, search), and the app shrinks to fit above it.
 - **Screen sleep.** The screen sleeps when nothing is playing. The first tap only wakes it.
 - **Self-healing.** A crashed app is restarted automatically.

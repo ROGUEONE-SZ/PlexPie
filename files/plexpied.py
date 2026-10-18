@@ -25,7 +25,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 
-VERSION = "2.10.2"
+VERSION = "2.11.0"
 CONF_PATH = os.environ.get("PLEXPIE_CONF", "/etc/plexpie/plexpie.conf")
 WWW = os.path.join(os.path.dirname(os.path.abspath(__file__)), "www")
 HTTP_PORT = int(os.environ.get("PLEXPIE_HTTP_PORT", "8080"))
@@ -69,7 +69,7 @@ EDITABLE = {
     "SCREEN_OFF_AFTER_SECS": "int", "SCREEN_BRIGHTNESS": "int", "AUTO_SHOW_SOURCES": "str",
     "SWIPE_HOME": "bool", "MA_HOST": "str", "MA_URL": "str",
     "MQTT_HOST": "str", "MQTT_PORT": "int", "MQTT_USER": "str", "MQTT_PASS": "secret",
-    "PHONE_ACCESS": "bool", "PHONE_PIN": "str", "SCREEN_SHARING": "bool",
+    "PHONE_ACCESS": "bool", "PHONE_PIN": "str", "SCREEN_SHARING": "bool", "HOME_BUTTON": "str",
 }
 
 
@@ -293,6 +293,7 @@ def state_json():
             "version": VERSION,
             "player_name": PLAYER_NAME,
             "source": ST.source,
+            "home_button": home_button_visible(),
             "sources": {k: v["name"] for k, v in SOURCES.items() if not v.get("hidden")},
             "spotify": dict(ST.np.get("spotify", {}), playing=bool(ST.playing.get("spotify")),
                             web="spotify_web" in SOURCES),
@@ -541,7 +542,17 @@ VIEWPORT = Viewport()
 FOCUS_JS = """(() => {
   // remove the old in-page Home tab from pages loaded by an earlier version
   const oldTab = document.getElementById('plexpie-home'); if (oldTab) oldTab.remove();
-  const home = false;
+  // Keyboard and mouse users: the Home key, Esc twice, or the mouse's Back button go home.
+  if (!window.__plexpieKeys) {
+    window.__plexpieKeys = true; let lastEsc = 0;
+    const typing = (el) => el && (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable);
+    addEventListener('keydown', (ev) => {
+      if (ev.key === 'Home' && !typing(ev.target)) window.__plexpieHome = true;
+      if (ev.key === 'Escape') { const n = Date.now(); if (n - lastEsc < 600) window.__plexpieHome = true; lastEsc = n; }
+    }, true);
+    addEventListener('mouseup', (ev) => { if (ev.button === 3) { window.__plexpieHome = true; ev.preventDefault(); } }, true);
+  }
+  const home = !!window.__plexpieHome; window.__plexpieHome = false;
   const TEXT = ['', 'text', 'email', 'password', 'search', 'tel', 'url', 'number'];
   let e = document.activeElement;
   while (e && e.shadowRoot && e.shadowRoot.activeElement) e = e.shadowRoot.activeElement;
@@ -2315,6 +2326,50 @@ def screen_share_loop():
         time.sleep(8)
 
 
+HOME_BTN = {"mouse": False, "vnc": 0}
+
+
+def mouse_connected():
+    """A real mouse or trackpad (relative pointer), not the touchscreen."""
+    try:
+        blocks = open("/proc/bus/input/devices").read().split("\n\n")
+    except OSError:
+        return False
+    for b in blocks:
+        rel = re.search(r"^B: REL=([0-9a-f ]+)$", b, re.M)
+        if rel and int(rel.group(1).split()[-1], 16) & 0x3 == 0x3 and "mouse" in b:   # moves in X and Y
+            return True
+    return False
+
+
+def vnc_clients():
+    n = 0
+    for f in ("/proc/net/tcp", "/proc/net/tcp6"):
+        try:
+            for line in open(f).readlines()[1:]:
+                parts = line.split()
+                if parts[1].endswith(":170C") and parts[3] == "01":          # port 5900, connected
+                    n += 1
+        except OSError:
+            pass
+    return n
+
+
+def home_button_loop():
+    """Keep track of whether a mouse or a screen-sharing viewer is connected (for the Home button)."""
+    while True:
+        m, v = mouse_connected(), vnc_clients()
+        if (m, v) != (HOME_BTN["mouse"], HOME_BTN["vnc"]):
+            HOME_BTN.update(mouse=m, vnc=v)
+            mark_changed()
+        time.sleep(3)
+
+
+def home_button_visible():
+    mode = (cfg("HOME_BUTTON", "auto") or "auto").lower()
+    return mode == "always" or (mode == "auto" and (HOME_BTN["mouse"] or HOME_BTN["vnc"] > 0))
+
+
 PLEXAMP_ORIGIN = "http://127.0.0.1:32500"
 PLEXAMP_SCREEN_BACKUP = os.path.join(SETTINGS_DIR, "plexamp-screen-backup.json")
 ADDRESS_FILE = os.path.join(SETTINGS_DIR, "last_address")
@@ -2381,6 +2436,7 @@ def settings_json(local, host=None, token=None):
     vals["NIGHT_END"] = vals.get("NIGHT_END") or "07:00"
     vals["NIGHT_BRIGHTNESS"] = vals.get("NIGHT_BRIGHTNESS") or "20"
     vals["HA_URL"] = vals.get("HA_URL") or HA_BASE
+    vals["HOME_BUTTON"] = (vals.get("HOME_BUTTON") or "auto").lower()
     vals["EQ_CUSTOM_TEXT"] = filters_to_apo(parse_compact(cfg("EQ_CUSTOM")))
     installed = {flag: subprocess.run(["systemctl", "cat", unit], capture_output=True).returncode == 0
                  for flag, unit in OPTIONAL_UNITS.items()}
@@ -3007,7 +3063,7 @@ def main():
     if "airplay" in SOURCES:
         spawn(airplay_reader)
     for fn in (fast_poller, slow_poller, focus_poller, gesture_reader, screen_loop, watchdog, update_checker,
-               sleep_loop, eq_manager, dim_loop, theme_loop, knob_reader, screen_share_loop):
+               sleep_loop, eq_manager, dim_loop, theme_loop, knob_reader, screen_share_loop, home_button_loop):
         spawn(fn)
     HA.start()
     while True:

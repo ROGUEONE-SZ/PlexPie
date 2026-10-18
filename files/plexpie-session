@@ -19,6 +19,11 @@ xset s off
 xset s noblank
 xset -dpms
 
+# Pointer: hidden while you use the touchscreen, shown when a mouse moves.
+if command -v unclutter >/dev/null; then
+  ( unclutter --timeout 3 --jitter 4 --hide-on-touch --start-hidden 2>/dev/null || unclutter --timeout 1 ) &
+fi
+
 # Overlay (Home button + wake shield), restarted if it ever exits.
 (
   while x_alive; do

@@ -200,6 +200,17 @@ Remove Plexamp's saved server list and restart it:
 
 ---
 
+### With screen sharing or a mouse, I can't get back to the home screen
+
+Swipes only work on the touchscreen itself. Since 2.11 there are other ways:
+
+- a small **Home tab** (a house) on the left edge appears when a screen-sharing viewer or a mouse
+  is connected (Settings › Screen › Home button: When needed, Always or Never);
+- the **Home** key, or **Esc** pressed twice;
+- the mouse's **Back** button.
+
+A mouse pointer shows when you move a mouse and hides again for touch (after a restart).
+
 ### Screen sharing won't connect
 
 - Turn it on first: Settings › System › **Screen sharing**, then Save. The row shows the address

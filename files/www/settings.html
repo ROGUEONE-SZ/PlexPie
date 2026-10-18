@@ -284,6 +284,8 @@
             <label class="sw"><input type="checkbox" id="AUTO_SHOW"><span></span></label></div>
           <div class="row"><div class="t"><b>Swipe home</b><small>From the left edge or the top edge</small></div>
             <label class="sw"><input type="checkbox" id="SWIPE_HOME"><span></span></label></div>
+          <div class="row"><div class="t"><b>Home button</b><small>A small tab on the left edge, for a mouse or screen sharing (they can't swipe). Keyboard: Home key or Esc twice.</small></div>
+            <select id="HOME_BUTTON"><option value="auto">When needed</option><option value="always">Always</option><option value="never">Never</option></select></div>
           <div class="row"><div class="t"><b>Album-art colors</b><small>Tint the screens with colors from the cover</small></div>
             <label class="sw"><input type="checkbox" id="THEME_FROM_ART"><span></span></label></div>
           <div class="row"><div class="t"><b>Visualizer</b><small>On the AirPlay, Spotify and Bluetooth screens. Tap the cover for full screen.</small></div>
@@ -470,7 +472,7 @@ const FIELDS = ["ENABLE_APPLE_MUSIC_WEB", "ENABLE_AIRPLAY", "ENABLE_SPOTIFY", "E
   "SCREEN_OFF_AFTER_SECS", "SCREEN_BRIGHTNESS", "AUTO_SHOW", "SWIPE_HOME", "MQTT_HOST", "MQTT_PORT",
   "MQTT_USER", "MQTT_PASS", "SHORTCUTS", "MA_HOST", "MA_URL", "PHONE_ACCESS",
   "EQ_ENABLED", "EQ_PRESET", "EQ_BANDS", "EQ_CUSTOM_TEXT", "THEME_FROM_ART", "VISUALIZER", "NIGHT_DIM",
-  "NIGHT_START", "NIGHT_END", "NIGHT_BRIGHTNESS", "AUTO_BRIGHTNESS", "HA_URL", "HA_DASHBOARD", "SCREEN_SHARING"];
+  "NIGHT_START", "NIGHT_END", "NIGHT_BRIGHTNESS", "AUTO_BRIGHTNESS", "HA_URL", "HA_DASHBOARD", "SCREEN_SHARING", "HOME_BUTTON"];
 const INSTALL_FLAG = {apple: null, airplay: "ENABLE_AIRPLAY", spotify: "ENABLE_SPOTIFY", bluetooth: "ENABLE_BLUETOOTH", ma: "ENABLE_MUSIC_ASSISTANT"};
 let data = null, page = null, dirty = false;
 const wide = () => matchMedia("(min-width: 700px)").matches;

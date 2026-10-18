@@ -10,7 +10,9 @@ Two always-on-top X windows drawn over Chromium:
                    sign-in pop-ups too.
   * Wake shield  - black full-screen window while the backlight is off, so the
                    first tap only wakes the screen.
-The Home button is drawn inside each app's page by the daemon, not here.
+  * Home tab     - a small tab on the left edge for mouse and screen-sharing users, who can't swipe
+                   (shown when a mouse or a screen-sharing viewer is connected, or always/never in
+                   Settings > Screen).
 """
 import json
 import subprocess
@@ -286,7 +288,22 @@ shield.geometry(f"{sw}x{sh}+0+0")
 shield.bind("<ButtonPress-1>", lambda e: call("/api/wake", {}))
 shield.withdraw()
 
-state = {"shield": False, "kb": False, "kb_auto": False, "dismissed": False, "dismissed_at": 0.0,
+# ------------------------------------------------------------------ home tab
+HT_W, HT_H = 30, 76
+home_tab = tk.Toplevel(root)
+home_tab.overrideredirect(True)
+home_tab.configure(bg="#000000")
+htc = tk.Canvas(home_tab, width=HT_W, height=HT_H, bg="#000000", highlightthickness=0, cursor="hand2")
+htc.pack()
+rounded_rect(htc, -14, 0, HT_W, HT_H, 14, fill="#2c2c30", outline="#4a4a50")
+hx, hy = HT_W // 2 - 3, HT_H // 2          # a small house
+htc.create_polygon(hx - 8, hy, hx, hy - 8, hx + 8, hy, fill=FG, outline=FG)
+htc.create_rectangle(hx - 6, hy, hx + 6, hy + 8, fill=FG, outline=FG)
+home_tab.geometry(f"{HT_W}x{HT_H}+0+{(sh - HT_H) // 2}")
+htc.bind("<ButtonRelease-1>", lambda e: api_async("/api/source", {"source": "home"}))
+home_tab.withdraw()
+
+state = {"shield": False, "home_tab": False, "kb": False, "kb_auto": False, "dismissed": False, "dismissed_at": 0.0,
          "misses": 0, "no_focus": 1}
 
 
@@ -336,6 +353,7 @@ def tick():
     if state["kb"]:
         kb.lift()
 
+    show(home_tab, "home_tab", bool(in_app and s.get("home_button")))
     show(shield, "shield", not screen_on)
     root.after(POLL_MS, tick)
 
