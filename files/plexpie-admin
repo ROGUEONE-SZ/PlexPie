@@ -231,6 +231,22 @@ PY
       [ "$(loginctl show-session "$s" -p TTY --value 2>/dev/null)" = tty1 ] && loginctl terminate-session "$s"
     done
     systemctl restart getty@tty1.service ;;   # autologin starts the PlexPie screen again
+  console-rotation) # console-rotation 0|90|180|270: turn the text console like the screen (after a restart)
+    deg=${2:-0}
+    case "$deg" in 0|90|180|270) ;; *) echo "bad rotation" >&2; exit 2 ;; esac
+    CMD=/boot/firmware/cmdline.txt; [ -f "$CMD" ] || CMD=/boot/cmdline.txt
+    [ -f "$CMD" ] || { echo "no cmdline.txt"; exit 0; }
+    line=$(head -n1 "$CMD")
+    if grep -q 'video=[^ ]*rotate=' <<<"$line"; then
+      echo "kept: rotate= set by hand in cmdline.txt"; exit 0
+    fi
+    new=$(sed -E 's/[[:space:]]*fbcon=rotate:[0-3]//g' <<<"$line")
+    [ "$deg" != 0 ] && new="$new fbcon=rotate:$((deg / 90))"
+    if [ -n "$new" ] && [ "$new" != "$line" ]; then
+      cp -p "$CMD" "$CMD.plexpie-bak"
+      printf '%s\n' "$new" > "$CMD.plexpie-new" && mv "$CMD.plexpie-new" "$CMD"
+      echo "changed (after a restart)"
+    fi ;;
   update-status)
     # A restart or power cut in the middle of an update leaves "running" behind: clear it.
     if grep -q '"running":true' "$STATE/update-run.json" 2>/dev/null && ! systemctl is-active --quiet plexpie-update; then

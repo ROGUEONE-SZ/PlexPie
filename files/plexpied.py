@@ -25,7 +25,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 
-VERSION = "2.13.0"
+VERSION = "2.14.0"
 CONF_PATH = os.environ.get("PLEXPIE_CONF", "/etc/plexpie/plexpie.conf")
 WWW = os.path.join(os.path.dirname(os.path.abspath(__file__)), "www")
 HTTP_PORT = int(os.environ.get("PLEXPIE_HTTP_PORT", "8080"))
@@ -70,6 +70,7 @@ EDITABLE = {
     "SWIPE_HOME": "bool", "MA_HOST": "str", "MA_URL": "str",
     "MQTT_HOST": "str", "MQTT_PORT": "int", "MQTT_USER": "str", "MQTT_PASS": "secret",
     "PHONE_ACCESS": "bool", "PHONE_PIN": "str", "SCREEN_SHARING": "bool", "HOME_BUTTON": "str",
+    "SCREEN_ROTATION": "str",
 }
 
 
@@ -1971,6 +1972,39 @@ def find_touchscreen():
     return best
 
 
+ROTATION_FILE = os.path.expanduser("~/.cache/plexpie-rotation")
+CONSOLE_ROT = os.path.join(SETTINGS_DIR, "console-rotation")
+
+
+def rotation_sync():
+    """Turn the text console (boot messages, Exit to command line) the same way as the screen.
+    Takes effect after a restart."""
+    last = None
+    while True:
+        try:
+            deg = int((read_file(ROTATION_FILE) or "").strip() or -1)
+        except ValueError:
+            deg = -1
+        if deg in (0, 90, 180, 270) and deg != last:
+            last = deg
+            if (read_file(CONSOLE_ROT) or "").strip() != str(deg):
+                ok, out = admin("console-rotation", str(deg), timeout=20)
+                if ok:
+                    log.info("console rotation %s: %s", deg, out.strip() or "unchanged")
+                    try:
+                        with open(CONSOLE_ROT, "w") as f:
+                            f.write(str(deg))
+                    except OSError:
+                        pass
+        time.sleep(15)
+
+
+def restart_screen():
+    """Start the overlay and Chromium again, so they pick up a new rotation and screen size."""
+    run(["pkill", "-f", "plexpie-overlay.py"])
+    run(["pkill", "-x", "chromium"])
+
+
 def gesture_reader():
     """Watch the touchscreen itself, so swipes work in every app."""
     if not cfg_yes("SWIPE_HOME"):
@@ -1982,7 +2016,17 @@ def gesture_reader():
         log.warning("python3-evdev missing: swipe-to-home is off")
         return
     tracker = SwipeTracker(on_swipe)
-    rotate = cfg_int("TOUCH_ROTATE", 0) % 360
+    fixed = cfg_int("TOUCH_ROTATE", 0) % 360       # set by hand for a screen mounted turned
+    rot = {"deg": fixed}
+
+    def current_rotation():
+        """The screen's rotation (written by the screen session), so swipes follow it."""
+        if fixed:
+            return fixed
+        try:
+            return int((read_file(ROTATION_FILE) or "0").strip()) % 360
+        except ValueError:
+            return 0
     while True:
         dev = find_touchscreen()
         if dev is None:
@@ -1997,6 +2041,7 @@ def gesture_reader():
             slot, pos, touching, moved = 0, [None, None], False, False
 
             def norm():
+                rotate = rot["deg"]
                 x = (pos[0] - ix.min) / max(1, ix.max - ix.min)
                 y = (pos[1] - iy.min) / max(1, iy.max - iy.min)
                 if rotate == 90:
@@ -2018,6 +2063,8 @@ def gesture_reader():
                             pos[1], moved = ev.value, True
                 elif ev.type == e.EV_KEY and ev.code == e.BTN_TOUCH:
                     touching = ev.value == 1
+                    if touching:
+                        rot["deg"] = current_rotation()
                     if not touching:
                         tracker.up(time.time())
                     moved = True
@@ -2558,6 +2605,7 @@ def settings_json(local, host=None, token=None):
     vals["NIGHT_BRIGHTNESS"] = vals.get("NIGHT_BRIGHTNESS") or "20"
     vals["HA_URL"] = vals.get("HA_URL") or HA_BASE
     vals["HOME_BUTTON"] = (vals.get("HOME_BUTTON") or "auto").lower()
+    vals["SCREEN_ROTATION"] = (vals.get("SCREEN_ROTATION") or "auto").lower()
     vals["EQ_CUSTOM_TEXT"] = filters_to_apo(parse_compact(cfg("EQ_CUSTOM")))
     installed = {flag: subprocess.run(["systemctl", "cat", unit], capture_output=True).returncode == 0
                  for flag, unit in OPTIONAL_UNITS.items()}
@@ -2591,6 +2639,8 @@ def apply_settings(data):
         if k == "AUTO_SHOW":
             clean["AUTO_SHOW_SOURCES"] = "plexamp airplay ma spotify bluetooth" if v else ""
             continue
+        if k == "SCREEN_ROTATION" and str(v).lower() not in ("auto", "normal", "right", "inverted", "left"):
+            continue
         if k == "EQ_CUSTOM_TEXT":
             clean["EQ_CUSTOM"] = to_compact(parse_apo(str(v)))
             continue
@@ -2611,6 +2661,8 @@ def apply_settings(data):
         clean["PHONE_PIN"] = f"{secrets.randbelow(1000000):06d}"
         SESSIONS.clear()                  # a new PIN signs every device out
         save_sessions()
+    rotation_changed = "SCREEN_ROTATION" in clean and \
+        (clean["SCREEN_ROTATION"] or "auto").lower() != (cfg("SCREEN_ROTATION") or "auto").lower()
     save_overrides(clean)
     log.info("settings saved: %s", ", ".join(k for k in clean if k != "MQTT_PASS"))
 
@@ -2618,6 +2670,8 @@ def apply_settings(data):
         time.sleep(0.8)
         if any(k in clean for k in ("MA_HOST", "PLAYER_NAME")):
             sudo("/usr/bin/systemctl", "restart", "plexpie-squeezelite")
+        if rotation_changed:
+            restart_screen()
         os._exit(0)
     spawn(restart)
     return clean
@@ -3196,7 +3250,8 @@ def main():
     if "airplay" in SOURCES:
         spawn(airplay_reader)
     for fn in (fast_poller, slow_poller, focus_poller, gesture_reader, screen_loop, watchdog, update_checker,
-               sleep_loop, eq_manager, dim_loop, theme_loop, knob_reader, screen_share_loop, home_button_loop):
+               sleep_loop, eq_manager, dim_loop, theme_loop, knob_reader, screen_share_loop, home_button_loop,
+               rotation_sync):
         spawn(fn)
     HA.start()
     while True:

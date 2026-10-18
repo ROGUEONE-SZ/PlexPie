@@ -81,7 +81,10 @@ APPLE_MUSIC_ZOOM="75"
 
 # Swipe right from the left edge, or down from the top edge, to go home
 SWIPE_HOME="yes"
-# Touchscreen rotation in degrees if your screen is mounted rotated (0, 90, 180, 270)
+# Screen rotation: auto (follow the Raspberry Pi desktop's setting), normal, right, inverted or left.
+# The Pi Touch Display 2 is portrait out of the box: right or left makes it landscape. Also in Settings > Screen.
+SCREEN_ROTATION="auto"
+# Only if swipes still go the wrong way after rotating: extra touch rotation in degrees (0, 90, 180, 270)
 TOUCH_ROTATE="0"
 # Starting one source pauses the others
 PAUSE_OTHERS="yes"

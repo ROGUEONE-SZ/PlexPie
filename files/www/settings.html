@@ -288,7 +288,10 @@
               <option value="30">30 seconds</option><option value="60">1 minute</option><option value="120">2 minutes</option>
               <option value="300">5 minutes</option><option value="900">15 minutes</option><option value="0">Never</option>
             </select></div>
-          <div class="row"><div class="t"><b>Brightness</b></div><input id="SCREEN_BRIGHTNESS" type="range" min="10" max="100" step="5"></div></div>
+          <div class="row"><div class="t"><b>Brightness</b></div><input id="SCREEN_BRIGHTNESS" type="range" min="10" max="100" step="5"></div>
+          <div class="row"><div class="t"><b>Rotation</b><small>Automatic follows the Raspberry Pi desktop's setting. The Pi Touch Display 2 starts in portrait: pick Right or Left for landscape. Touch turns with it.</small></div>
+            <select id="SCREEN_ROTATION"><option value="auto">Automatic</option><option value="normal">Normal</option><option value="right">Right (90°)</option>
+              <option value="inverted">Upside down</option><option value="left">Left (270°)</option></select></div></div>
         <div class="group">
           <div class="row"><div class="t"><b>Show what's playing</b><small>Switch to the app that starts playing</small></div>
             <label class="sw"><input type="checkbox" id="AUTO_SHOW"><span></span></label></div>
@@ -488,7 +491,7 @@ const FIELDS = ["ENABLE_APPLE_MUSIC_WEB", "ENABLE_AIRPLAY", "ENABLE_SPOTIFY", "E
   "SCREEN_OFF_AFTER_SECS", "SCREEN_BRIGHTNESS", "AUTO_SHOW", "SWIPE_HOME", "MQTT_HOST", "MQTT_PORT",
   "MQTT_USER", "MQTT_PASS", "SHORTCUTS", "MA_HOST", "MA_URL", "PHONE_ACCESS",
   "EQ_ENABLED", "EQ_PRESET", "EQ_BANDS", "EQ_CUSTOM_TEXT", "THEME_FROM_ART", "VISUALIZER", "NIGHT_DIM",
-  "NIGHT_START", "NIGHT_END", "NIGHT_BRIGHTNESS", "AUTO_BRIGHTNESS", "HA_URL", "HA_DASHBOARD", "SCREEN_SHARING", "HOME_BUTTON"];
+  "NIGHT_START", "NIGHT_END", "NIGHT_BRIGHTNESS", "AUTO_BRIGHTNESS", "HA_URL", "HA_DASHBOARD", "SCREEN_SHARING", "HOME_BUTTON", "SCREEN_ROTATION"];
 const INSTALL_FLAG = {apple: null, airplay: "ENABLE_AIRPLAY", spotify: "ENABLE_SPOTIFY", bluetooth: "ENABLE_BLUETOOTH", ma: "ENABLE_MUSIC_ASSISTANT", caldera: "ENABLE_CALDERA"};
 let data = null, page = null, dirty = false;
 const wide = () => matchMedia("(min-width: 700px)").matches;

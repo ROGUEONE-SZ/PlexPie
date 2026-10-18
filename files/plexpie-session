@@ -19,6 +19,30 @@ xset s off
 xset s noblank
 xset -dpms
 
+# Screen rotation (Settings > Screen > Rotation; "auto" follows the Raspberry Pi desktop's setting).
+# The touchscreen is turned to match, so taps land where you touch.
+apply_rotation() {
+  local out deg want cur id
+  out=$(xrandr --query 2>/dev/null | awk '$2=="connected"{print $1}' | grep -m1 '^DSI')
+  [ -n "$out" ] || out=$(xrandr --query 2>/dev/null | awk '$2=="connected"{print $1; exit}')
+  [ -n "$out" ] || return 0
+  deg=$(python3 /opt/plexpie/plexpie-rotation "$out" 2>/dev/null || echo 0)
+  case "$deg" in 90) want=right ;; 180) want=inverted ;; 270) want=left ;; *) want=normal; deg=0 ;; esac
+  cur=$(xrandr --query 2>/dev/null | awk -v o="$out" '$1==o{r="normal"; for(i=3;i<=NF;i++){if($i ~ /^\(/) break; if($i ~ /^(left|right|inverted)$/) r=$i}; print r}')
+  if [ "$cur" != "$want" ]; then
+    log "rotating $out: $cur -> $want"
+    xrandr --output "$out" --rotate "$want" || log "could not rotate $out"
+  fi
+  if command -v xinput >/dev/null; then
+    for id in $(xinput list --id-only 2>/dev/null); do
+      xinput list-props "$id" 2>/dev/null | grep -q "libinput Calibration Matrix" && xinput map-to-output "$id" "$out" 2>/dev/null
+    done
+  fi
+  mkdir -p "$HOME/.cache"
+  echo "$deg" > "$HOME/.cache/plexpie-rotation"
+}
+apply_rotation
+
 # Pointer: hidden while you use the touchscreen, shown when a mouse moves.
 if command -v unclutter >/dev/null; then
   ( unclutter --timeout 3 --jitter 4 --hide-on-touch --start-hidden 2>/dev/null || unclutter --timeout 1 ) &
@@ -27,6 +51,7 @@ fi
 # Overlay (Home button + wake shield), restarted if it ever exits.
 (
   while x_alive; do
+    apply_rotation
     python3 /opt/plexpie/plexpie-overlay.py
     log "overlay exited ($?), restarting"
     sleep 2
@@ -64,6 +89,7 @@ prefs.get("browser", {}).pop("window_placement", None)   # a remembered smaller 
 with open(path, "w") as f:
     json.dump(prefs, f)
 PY
+  apply_rotation
   # Size the window to the whole screen. Without a window manager, Chromium can open smaller
   # than a big monitor (e.g. only the left half of an ultrawide).
   SIZE=$(xrandr 2>/dev/null | sed -n 's/.*current \([0-9]*\) x \([0-9]*\).*/\1,\2/p' | head -1)

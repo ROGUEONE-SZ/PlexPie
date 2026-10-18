@@ -114,14 +114,30 @@ On an older version, Settings › System › Restart PlexPie resets the zoom.
 It's probably asleep: tap it. The first tap only wakes it. Still black? Unplug the power for 10
 seconds. To change how fast it sleeps: Settings › Screen › Screen sleep.
 
-### Upside down, or touches land in the wrong place
+### Wrong orientation (portrait instead of landscape, or upside down)
 
-Set `TOUCH_ROTATE` in `~/plexpie/plexpie.conf`, then run `sudo bash ~/plexpie/install.sh`.
+Settings › Screen › **Rotation**. *Automatic* follows what you set for the Raspberry Pi desktop
+(Control Centre › Screens, or Screen Configuration) and a `video=...,rotate=` setting in `cmdline.txt`.
+Or pick it directly: **Right** or **Left** turn a portrait screen into landscape, **Upside down** flips
+it. The screen restarts in the new orientation in a few seconds and touch turns with it.
+
+The **Pi Touch Display 2** is portrait out of the box, so on Raspberry Pi OS Lite pick Right or Left.
+The text console (boot messages, Exit to command line) follows after a restart. If you already
+set `video=DSI-1:...,rotate=` in `cmdline.txt` yourself, PlexPie leaves it alone.
+
+Without the screen: from a computer, open `http://ADDRESS:8080/settings` › Screen, or set
+`SCREEN_ROTATION="right"` in `~/plexpie/plexpie.conf` and run `sudo bash ~/plexpie/install.sh`.
+
+### Touches land in the wrong place after rotating
+
+Restart once (Settings › System › Reboot). Still off? Set `TOUCH_ROTATE` (0, 90, 180 or 270) in
+`~/plexpie/plexpie.conf` for swipes, and check that `cmdline.txt`/`config.txt` don't also rotate the
+touch panel (`swapxy`, `invx`, `invy`, `rotation=` on the display's `dtoverlay` line).
 
 ### Swiping home doesn't work
 
 Swipe right from the very left edge, or down from the very top edge. If your screen is mounted
-rotated, set `TOUCH_ROTATE` (above). The log shows what the touchscreen reports:
+rotated, set Settings › Screen › Rotation (above). The log shows what the touchscreen reports:
 `journalctl -u plexpie | grep -i touch`.
 
 ---

@@ -157,7 +157,7 @@ Settings is laid out like an iPad: categories on the left, details on the right 
 </p>
 
 - **Configuration:** every app in one list (Plexamp, Apple Music, AirPlay, Spotify, Bluetooth, Music Assistant, Caldera Music, Home Assistant, Workout timer), each with its on/off switch, account status and sign-out, its own options, and a **Setup instructions** link. PlexPie never stores your passwords; each service signs in on its own page.
-- **Screen:** sleep, brightness, show what's playing, swipe home, album-art colors, visualizer, night dimming, light sensor.
+- **Screen:** sleep, brightness, rotation (follows the Pi desktop, or pick one: handy for the portrait Pi Touch Display 2), show what's playing, swipe home, album-art colors, visualizer, night dimming, light sensor.
 - **Sound:** the equalizer, with a live curve of what it does.
 - **Network:** Wi-Fi on/off, current network, scan and join (the password goes to NetworkManager, not PlexPie).
 - **Updates:** **PlexPie** and **Raspberry Pi OS** are separate rows. **Check now** looks in the background; when something's found the button becomes **Update**, with a list of what's new, and a live progress bar (step, package and elapsed time) while it installs. Raspberry Pi OS asks for a restart only when it needs one. Both check by themselves twice a day, and Home Assistant gets two update entities with Install buttons.

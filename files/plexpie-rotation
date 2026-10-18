@@ -1,0 +1,113 @@
+#!/usr/bin/env python3
+"""PlexPie: which way to turn the screen, in degrees clockwise (0, 90, 180 or 270).
+
+Usage: plexpie-rotation [OUTPUT]   (e.g. DSI-1, HDMI-A-1)
+
+SCREEN_ROTATION from Settings (or plexpie.conf) wins. "auto" (the default) follows what you set
+for the Raspberry Pi desktop (Screen Configuration / Control Centre > Screens), then a
+video=...,rotate= setting in cmdline.txt, and otherwise leaves the screen as it is.
+"""
+import glob
+import os
+import re
+import sys
+
+HOME = os.path.expanduser("~")
+OUT = sys.argv[1] if len(sys.argv) > 1 else ""
+WORDS = {"normal": 0, "right": 90, "inverted": 180, "left": 270}
+
+
+def read(path):
+    try:
+        with open(path, errors="replace") as f:
+            return f.read()
+    except OSError:
+        return ""
+
+
+def setting():
+    val = ""
+    for path in ("/etc/plexpie/plexpie.conf", os.path.join(HOME, ".config/plexpie/settings.env")):
+        m = re.findall(r'^\s*SCREEN_ROTATION\s*=\s*"?([^"\n]*)"?', read(path), re.M)
+        if m:
+            val = m[-1].strip().lower()
+    return val or "auto"
+
+
+def same_output(name):
+    """Desktop tools name outputs like the kernel (HDMI-A-1); X calls the same one HDMI-1."""
+    if not OUT or not name:
+        return True
+    a, b = (re.sub(r"-A-", "-", x.strip('"').upper()) for x in (name, OUT))
+    return a == b
+
+
+def wayland_transform(t):
+    t = t.strip().lower()
+    if t.startswith("flipped"):
+        t = t.replace("flipped", "").strip("-") or "0"
+    return {"normal": 0, "0": 0, "90": 90, "180": 180, "270": 270}.get(t)
+
+
+def from_kanshi():
+    # labwc desktop (Raspberry Pi OS Bookworm/Trixie): ~/.config/kanshi/config
+    txt = read(os.path.join(HOME, ".config/kanshi/config"))
+    for m in re.finditer(r'output\s+("[^"]+"|\S+)([^\n{}]*)', txt):
+        name, rest = m.group(1), m.group(2)
+        t = re.search(r"transform\s+(\S+)", rest)
+        if t and same_output(name):
+            return wayland_transform(t.group(1))
+    return None
+
+
+def from_wayfire():
+    # wayfire desktop (Bookworm before labwc): [output:DSI-1] transform = 90
+    txt = read(os.path.join(HOME, ".config/wayfire.ini"))
+    for m in re.finditer(r"\[output:([^\]]+)\]([^\[]*)", txt):
+        t = re.search(r"^\s*transform\s*=\s*(\S+)", m.group(2), re.M)
+        if t and same_output(m.group(1)):
+            return wayland_transform(t.group(1))
+    return None
+
+
+def from_xrandr_scripts():
+    # X11 desktop: Screen Configuration saves an xrandr line (autostart or ~/.screenlayout)
+    files = glob.glob(os.path.join(HOME, ".config/autostart/*.desktop")) + \
+        glob.glob(os.path.join(HOME, ".screenlayout/*.sh")) + [os.path.join(HOME, ".config/lxsession/LXDE-pi/autostart")]
+    for path in files:
+        for line in read(path).splitlines():
+            if "xrandr" not in line:
+                continue
+            for m in re.finditer(r"--output\s+(\S+)((?:(?!--output).)*)", line):
+                r = re.search(r"--rotate\s+(normal|left|right|inverted)", m.group(2))
+                if r and same_output(m.group(1)):
+                    return WORDS[r.group(1)]
+    return None
+
+
+def from_cmdline():
+    # Raspberry Pi's guide for the Touch Display 2 on Lite: video=DSI-1:720x1280@60,rotate=90
+    for path in ("/boot/firmware/cmdline.txt", "/boot/cmdline.txt"):
+        for m in re.finditer(r"video=([^:\s]+):\S*?rotate=(\d+)", read(path)):
+            if same_output(m.group(1)) and int(m.group(2)) % 90 == 0:
+                return int(m.group(2)) % 360
+    return None
+
+
+def main():
+    s = setting()
+    if s in WORDS:
+        return WORDS[s]
+    if s.isdigit() and int(s) % 90 == 0:
+        return int(s) % 360
+    for find in (from_kanshi, from_wayfire, from_xrandr_scripts, from_cmdline):
+        try:
+            deg = find()
+        except Exception:
+            deg = None
+        if deg is not None:
+            return deg
+    return 0
+
+
+print(main())

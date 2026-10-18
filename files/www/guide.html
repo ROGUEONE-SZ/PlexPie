@@ -113,7 +113,7 @@
       <tr><td><b>Raspberry Pi 4 or 5</b></td><td>2 GB or more. A Pi 4 with 4 GB is plenty.</td></tr>
       <tr><td><b>Official power supply</b></td><td>Cheap phone chargers cause random freezes.</td></tr>
       <tr><td><b>microSD card</b></td><td>32 GB or larger, "A1" or "A2" rated (SanDisk, Samsung).</td></tr>
-      <tr><td><b>Touchscreen</b></td><td>The official 7" Touch Display, or any HDMI touchscreen.</td></tr>
+      <tr><td><b>Touchscreen</b></td><td>The official 7" Touch Display or Touch Display 2, or any HDMI touchscreen.</td></tr>
       <tr><td><b>USB DAC</b> (recommended)</td><td>From about $50 (SMSL, Topping, FiiO). Sounds far better than the headphone jack.</td></tr>
       <tr><td><b>Cable</b></td><td>RCA (DAC to receiver) or 3.5 mm (DAC to powered speakers).</td></tr>
       <tr><td><b>Accounts</b></td><td>Plex (free). Optional: Apple Music, Spotify Premium, Home Assistant.</td></tr>
@@ -142,6 +142,7 @@
       <li>Answer the short questions (press Enter to accept a suggestion): player name, which apps you want, screen sleep.</li>
       <li>When it asks for a <b>claim code</b>: open <code>plex.tv/claim</code> on any device, copy the code, paste it, press Enter, type the player name, and press Ctrl+C when Plexamp says it's ready.</li>
       <li>It takes 15 to 30 minutes. When it's done, the screen shows the PlexPie home screen.</li>
+      <li>Screen standing up instead of lying down (the Touch Display 2 starts in portrait)? Settings › Screen › <b>Rotation</b> › Right or Left.</li>
     </ol>
     <div class="tip"><b>Can't connect?</b> Use the Pi's number address instead of <code>plexpie.local</code>. Your router's list of devices shows it, e.g. <code>ssh pi@192.168.1.42</code>.</div>
   </section>
@@ -359,6 +360,7 @@
       <tr><td>AirPlay or Spotify doesn't list the player</td><td>Same network (not guest Wi-Fi); turn on mDNS/Bonjour forwarding in the router.</td></tr>
       <tr><td>Home Assistant shows "unavailable"</td><td>Wait two minutes; check the green dot in Configuration › Home Assistant.</td></tr>
       <tr><td>Receiver or smart plug stops responding</td><td>Give it a fixed address in the router; unplug the receiver for a minute.</td></tr>
+      <tr><td>Screen in portrait (or upside down), but you want landscape</td><td>Settings › Screen › <b>Rotation</b>: Right or Left. Automatic follows the Raspberry Pi desktop's setting. Touch turns with it.</td></tr>
       <tr><td>Screen black</td><td>Tap it (asleep). Still black: unplug for 10 seconds.</td></tr>
       <tr><td>Caldera isn't in Plexamp's speaker list</td><td>Settings › Configuration › Caldera Music: check it's on and signed in. Not signed in: run the installer again from a computer (<code>ssh -t</code>). Caldera needs a 64-bit Raspberry Pi OS on a Pi 4 or 5.</td></tr>
       <tr><td>Caldera plays, but other apps go silent (or the other way round)</td><td>Caldera has the DAC to itself. Set <code>CALDERA_DEVICE="auto"</code> in plexpie.conf, run the installer again and reboot.</td></tr>
