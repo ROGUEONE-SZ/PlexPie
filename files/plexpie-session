@@ -60,10 +60,16 @@ for host in ("music.apple.com", "beta.music.apple.com"):
         levels[host] = {"last_modified": stamp, "zoom_level": math.log(pct / 100) / math.log(1.2)}
     else:
         levels.pop(host, None)
+prefs.get("browser", {}).pop("window_placement", None)   # a remembered smaller window must not win
 with open(path, "w") as f:
     json.dump(prefs, f)
 PY
-  log "starting chromium"
+  # Size the window to the whole screen. Without a window manager, Chromium can open smaller
+  # than a big monitor (e.g. only the left half of an ultrawide).
+  SIZE=$(xrandr 2>/dev/null | sed -n 's/.*current \([0-9]*\) x \([0-9]*\).*/\1,\2/p' | head -1)
+  WINDOW_ARGS=()
+  [ -n "$SIZE" ] && WINDOW_ARGS=(--window-position=0,0 "--window-size=$SIZE")
+  log "starting chromium (screen ${SIZE:-unknown})"
   chromium \
     --kiosk \
     --user-data-dir="$PROFILE" \
@@ -81,6 +87,7 @@ PY
     --overscroll-history-navigation=0 \
     --disable-pinch \
     --check-for-update-interval=31536000 \
+    "${WINDOW_ARGS[@]}" \
     "$LAUNCHER"
   log "chromium exited ($?), restarting in 2s"
   sleep 2
