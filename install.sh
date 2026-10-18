@@ -375,6 +375,8 @@ XEOF
   ok "display set to the Raspberry Pi's display chip"
 fi
 systemctl disable --now display-control.service >/dev/null 2>&1 || true
+DESKTOP_WAS_RUNNING=no
+systemctl is-active --quiet lightdm.service 2>/dev/null && DESKTOP_WAS_RUNNING=yes
 systemctl disable lightdm.service >/dev/null 2>&1 || true
 cat > "$UHOME/.xinitrc" <<'EOF'
 #!/bin/sh
@@ -452,13 +454,18 @@ for unit in plexamp plexpie plexpie-airplay plexpie-squeezelite plexpie-spotify 
 done
 if curl -fs --max-time 3 http://127.0.0.1:8080/api/state >/dev/null; then ok "launcher answering on the Pi"; fi
 
-cat <<EOF
-
-PlexPie is installed.
-  * Touchscreen: launcher with Plexamp, Apple Music, AirPlay and Music Assistant
-  * Home Assistant: device "$(hostname)" appears under Settings -> Devices (MQTT)
-  * AirPlay: choose "$AIRPLAY_NAME" on your iPhone
-  * Logs: journalctl -u plexpie -f   and   ~/.local/state/plexpie/session.log
-  * Undo: sudo bash $REPO/rollback.sh
-A reboot is a good final test:  sudo reboot
-EOF
+echo
+echo "PlexPie is installed."
+echo "  * Touchscreen: launcher with Plexamp, Apple Music, AirPlay and more"
+[ -n "${MQTT_HOST:-}" ] && echo "  * Home Assistant: device \"$(hostname)\" appears under Settings -> Devices (MQTT)"
+echo "  * AirPlay: choose \"$AIRPLAY_NAME\" on your iPhone"
+echo "  * Settings from your phone: http://$(hostname).local:8080/settings (PIN on the screen)"
+echo "  * Logs: journalctl -u plexpie -f   and   ~/.local/state/plexpie/session.log"
+echo "  * Undo: sudo bash $REPO/rollback.sh"
+if [ "$DESKTOP_WAS_RUNNING" = yes ]; then
+  echo
+  echo "  >> This Pi was showing the Raspberry Pi desktop. Restart it once to switch the screen to PlexPie:"
+  echo "       sudo reboot"
+else
+  echo "A reboot is a good final test:  sudo reboot"
+fi
