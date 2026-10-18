@@ -14,7 +14,7 @@ sec VERSIONS
 /usr/local/bin/shairport-sync -V 2>&1
 nqptp -V 2>&1 | head -1
 sec SERVICES
-for u in plexamp plexpie plexpie-airplay plexpie-squeezelite nqptp; do printf '%-22s %s\n' "$u" "$(systemctl is-active "$u")"; done
+for u in plexamp plexpie plexpie-airplay plexpie-squeezelite plexpie-caldera nqptp; do printf '%-22s %s\n' "$u" "$(systemctl is-active "$u")"; done
 systemctl --user is-active pipewire pipewire-pulse wireplumber 2>&1 | paste -sd' '
 loginctl show-user "$U" -p Linger 2>&1
 sec PIPEWIRE
@@ -32,6 +32,14 @@ sec PLEXPIE LOG
 journalctl -u plexpie -n 80 --no-pager 2>&1 | grep -v "GET /api"
 sec PLEXAMP LOG
 journalctl -u plexamp -n 120 --no-pager 2>&1
+if systemctl cat plexpie-caldera >/dev/null 2>&1; then
+sec CALDERA MUSIC
+echo "output: $(cat "$HOME/.config/plexpie/caldera-device" 2>/dev/null || echo '(not started yet)')"
+echo "signed in: $([ -f "$HOME/.config/plexpie/caldera-linked" ] && echo yes || echo no)"
+echo "devices:"; sed 's/^/  /' "$HOME/.config/plexpie/caldera-devices.txt" 2>/dev/null | head -20
+ss -ltnpH 2>/dev/null | grep -i caldera
+journalctl -u plexpie-caldera -n 40 --no-pager 2>&1
+fi
 sec PLEXAMP AUDIO SETTINGS
 for f in "$HOME"/.local/share/Plexamp/Settings/*; do
   case "$f" in *udio*|*utput*|*evice*|*xclusive*|*ample*|*layback*) echo "$(basename "$f") = $(head -c 300 "$f")";; esac

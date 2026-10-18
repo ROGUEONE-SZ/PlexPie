@@ -95,6 +95,8 @@ if [ "$ENABLE_MUSIC_ASSISTANT" = yes ]; then
 else
   MA_HOST="${MA_HOST:-}"; MA_URL="${MA_URL:-}"
 fi
+dim "Caldera Music (Plex Labs) plays in sync with other Caldera speakers and shows up in Plexamp's speaker list."
+yesno ENABLE_CALDERA "Add Caldera Music (multi-room with other Caldera speakers)?" "${ENABLE_CALDERA:-no}"
 
 # --------------------------------------------------------- home assistant
 echo
@@ -137,6 +139,10 @@ ENABLE_APPLE_MUSIC_WEB="$ENABLE_APPLE_MUSIC_WEB"
 ENABLE_MUSIC_ASSISTANT="$ENABLE_MUSIC_ASSISTANT"
 ENABLE_SPOTIFY="$ENABLE_SPOTIFY"
 ENABLE_SPOTIFY_WEB="$ENABLE_SPOTIFY_WEB"
+# Caldera Music (Plex Labs): multi-room with other Caldera speakers; shows up in Plexamp's speaker list
+ENABLE_CALDERA="$ENABLE_CALDERA"
+# Where Caldera plays: auto = shared with the other sources, caldera = Caldera's own pick (often the DAC alone)
+CALDERA_DEVICE="${CALDERA_DEVICE:-auto}"
 # A push button between pins 5 and 6 (GPIO3 and ground) shuts the Pi down and starts it again
 # (leave "no" if a DAC HAT or other add-on board uses those pins)
 POWER_BUTTON="${POWER_BUTTON:-no}"

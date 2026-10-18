@@ -1,0 +1,47 @@
+#!/bin/bash
+# PlexPie: start Caldera Music (Plex Labs) on the shared sound output, so it plays alongside
+# Plexamp, AirPlay and the rest instead of taking the DAC for itself.
+# CALDERA_DEVICE (in plexpie.conf): auto = shared output (default), caldera = let Caldera pick
+# (usually the DAC directly, bit-perfect but exclusive), or an exact name from --list-devices.
+set -u
+DIR="$HOME/caldera-music"
+BIN="$DIR/caldera-music"
+[ -x "$BIN" ] || BIN="$DIR/bin/caldera-music"
+if [ ! -x "$BIN" ]; then
+  echo "Caldera Music isn't installed: switch it on in configure.sh and run the installer again."
+  exit 1
+fi
+OUT="$HOME/.config/plexpie"
+mkdir -p "$OUT"
+
+# Caldera's own service would start a second copy: PlexPie runs it instead.
+if systemctl --user is-active --quiet caldera-music 2>/dev/null; then
+  systemctl --user disable --now caldera-music >/dev/null 2>&1 || true
+fi
+
+# Keep any options Caldera's own service file uses, then choose the output ourselves.
+ARGS=()
+UNIT="$HOME/.config/systemd/user/caldera-music.service"
+if [ -f "$UNIT" ]; then
+  line=$(sed -n 's/^ExecStart=//p' "$UNIT" | head -1)
+  read -r -a parts <<< "$line"
+  skip=0
+  for p in "${parts[@]:1}"; do
+    if [ $skip = 1 ]; then skip=0; continue; fi
+    case "$p" in --device) skip=1 ;; --device=*) ;; *) ARGS+=("$p") ;; esac
+  done
+fi
+
+DEV="${CALDERA_DEVICE:-auto}"
+LIST=$(timeout 20 "$BIN" --list-devices 2>&1 || true)
+printf '%s\n' "$LIST" > "$OUT/caldera-devices.txt"
+case "$DEV" in
+  auto)
+    if printf '%s\n' "$LIST" | grep -qiw pipewire; then DEV=pipewire
+    elif printf '%s\n' "$LIST" | grep -qiw default; then DEV=default
+    else DEV=""; fi ;;
+  caldera) DEV="" ;;
+esac
+echo "${DEV:-Caldera's own choice}" > "$OUT/caldera-device"
+echo "Caldera Music output: ${DEV:-Caldera's own choice}"
+exec "$BIN" "${ARGS[@]}" ${DEV:+--device "$DEV"}

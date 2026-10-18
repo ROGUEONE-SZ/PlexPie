@@ -267,6 +267,34 @@ forwarding in the router.
 
 ---
 
+## Caldera Music
+
+Caldera Music is optional (Plex Labs). The full report (`tools/diagnose.sh`) has a **CALDERA MUSIC**
+section with the output it picked, whether it's signed in, and its log.
+
+### It isn't in Plexamp's speaker list
+
+1. Settings › Configuration › Caldera Music: is it on, signed in and running?
+2. "Not installed": run `bash configure.sh`, answer yes to Caldera Music, then `sudo bash install.sh`.
+3. "Not signed in": run the installer again from an interactive terminal (`ssh -t USER@ADDRESS`), it asks
+   you to sign in.
+4. "Not running": `journalctl -u plexpie-caldera -n 50`. Caldera needs a 64-bit Raspberry Pi OS.
+5. Same network rules as AirPlay: the Pi and your phone must be on the same network.
+
+### Caldera plays, but other apps are silent (or Caldera is silent)
+
+Only one app can use the DAC directly. PlexPie normally points Caldera at the shared output
+(`CALDERA_DEVICE="auto"`). If you changed it to `caldera`, change it back, run the installer again and
+reboot. To see the outputs Caldera found: `cat ~/.config/plexpie/caldera-devices.txt`. You can put one of
+those names in `CALDERA_DEVICE` too.
+
+### The screen doesn't show the track name
+
+The screen always shows *Playing via Caldera*. Track names show up when Caldera answers PlexPie's
+now-playing questions; if it doesn't, use Plexamp on your phone for the details.
+
+---
+
 ## Home Assistant
 
 ### Every PlexPie entity says "unavailable"

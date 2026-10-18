@@ -1,7 +1,7 @@
 # PlexPie
 
 Turn a Raspberry Pi with a touchscreen and a DAC into a one-screen music player:
-**Plexamp**, **AirPlay 2**, **Spotify Connect**, the **Apple Music** web player and **Music Assistant**, all
+**Plexamp**, **AirPlay 2**, **Spotify Connect**, the **Apple Music** web player, **Music Assistant** and **Caldera Music**, all
 on one launcher and all controllable from **Home Assistant**.
 
 > **New to Raspberry Pi?** Follow the **[step-by-step guide](docs/INSTALL.md)**: shopping list,
@@ -27,6 +27,7 @@ on one launcher and all controllable from **Home Assistant**.
 | **Bluetooth** | Any phone, tablet or computer can play to it: tap **Pair a device**, then pick the player in its Bluetooth settings |
 | **Apple Music** | music.apple.com on the screen (Chromium + Widevine), zoomed so it shows the full desktop layout |
 | **Music Assistant** | The Pi becomes a Music Assistant player (Squeezelite), and MA's own interface opens on the screen |
+| **Caldera** | Optional [Caldera Music](https://caldera.homes/music/headless/) (Plex Labs): the Pi joins your other Caldera speakers for multi-room, in sync, from Plexamp's speaker list. Shares the DAC with the other apps |
 | **Timer** | Workout timer: intervals (work / rest / rounds), countdown and stopwatch, with big digits and beeps |
 | **Home** | The launcher: now playing, volume, pause all, screen off, and your Home Assistant buttons |
 
@@ -155,7 +156,7 @@ Settings is laid out like an iPad: categories on the left, details on the right 
   <img src="docs/phone-guide-airplay.png" width="22%" alt="A setup guide on a phone">
 </p>
 
-- **Configuration:** every app in one list (Plexamp, Apple Music, AirPlay, Spotify, Bluetooth, Music Assistant, Home Assistant, Workout timer), each with its on/off switch, account status and sign-out, its own options, and a **Setup instructions** link. PlexPie never stores your passwords; each service signs in on its own page.
+- **Configuration:** every app in one list (Plexamp, Apple Music, AirPlay, Spotify, Bluetooth, Music Assistant, Caldera Music, Home Assistant, Workout timer), each with its on/off switch, account status and sign-out, its own options, and a **Setup instructions** link. PlexPie never stores your passwords; each service signs in on its own page.
 - **Screen:** sleep, brightness, show what's playing, swipe home, album-art colors, visualizer, night dimming, light sensor.
 - **Sound:** the equalizer, with a live curve of what it does.
 - **Network:** Wi-Fi on/off, current network, scan and join (the password goes to NetworkManager, not PlexPie).
@@ -257,6 +258,22 @@ provider. Your Pi then shows up as a player under the name you chose. If MA runs
 different subnet from the Pi, set its address in the wizard. When MA is off, its tile greys
 out, and the Pi reconnects by itself when MA comes back.
 
+## Caldera Music
+
+[Caldera Music](https://caldera.homes/music/headless/) is a free, lightweight Plex player from Plex Labs
+that plays in sync across rooms. Answer yes to **Add Caldera Music** in `configure.sh`; the installer runs
+Caldera's own installer and asks you to sign in to Plex once. The Pi then shows up in Plexamp's speaker list
+twice: **YourPlayer** (Plexamp on the screen) and **YourPlayer (Caldera)** for multi-room. When Caldera
+plays, the screen shows *Playing via Caldera*, and Pause all and the volume work as usual.
+
+<img src="docs/caldera.png" width="480" alt="Playing via Caldera on the touchscreen">
+
+By default PlexPie points Caldera at the shared sound output so it doesn't lock the other apps out of the
+DAC. `CALDERA_DEVICE="caldera"` in plexpie.conf lets Caldera pick its own output instead (often the DAC directly,
+bit-perfect, but then it's the only app that can play while it's running). Update Caldera with
+`UPDATE_CALDERA=1 sudo -E bash install.sh`. Caldera is a Plex Labs project, so it's new and still changing;
+support for it is on the [Plex forums](https://forums.plex.tv/c/plex-labs/16).
+
 ## Good to know
 
 - **Spotify Connect** uses an unofficial protocol: if Spotify changes something, it may stop working until go-librespot is updated (`UPDATE_SPOTIFY=1 sudo -E bash install.sh`). Quality is up to 320 kbps.
@@ -282,6 +299,7 @@ For a read-only report from another computer: `curl -fsSL https://raw.githubuser
 | AirPlay | `journalctl -u plexpie-airplay -f` |
 | Music Assistant player | `journalctl -u plexpie-squeezelite -f` |
 | Spotify Connect | `journalctl -u plexpie-spotify -f` |
+| Caldera Music | `journalctl -u plexpie-caldera -f` |
 | Updates | `/var/log/plexpie-update.log` |
 | Plexamp | `journalctl -u plexamp -f` |
 | Audio devices | `wpctl status` |
@@ -320,6 +338,7 @@ and keeps its own license and terms:
 - [shairport-sync](https://github.com/mikebrady/shairport-sync) and [nqptp](https://github.com/mikebrady/nqptp) by Mike Brady, for AirPlay 2
 - [go-librespot](https://github.com/devgianlu/go-librespot), an unofficial Spotify Connect client
 - [Squeezelite](https://github.com/ralph-irving/squeezelite) and [Music Assistant](https://music-assistant.io)
+- [Caldera Music](https://caldera.homes/music/headless/) by Plex Labs (optional), downloaded from Caldera during install
 - [PipeWire](https://pipewire.org), WirePlumber, [BlueZ](https://www.bluez.org), Chromium and Raspberry Pi OS
 - [QR Code Generator](https://github.com/kazuhikoarase/qrcode-generator) by Kazuhiko Arase (MIT), included in `files/www/qrcode.js`
 - Ideas and inspiration from years of Raspberry Pi audio projects, including Volumio, moOde and the

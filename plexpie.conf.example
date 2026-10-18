@@ -15,6 +15,10 @@ ENABLE_APPLE_MUSIC_WEB="yes"
 ENABLE_MUSIC_ASSISTANT="no"
 ENABLE_SPOTIFY="no"
 ENABLE_SPOTIFY_WEB="no"
+# Caldera Music (Plex Labs): multi-room with other Caldera speakers; shows up in Plexamp's speaker list
+ENABLE_CALDERA="no"
+# Where Caldera plays: auto = shared with the other sources, caldera = Caldera's own pick (often the DAC alone)
+CALDERA_DEVICE="auto"
 # A push button between pins 5 and 6 (GPIO3 and ground) shuts the Pi down and starts it again
 # (leave "no" if a DAC HAT or other add-on board uses those pins)
 POWER_BUTTON="no"

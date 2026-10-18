@@ -1,0 +1,22 @@
+[Unit]
+Description=PlexPie Caldera Music player (Plex Labs)
+After=network-online.target user@@UID@.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=@USER@
+Group=@USER@
+Environment=HOME=@HOME@
+Environment=XDG_RUNTIME_DIR=/run/user/@UID@
+Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/@UID@/bus
+EnvironmentFile=/etc/plexpie/plexpie.conf
+EnvironmentFile=-@HOME@/.config/plexpie/settings.env
+# Only when switched on (Settings -> Configuration -> Caldera Music)
+ExecCondition=/bin/sh -c '[ "$${ENABLE_CALDERA:-no}" = yes ]'
+ExecStart=/opt/plexpie/caldera-run
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

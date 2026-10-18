@@ -240,6 +240,16 @@
         <div class="group" data-guide="ma"></div>
       </section>
 
+      <section data-page="app-caldera" data-parent="config" data-title="Caldera Music">
+        <div class="group"><div class="row"><div class="t"><b>Caldera Music</b><small>Plays in sync with other Caldera speakers. Pick “<span data-name></span> (Caldera)” in Plexamp's speaker list.</small></div>
+          <label class="sw"><input type="checkbox" id="ENABLE_CALDERA"><span></span></label></div>
+          <div class="row"><span class="dot" id="acct-caldera-dot"></span><div class="t"><b>Status</b><small id="acct-caldera"></small></div></div>
+          <div class="row"><div class="t"><b>Sound output</b><small id="calderadev"></small></div></div></div>
+        <div class="group hidden" id="caldera-missing"><div class="row"><div class="t"><b>Not installed yet</b>
+          <small>On the Pi, run <code>bash configure.sh</code>, answer yes to Caldera Music, then <code>sudo bash install.sh</code>. It asks you to sign in to Plex once.</small></div></div></div>
+        <div class="group" data-guide="caldera"></div>
+      </section>
+
       <section data-page="app-ha" data-parent="config" data-title="Home Assistant">
         <div class="group"><div class="row"><span class="dot" id="acct-ha-dot"></span><div class="t"><b>Connection</b><small id="acct-ha"></small></div></div></div>
         <h3>MQTT (for controls and automations)</h3>
@@ -418,6 +428,7 @@ const I = {
   spotify: svg('<circle cx="12" cy="12" r="10"/><path d="M7 9.5c3.5-1 7-.6 10 1M7.5 13c3-.8 5.6-.4 8 .8M8 16.3c2.4-.6 4.4-.3 6 .6"/>'),
   bt: svg('<path d="m7 7 10 10-5 5V2l5 5L7 17"/>'),
   ma: svg('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3"/>'),
+  caldera: svg('<rect x="3" y="7" width="7" height="12" rx="1.5"/><rect x="14" y="7" width="7" height="12" rx="1.5"/><circle cx="6.5" cy="14.5" r="1.8"/><circle cx="17.5" cy="14.5" r="1.8"/><path d="M8.5 4.5c2-1.3 5-1.3 7 0"/>'),
   ha: svg('<path d="M3 11 12 3l9 8"/><path d="M5 9.5V20h14V9.5"/><circle cx="12" cy="14" r="2"/>'),
   timer: svg('<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6"/>'),
   plex: svg('<path d="M8 4h4l5 8-5 8H8l5-8z"/>'),
@@ -450,6 +461,7 @@ const APPS = [
   ["spotify", "Spotify", I.spotify, "#1db954", "music", ["ENABLE_SPOTIFY", "ENABLE_SPOTIFY_WEB"]],
   ["bluetooth", "Bluetooth", I.bt, "#0a6cff", "music", "ENABLE_BLUETOOTH"],
   ["ma", "Music Assistant", I.ma, "#18a0e0", "music", "ENABLE_MUSIC_ASSISTANT"],
+  ["caldera", "Caldera Music", I.caldera, "#e8742c", "music", "ENABLE_CALDERA"],
   ["ha", "Home Assistant", I.ha, "#18bcf2", "home", null],
   ["timer", "Workout timer", I.timer, "#ff9f0a", "home", "ENABLE_TIMER"],
 ];
@@ -461,6 +473,7 @@ const GUIDES = [
   ["spotify", "Spotify", "Spotify Connect and the web player", I.spotify, "#1db954"],
   ["bluetooth", "Bluetooth", "Pair a phone, tablet or computer", I.bt, "#0a6cff"],
   ["ma", "Music Assistant", "Use it as a Music Assistant speaker", I.ma, "#18a0e0"],
+  ["caldera", "Caldera Music", "Multi-room with other Caldera speakers", I.caldera, "#e8742c"],
   ["ha", "Home Assistant", "Controls, dashboard tile, launcher buttons", I.ha, "#18bcf2"],
   ["timer", "Workout timer", "Intervals, countdown, stopwatch", I.timer, "#ff9f0a"],
   ["eq", "Equalizer", "Presets and room correction", I.eq, "#ff375f"],
@@ -470,13 +483,13 @@ const GUIDES = [
   ["backup", "Backup and restore", "Keep your settings safe", I.backup, "#ff9f0a"],
   ["help", "Troubleshooting", "Quick fixes for common problems", I.update, "#8e8e93"],
 ];
-const FIELDS = ["ENABLE_APPLE_MUSIC_WEB", "ENABLE_AIRPLAY", "ENABLE_SPOTIFY", "ENABLE_SPOTIFY_WEB", "ENABLE_MUSIC_ASSISTANT",
+const FIELDS = ["ENABLE_APPLE_MUSIC_WEB", "ENABLE_AIRPLAY", "ENABLE_SPOTIFY", "ENABLE_SPOTIFY_WEB", "ENABLE_MUSIC_ASSISTANT", "ENABLE_CALDERA",
   "ENABLE_BLUETOOTH", "ENABLE_TIMER", "ENABLE_HA_DASHBOARD",
   "SCREEN_OFF_AFTER_SECS", "SCREEN_BRIGHTNESS", "AUTO_SHOW", "SWIPE_HOME", "MQTT_HOST", "MQTT_PORT",
   "MQTT_USER", "MQTT_PASS", "SHORTCUTS", "MA_HOST", "MA_URL", "PHONE_ACCESS",
   "EQ_ENABLED", "EQ_PRESET", "EQ_BANDS", "EQ_CUSTOM_TEXT", "THEME_FROM_ART", "VISUALIZER", "NIGHT_DIM",
   "NIGHT_START", "NIGHT_END", "NIGHT_BRIGHTNESS", "AUTO_BRIGHTNESS", "HA_URL", "HA_DASHBOARD", "SCREEN_SHARING", "HOME_BUTTON"];
-const INSTALL_FLAG = {apple: null, airplay: "ENABLE_AIRPLAY", spotify: "ENABLE_SPOTIFY", bluetooth: "ENABLE_BLUETOOTH", ma: "ENABLE_MUSIC_ASSISTANT"};
+const INSTALL_FLAG = {apple: null, airplay: "ENABLE_AIRPLAY", spotify: "ENABLE_SPOTIFY", bluetooth: "ENABLE_BLUETOOTH", ma: "ENABLE_MUSIC_ASSISTANT", caldera: "ENABLE_CALDERA"};
 let data = null, page = null, dirty = false;
 const wide = () => matchMedia("(min-width: 700px)").matches;
 
@@ -516,6 +529,8 @@ function appState(id) {
   if (id === "apple") return ac.ok ? "On · signed in" : ac.ok === false ? "On · not signed in" : "On";
   if (id === "bluetooth") { const b = data.bluetooth || {}; return b.connected ? `On · ${b.connected}` : "On"; }
   if (id === "ma") return ac.ok ? "On · server reachable" : "On · server not reachable";
+  if (id === "caldera") { const c = data.caldera || {};
+    return !c.linked ? "On · not signed in" : c.running ? "On · running" : "On · not running"; }
   return "On";
 }
 function navRow(id, name, icon, color, sub, extra = "") {
@@ -587,12 +602,16 @@ function render() {
   const sel = $("SCREEN_OFF_AFTER_SECS");
   if (![...sel.options].some(o => o.value === String(v.SCREEN_OFF_AFTER_SECS)))
     sel.insertAdjacentHTML("beforeend", `<option value="${esc(v.SCREEN_OFF_AFTER_SECS)}">${esc(v.SCREEN_OFF_AFTER_SECS)} seconds</option>`), sel.value = v.SCREEN_OFF_AFTER_SECS;
-  for (const id of ["plexamp", "apple", "spotify", "ma", "ha"]) {
+  for (const id of ["plexamp", "apple", "spotify", "ma", "caldera", "ha"]) {
     const a = acct(id), el = $("acct-" + id); if (!el) continue;
     el.textContent = a.status || (id === "apple" ? "Turn Apple Music on to sign in" : "Off");
     $("acct-" + id + "-dot").className = "dot " + (a.ok === true ? "ok" : a.ok === false ? "no" : "");
   }
   $("passnote").textContent = v.MQTT_PASS_SET ? "Saved · leave empty to keep it" : "";
+  const cal = data.caldera || {};
+  $("calderadev").textContent = !cal.device ? "Chosen when it starts"
+    : /^(pipewire|default)$/.test(cal.device) ? "Shared with the other apps" : cal.device;
+  $("caldera-missing").classList.toggle("hidden", data.installed.ENABLE_CALDERA !== false);
   $("phoneurl").textContent = data.phone_url || "(no network)";
   $("pinshow").textContent = v.PHONE_PIN || "";
   $("ver").textContent = data.version;

@@ -232,6 +232,19 @@
     <div class="tip">The dot next to <b>Server</b> turns green when the player can reach Music Assistant.</div>
   </section>
 
+  <!-- ===================================================================== caldera -->
+  <section class="g" id="caldera" data-group="2" data-sub="Multi-room with other Caldera speakers">
+    <h2>Caldera Music</h2>
+    <p class="sub">Caldera Music is a free Plex Labs player. With it, the player shows up in Plexamp's speaker list and can play in sync with other Caldera speakers around the house.</p>
+    <ol>
+      <li>On the Pi, run <code>bash configure.sh</code> and answer <b>yes</b> to <b>Add Caldera Music</b>, then <code>sudo bash install.sh</code>.</li>
+      <li>The installer downloads Caldera Music and asks you to sign in to Plex once. Follow what it shows on the screen.</li>
+      <li>In <b>Plexamp</b> on your phone, tablet or computer, tap the speaker icon and pick <b><span data-name>your player</span> (Caldera)</b>. To play in more rooms, add your other Caldera speakers there too.</li>
+      <li>When it plays, the screen shows <b>Playing via Caldera</b>. <span class="k">Pause all</span> and the volume work as usual.</li>
+    </ol>
+    <div class="tip">You'll see the player twice in Plexamp: <b><span data-name>your player</span></b> is Plexamp on the screen, <b>(Caldera)</b> is the multi-room one. Switch Caldera off any time in Settings › Configuration › Caldera Music. It shares the sound output with the other apps; for Caldera alone on the DAC, set <code>CALDERA_DEVICE="caldera"</code> in plexpie.conf and run the installer again.</div>
+  </section>
+
   <!-- ===================================================================== ha -->
   <section class="g" id="ha" data-group="2" data-sub="Controls, dashboard tile, launcher buttons">
     <h2>Home Assistant</h2>
@@ -347,6 +360,8 @@
       <tr><td>Home Assistant shows "unavailable"</td><td>Wait two minutes; check the green dot in Configuration › Home Assistant.</td></tr>
       <tr><td>Receiver or smart plug stops responding</td><td>Give it a fixed address in the router; unplug the receiver for a minute.</td></tr>
       <tr><td>Screen black</td><td>Tap it (asleep). Still black: unplug for 10 seconds.</td></tr>
+      <tr><td>Caldera isn't in Plexamp's speaker list</td><td>Settings › Configuration › Caldera Music: check it's on and signed in. Not signed in: run the installer again from a computer (<code>ssh -t</code>). Caldera needs a 64-bit Raspberry Pi OS on a Pi 4 or 5.</td></tr>
+      <tr><td>Caldera plays, but other apps go silent (or the other way round)</td><td>Caldera has the DAC to itself. Set <code>CALDERA_DEVICE="auto"</code> in plexpie.conf, run the installer again and reboot.</td></tr>
     </table>
     <div class="tip"><b>Report for help:</b> from a computer, run<br><code>curl -fsSL https://raw.githubusercontent.com/ROGUEONE-SZ/plexamp-raspberry-pi-install/main/tools/diag.sh | ssh USER@ADDRESS bash</code><br>and attach the output to an issue on GitHub.</div>
   </section>

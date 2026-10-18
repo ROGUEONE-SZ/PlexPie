@@ -25,7 +25,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 
-VERSION = "2.12.0"
+VERSION = "2.13.0"
 CONF_PATH = os.environ.get("PLEXPIE_CONF", "/etc/plexpie/plexpie.conf")
 WWW = os.path.join(os.path.dirname(os.path.abspath(__file__)), "www")
 HTTP_PORT = int(os.environ.get("PLEXPIE_HTTP_PORT", "8080"))
@@ -62,7 +62,7 @@ SETTINGS_ENV = os.path.join(SETTINGS_DIR, "settings.env")      # read by the sys
 # What the Settings page may change, and how
 EDITABLE = {
     "ENABLE_APPLE_MUSIC_WEB": "bool", "ENABLE_AIRPLAY": "bool", "ENABLE_SPOTIFY": "bool",
-    "ENABLE_SPOTIFY_WEB": "bool", "ENABLE_MUSIC_ASSISTANT": "bool", "ENABLE_TIMER": "bool", "SHORTCUTS": "str",
+    "ENABLE_SPOTIFY_WEB": "bool", "ENABLE_MUSIC_ASSISTANT": "bool", "ENABLE_CALDERA": "bool", "ENABLE_TIMER": "bool", "SHORTCUTS": "str",
     "VISUALIZER": "str", "THEME_FROM_ART": "bool", "NIGHT_DIM": "bool", "NIGHT_START": "str", "NIGHT_END": "str",
     "NIGHT_BRIGHTNESS": "int", "AUTO_BRIGHTNESS": "bool", "ENABLE_HA_DASHBOARD": "bool", "HA_URL": "str", "HA_DASHBOARD": "str",
     "ENABLE_BLUETOOTH": "bool", "EQ_ENABLED": "bool", "EQ_PRESET": "str", "EQ_BANDS": "str", "EQ_CUSTOM": "str",
@@ -128,6 +128,7 @@ SOURCES = {
     "spotify_web": {"name": "Spotify web", "url": "https://open.spotify.com/", "hidden": True},
     "bluetooth": {"name": "Bluetooth", "url": f"http://127.0.0.1:{HTTP_PORT}/bluetooth"},
     "ma": {"name": "Music Assistant", "url": MA_URL + "/"},
+    "caldera": {"name": "Caldera", "url": f"http://127.0.0.1:{HTTP_PORT}/caldera"},
     "timer": {"name": "Timer", "url": f"http://127.0.0.1:{HTTP_PORT}/timer"},
     "alert": {"name": "Alert", "url": f"http://127.0.0.1:{HTTP_PORT}/alert", "hidden": True},
     "settings": {"name": "Settings", "url": f"http://127.0.0.1:{HTTP_PORT}/settings", "hidden": True},
@@ -138,7 +139,7 @@ if HA_BASE and cfg_yes("ENABLE_HA_DASHBOARD", "yes"):
 for key, flag, default in (("airplay", "ENABLE_AIRPLAY", "yes"), ("ma", "ENABLE_MUSIC_ASSISTANT", "yes"),
                            ("apple", "ENABLE_APPLE_MUSIC_WEB", "yes"), ("spotify", "ENABLE_SPOTIFY", "no"),
                            ("spotify_web", "ENABLE_SPOTIFY_WEB", "no"), ("timer", "ENABLE_TIMER", "yes"),
-                           ("bluetooth", "ENABLE_BLUETOOTH", "yes")):
+                           ("bluetooth", "ENABLE_BLUETOOTH", "yes"), ("caldera", "ENABLE_CALDERA", "no")):
     if not cfg_yes(flag, default):
         SOURCES.pop(key)
 if "spotify" not in SOURCES:
@@ -166,7 +167,7 @@ def source_for_url(url):
     if u.netloc == f"127.0.0.1:{HTTP_PORT}":
         if u.path.startswith("/guide"):
             return "settings"                    # the setup guides open inside the Settings tab
-        for key in ("airplay", "spotify", "settings", "timer", "alert", "bluetooth"):
+        for key in ("airplay", "spotify", "settings", "timer", "alert", "bluetooth", "caldera"):
             if u.path.startswith("/" + key):
                 return key
         return "home"
@@ -312,12 +313,12 @@ def state_json():
             "brightness": ST.brightness,
             "volume": ST.volume,
             "ma_up": ST.ma_up,
-            "home_button": cfg("HOME_BUTTON_POSITION", "top-left"),
-            "home_autohide": cfg_int("HOME_BUTTON_AUTOHIDE_SECS", 5),
             "text_focus": ST.text_focus,
             "text_y": ST.text_y,
             "shortcuts": [{"id": k, **v} for k, v in SHORTCUTS.items()],
             "alert": bool(ST.alert),
+            "caldera": dict(ST.np.get("caldera", {}), playing=bool(ST.playing.get("caldera")),
+                            remote=bool(CALDERA.base)),
             "bluetooth": dict({k: v for k, v in ST.bt.items() if k != "player"},
                               playing=bool(ST.playing.get("bluetooth"))),
             "eq": cfg_yes("EQ_ENABLED", "no"),
@@ -647,6 +648,87 @@ class Plexamp:
 PLEX = Plexamp()
 
 
+# ---------------------------------------------------------------- Caldera Music
+CALDERA_DIR = os.path.expanduser("~/caldera-music")
+
+
+def caldera_bin():
+    for p in (os.path.join(CALDERA_DIR, "caldera-music"), os.path.join(CALDERA_DIR, "bin", "caldera-music")):
+        if os.path.isfile(p) and os.access(p, os.X_OK):
+            return p
+    return None
+
+
+def caldera_pids():
+    out = []
+    for d in glob.glob("/proc/[0-9]*"):
+        try:
+            with open(d + "/comm") as f:
+                if "caldera" in f.read().lower():
+                    out.append(int(d[6:]))
+        except (OSError, ValueError):
+            pass
+    return out
+
+
+def caldera_on_dac(pids):
+    """True if Caldera has the DAC open directly (not through the shared sound system) and is playing."""
+    for st in glob.glob("/proc/asound/card*/pcm*p/sub*/status"):
+        txt = read_file(st) or ""
+        m = re.search(r"owner_pid\s*:\s*(\d+)", txt)
+        if m and int(m.group(1)) in pids and "RUNNING" in txt:
+            return True
+    return False
+
+
+class Caldera(Plexamp):
+    """Caldera Music answers like a Plex player. Its address isn't documented, so look for it among
+    the ports the caldera process listens on. Track details are a bonus: playing/stopped comes
+    from the sound system either way."""
+    base = None
+    next_look = 0
+
+    def _q(self, path, timeout=3):
+        if not self.base:
+            raise OSError("caldera player address unknown")
+        Plexamp._cmd += 1
+        sep = "&" if "?" in path else "?"
+        return http_get(f"{self.base}{path}{sep}commandID={Plexamp._cmd}", timeout, headers=self.HEADERS)
+
+    def find(self, pids):
+        if self.base or time.time() < self.next_look or not pids:
+            return
+        self.next_look = time.time() + 60
+        ports = set()
+        for line in (run(["ss", "-ltnpH"], 5) or "").splitlines():
+            if "caldera" not in line.lower():
+                continue
+            m = re.search(r":(\d+)\s", line.split()[3] + " ") if len(line.split()) > 3 else None
+            if m:
+                ports.add(int(m.group(1)))
+        for port in sorted(ports):
+            try:
+                body = http_get(f"http://127.0.0.1:{port}/player/timeline/poll?wait=0&type=music", 2,
+                                headers=self.HEADERS)
+                if b"Timeline" in (body if isinstance(body, bytes) else body.encode()):
+                    self.base = f"http://127.0.0.1:{port}"
+                    log.info("caldera: player found on port %s", port)
+                    return
+            except Exception:
+                pass
+
+    def poll(self):
+        if not self.base:
+            return None, None
+        playing, md = Plexamp.poll(self)
+        if playing is None:
+            self.base = None                  # restarted on another port: look again
+        return playing, md
+
+
+CALDERA = Caldera()
+
+
 # ----------------------------------------------------------------------- screen
 class Screen:
     def __init__(self):
@@ -736,8 +818,8 @@ def on_started(src):
             pause_source(other)
     # Show the app that just started playing (e.g. Plexamp started from the phone).
     auto = cfg("AUTO_SHOW_SOURCES", "plexamp airplay ma spotify bluetooth").replace(",", " ").split()
-    if auto and src == "bluetooth":
-        auto.append("bluetooth")
+    if auto and src in ("bluetooth", "caldera"):    # newer sources follow the on/off switch
+        auto.append(src)
     if src == "airplay" and not cfg_yes("AUTO_SHOW_AIRPLAY"):
         auto = [a for a in auto if a != "airplay"]
     with ST.lock:
@@ -759,6 +841,12 @@ def pause_source(src):
     elif src == "ma":
         sudo("/usr/bin/systemctl", "restart", "plexpie-squeezelite")
         set_playing("ma", False)
+    elif src == "caldera":
+        if CALDERA.base:
+            CALDERA.pause()
+        else:                                 # no remote control found: stop the sound by restarting it
+            sudo("/usr/bin/systemctl", "restart", "plexpie-caldera")
+            set_playing("caldera", False)
     elif src == "spotify":
         try:
             http_get(SPOTIFY_API + "/player/pause", 3, method="POST")
@@ -1479,6 +1567,20 @@ def set_volume(value):
     mark_changed()
 
 
+def poll_caldera(streams):
+    pids = caldera_pids()
+    CALDERA.find(pids)
+    playing, md = CALDERA.poll()
+    if playing is None:
+        playing = any(v for k, v in streams.items() if "caldera" in k) or (bool(pids) and caldera_on_dac(pids))
+    set_playing("caldera", playing)
+    with ST.lock:
+        new = md or (ST.np.get("caldera") if playing else {}) or {}
+        if ST.np.get("caldera") != new:
+            ST.np["caldera"] = new
+            mark_changed()
+
+
 def pw_streams():
     """binary name -> True if it has a running PipeWire output stream."""
     try:
@@ -1742,8 +1844,12 @@ def fast_poller():
                         if ST.np.get("plexamp") != md:
                             ST.np["plexamp"] = md
                             mark_changed()
+            if "ma" in SOURCES or "caldera" in SOURCES:
+                streams = pw_streams()
             if "ma" in SOURCES:
-                set_playing("ma", pw_streams().get("squeezelite", False))
+                set_playing("ma", streams.get("squeezelite", False))
+            if "caldera" in SOURCES:
+                poll_caldera(streams)
             if "spotify" in SOURCES:
                 poll_spotify()
             if "bluetooth" in SOURCES:
@@ -2030,9 +2136,12 @@ def watchdog():
 # --------------------------------------------------------------------- settings
 OPTIONAL_UNITS = {"ENABLE_AIRPLAY": "plexpie-airplay", "ENABLE_SPOTIFY": "plexpie-spotify",
                   "ENABLE_BLUETOOTH": "plexpie-bluetooth",
-                  "ENABLE_MUSIC_ASSISTANT": "plexpie-squeezelite"}
+                  "ENABLE_MUSIC_ASSISTANT": "plexpie-squeezelite", "ENABLE_CALDERA": "plexpie-caldera"}
 OPTIONAL_DEFAULTS = {"ENABLE_AIRPLAY": "yes", "ENABLE_SPOTIFY": "no", "ENABLE_MUSIC_ASSISTANT": "yes",
+                     "ENABLE_CALDERA": "no",
                      "ENABLE_BLUETOOTH": "yes"}
+CALDERA_LINKED = os.path.join(SETTINGS_DIR, "caldera-linked")       # written by the installer after sign-in
+CALDERA_DEVICE_FILE = os.path.join(SETTINGS_DIR, "caldera-device")  # which output caldera-run picked
 SESSIONS_FILE = os.path.join(SETTINGS_DIR, "sessions.json")
 SESSION_DAYS = 365                # a device stays signed in for a year (renewed on every visit)
 
@@ -2279,6 +2388,12 @@ def accounts():
     if "ma" in SOURCES:
         out.append({"id": "ma", "name": "Music Assistant",
                     "status": "Reachable" if ST.ma_up else "Not reachable", "ok": ST.ma_up})
+    if "caldera" in SOURCES:
+        linked = os.path.exists(CALDERA_LINKED)
+        running = bool(caldera_pids())
+        out.append({"id": "caldera", "name": "Caldera Music",
+                    "status": ("Running" if running else "Not running") + ("" if linked else ": not signed in yet"),
+                    "ok": running and linked})
     out.append({"id": "ha", "name": "Home Assistant",
                 "status": "Connected" if HA.connected else ("Not set up" if not cfg("MQTT_HOST") else "Not connected"),
                 "ok": HA.connected})
@@ -2428,7 +2543,7 @@ def settings_json(local, host=None, token=None):
         elif kind == "bool":
             vals[k] = cfg_yes(k, {"ENABLE_SPOTIFY": "no", "ENABLE_SPOTIFY_WEB": "no", "EQ_ENABLED": "no",
                                   "NIGHT_DIM": "no", "AUTO_BRIGHTNESS": "no",
-                                  "PHONE_ACCESS": "yes", "SCREEN_SHARING": "no"}.get(k, "yes"))
+                                  "PHONE_ACCESS": "yes", "SCREEN_SHARING": "no", "ENABLE_CALDERA": "no"}.get(k, "yes"))
         else:
             vals[k] = cfg(k)
     vals["MA_HOST"] = vals.get("MA_HOST") or cfg("HA_HOST")
@@ -2446,6 +2561,7 @@ def settings_json(local, host=None, token=None):
     vals["EQ_CUSTOM_TEXT"] = filters_to_apo(parse_compact(cfg("EQ_CUSTOM")))
     installed = {flag: subprocess.run(["systemctl", "cat", unit], capture_output=True).returncode == 0
                  for flag, unit in OPTIONAL_UNITS.items()}
+    installed["ENABLE_CALDERA"] = installed.get("ENABLE_CALDERA", False) and caldera_bin() is not None
     addr = lan_address()
     ok, wifi = admin("wifi-status", timeout=10)
     try:
@@ -2461,6 +2577,8 @@ def settings_json(local, host=None, token=None):
             "eq_presets": {k: {"name": v["name"], "filters": v["filters"]} for k, v in EQ_PRESETS.items()}, "updates": update_info(), "installed": installed, "accounts": accounts(), "player_name": PLAYER_NAME,
             "version": VERSION, "devices": devices_json(token), "address_change": dict(ADDRESS_CHANGE),
             "vnc": {"on": screen_sharing_on(), "address": addr},
+            "caldera": {"linked": os.path.exists(CALDERA_LINKED), "running": bool(caldera_pids()),
+                        "remote": bool(CALDERA.base), "device": (read_file(CALDERA_DEVICE_FILE) or "").strip()},
             "paused": os.path.exists(PAUSED_FLAG),
             "desktop": subprocess.run(["systemctl", "cat", "lightdm.service"], capture_output=True).returncode == 0, "sources": sorted(SOURCES),
             "phone_url": f"http://{host}/settings" if host else (f"http://{addr}:{HTTP_PORT}/settings" if addr else ""),
@@ -2578,7 +2696,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return
         if path in ("/", "/index.html"):
             return self._file("index.html")
-        if path in ("/airplay", "/spotify", "/bluetooth"):
+        if path in ("/airplay", "/spotify", "/bluetooth", "/caldera"):
             return self._file("nowplaying.html")
         if path == "/settings":
             return self._file("settings.html")

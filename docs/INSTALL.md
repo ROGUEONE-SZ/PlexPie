@@ -132,6 +132,7 @@ shown in brackets, or type your own:
 | Add a Spotify Connect receiver? | `yes` if you have Spotify Premium |
 | Let any phone, tablet or computer play to it over Bluetooth? | `yes` (it's only visible when you tap "Pair a device") |
 | Add Music Assistant? | `no`, unless you already run a Music Assistant server |
+| Add Caldera Music? | `yes` if you have (or want) other Caldera speakers for multi-room; it signs in to Plex once during the install |
 | Connect to Home Assistant? | `no`, unless you use Home Assistant (you can add it later) |
 | Turn the screen off after how many idle seconds? | `60` is a good start |
 

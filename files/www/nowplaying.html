@@ -61,6 +61,7 @@
   body.full #viz { order: 9; flex: 1; height: auto; margin-top: 18px; }
   body.full h1 { font-size: 30px; margin: 10px 0 4px; }
   body.bluetooth .art { background: linear-gradient(145deg, #2a3170, #101018); }
+  body.caldera .art { background: linear-gradient(145deg, #7a3a12, #101018); }
   .btn.ghost { background: rgba(255,255,255,.1); color: var(--text); margin-left: 8px; }
   html, body { touch-action: pan-x pan-y; } /* plexpie-nopinch: no accidental pinch-zoom on the touchscreen */
   * { scrollbar-width: none; } ::-webkit-scrollbar { display: none; } /* plexpie-noscrollbar: touch scrolling, no desktop scroll bars */
@@ -88,7 +89,8 @@
 </div>
 <script>
 const $ = (id) => document.getElementById(id);
-const SRC = location.pathname.startsWith("/spotify") ? "spotify" : location.pathname.startsWith("/bluetooth") ? "bluetooth" : "airplay";
+const SRC = location.pathname.startsWith("/spotify") ? "spotify" : location.pathname.startsWith("/bluetooth") ? "bluetooth"
+  : location.pathname.startsWith("/caldera") ? "caldera" : "airplay";
 document.body.classList.add(SRC);
 let artKey = null;
 
@@ -96,6 +98,8 @@ const ICON_SPOTIFY = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
 const ICON_BT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7l10 10-5 5V2l5 5L7 17"/></svg>';
 if (SRC === "spotify") document.querySelector(".art svg").outerHTML = ICON_SPOTIFY;
 if (SRC === "bluetooth") document.querySelector(".art svg").outerHTML = ICON_BT;
+const ICON_CALDERA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="7" height="12" rx="1.5"/><rect x="14" y="7" width="7" height="12" rx="1.5"/><circle cx="6.5" cy="14.5" r="1.8"/><circle cx="17.5" cy="14.5" r="1.8"/><path d="M8.5 4.5c2-1.3 5-1.3 7 0"/></svg>';
+if (SRC === "caldera") document.querySelector(".art svg").outerHTML = ICON_CALDERA;
 const btPost = (action) => fetch("/api/bluetooth", {method: "POST", headers: {"Content-Type": "application/json"},
   body: JSON.stringify({action})}).then(poll);
 $("pair").onclick = () => btPost("pair");
@@ -129,7 +133,7 @@ function theme(s) {
   document.body.classList.toggle("themed", !!s.accent);
   if (s.accent) document.body.style.setProperty("--art", s.accent);
   mode = s.visualizer || "bars";
-  const playing = !!((SRC === "bluetooth" ? s.bluetooth : SRC === "spotify" ? s.spotify : s.airplay) || {}).playing;
+  const playing = !!((SRC === "bluetooth" ? s.bluetooth : SRC === "spotify" ? s.spotify : SRC === "caldera" ? s.caldera : s.airplay) || {}).playing;
   const want = mode !== "off" && playing;
   document.body.classList.toggle("viz", want);
   if (!want) document.body.classList.remove("full");
@@ -165,9 +169,22 @@ function draw() {
 }
 requestAnimationFrame(draw);
 
+function renderCaldera(s) {
+  const c = s.caldera || {};
+  const has = !!(c.title || c.artist);
+  $("info").classList.toggle("playing", !!c.playing);
+  $("status").textContent = c.playing ? "Playing via Caldera" : (has ? "Paused" : "Ready for Caldera");
+  $("title").textContent = has ? (c.title || "Unknown track") : (c.playing ? "Caldera Music" : s.player_name);
+  $("artist").textContent = c.artist || "";
+  $("album").textContent = c.album || "";
+  $("fmt").textContent = ""; $("fmt").className = "fmt";
+  $("hint").innerHTML = (has || c.playing) ? "" : `In <b>Plexamp</b> on your phone, tablet or computer, tap the speaker icon and pick <b>${s.player_name} (Caldera)</b>. Other Caldera speakers can join it there for multi-room.`;
+}
+
 function render(s) {
   theme(s);
   if (SRC === "bluetooth") return renderBt(s);
+  if (SRC === "caldera") return renderCaldera(s);
   const a = (SRC === "spotify" ? s.spotify : s.airplay) || {};
   const has = !!(a.title || a.artist);
   const via = SRC === "spotify" ? "Spotify Connect" : "AirPlay";

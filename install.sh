@@ -293,12 +293,57 @@ if [ -x /usr/local/bin/go-librespot ]; then
   ok "Spotify device name: $PLAYER_NAME"
 fi
 
+# ------------------------------------------------------------ Caldera Music
+# Optional. Caldera's own installer puts it in ~/caldera-music; PlexPie runs it as plexpie-caldera
+# on the shared sound output, so it doesn't take the DAC away from the other sources.
+if yes_ "${ENABLE_CALDERA:-no}"; then
+  step "Caldera Music"
+  cbin() { for b in "$UHOME/caldera-music/caldera-music" "$UHOME/caldera-music/bin/caldera-music"; do
+             [ -x "$b" ] && { echo "$b"; return; }; done; }
+  if [ -z "$(cbin)" ]; then
+    as_user bash -c 'cd "$HOME" && curl -fsSL https://releases.caldera.homes/music/headless/install.sh | bash' \
+      || note "Caldera's installer reported a problem (details above)."
+  elif [ -n "${UPDATE_CALDERA:-}" ]; then
+    as_user bash -c 'cd "$HOME" && curl -fsSL https://releases.caldera.homes/music/headless/upgrade.sh | bash' || true
+  fi
+  CBIN=$(cbin)
+  if [ -z "$CBIN" ]; then
+    note "Caldera Music didn't install, so it stays off. Run this installer again to retry."
+  else
+    ok "Caldera Music installed"
+    # PlexPie starts it (plexpie-caldera); Caldera's own service would be a second copy.
+    as_user systemctl --user disable --now caldera-music >/dev/null 2>&1 || true
+    LINKED="$UHOME/.config/plexpie/caldera-linked"
+    install -d -o "$U" -g "$U" "$UHOME/.config/plexpie"
+    if [ -f "$LINKED" ]; then
+      ok "Caldera Music is signed in"
+    elif [ -t 0 ]; then
+      echo
+      echo "    Caldera Music needs to be linked to your Plex account once."
+      echo "    Follow the steps it shows (usually a code to enter at plex.tv/link)."
+      echo "    When it says you're signed in, press Ctrl+C if it doesn't return by itself."
+      echo
+      if as_user "$CBIN" --login --player-name "$PLAYER_NAME (Caldera)" </dev/tty >/dev/tty 2>&1; then
+        as_user touch "$LINKED"; ok "Caldera Music linked"
+      else
+        read -r -p "    Did Caldera say you're signed in? [y/N] " ans </dev/tty || ans=n
+        if [[ "${ans,,}" == y* ]]; then as_user touch "$LINKED"; ok "Caldera Music linked"
+        else note "Caldera Music isn't linked yet; run this installer again to retry."; fi
+      fi
+    else
+      note "Caldera Music isn't linked yet. Run this installer again from an interactive"
+      note "terminal (ssh -t ...) to sign in."
+    fi
+  fi
+fi
+
 # ---------------------------------------------------------- 6. plexpie files
 step "Installing PlexPie"
 install -d -m 755 /opt/plexpie /opt/plexpie/www
 install -m 755 "$REPO/files/plexpied.py" "$REPO/files/plexpie-overlay.py" "$REPO/files/plexpie-session" /opt/plexpie/
 install -m 755 -o root -g root "$REPO/files/plexpie-admin" /opt/plexpie/plexpie-admin
 install -m 755 -o root -g root "$REPO/files/plexpie-bt.py" /opt/plexpie/plexpie-bt.py
+install -m 755 -o root -g root "$REPO/files/caldera-run" /opt/plexpie/caldera-run
 install -d -m 755 /var/lib/plexpie
 echo "$REPO" > /etc/plexpie/repo_dir
 install -m 644 "$REPO/files/www/"*.html "$REPO/files/www/"*.png "$REPO/files/www/"*.js /opt/plexpie/www/
@@ -307,7 +352,7 @@ if [ -f /etc/plexpie/plexpie.conf ] && ! cmp -s "$REPO/plexpie.conf" /etc/plexpi
   cp -p /etc/plexpie/plexpie.conf /etc/plexpie/plexpie.conf.prev
 fi
 install -m 640 -o root -g "$U" "$REPO/plexpie.conf" /etc/plexpie/plexpie.conf
-for unit in plexpie plexpie-airplay plexpie-squeezelite plexpie-spotify plexpie-bluetooth; do
+for unit in plexpie plexpie-airplay plexpie-squeezelite plexpie-spotify plexpie-bluetooth plexpie-caldera; do
   render "$REPO/files/systemd/$unit.service" > "/etc/systemd/system/$unit.service"
 done
 
@@ -339,6 +384,7 @@ $U ALL=(root) NOPASSWD: /usr/bin/systemctl start plexpie-airplay, /usr/bin/syste
 $U ALL=(root) NOPASSWD: /usr/bin/systemctl start plexpie-squeezelite, /usr/bin/systemctl stop plexpie-squeezelite, /usr/bin/systemctl restart plexpie-squeezelite
 $U ALL=(root) NOPASSWD: /usr/bin/systemctl start plexpie-spotify, /usr/bin/systemctl stop plexpie-spotify, /usr/bin/systemctl restart plexpie-spotify
 $U ALL=(root) NOPASSWD: /usr/bin/systemctl start plexpie-bluetooth, /usr/bin/systemctl stop plexpie-bluetooth, /usr/bin/systemctl restart plexpie-bluetooth
+$U ALL=(root) NOPASSWD: /usr/bin/systemctl start plexpie-caldera, /usr/bin/systemctl stop plexpie-caldera, /usr/bin/systemctl restart plexpie-caldera
 EOF
 chmod 440 /etc/sudoers.d/plexpie
 visudo -cf /etc/sudoers.d/plexpie >/dev/null
@@ -437,6 +483,7 @@ if yes_ "${ENABLE_AIRPLAY:-yes}"; then systemctl enable plexpie-airplay >/dev/nu
 else systemctl disable --now plexpie-airplay >/dev/null 2>&1 || true; fi
 # Optional players are enabled at boot; the plexpie daemon stops the ones switched off in Settings.
 systemctl enable plexpie-squeezelite >/dev/null 2>&1
+systemctl enable plexpie-caldera >/dev/null 2>&1
 [ -x /usr/local/bin/go-librespot ] && systemctl enable plexpie-spotify >/dev/null 2>&1
 if [ -x /usr/sbin/bluetoothd ] || [ -x /usr/libexec/bluetooth/bluetoothd ]; then
   # Show up as a speaker; reconnecting phones that were already paired needs no confirmation
@@ -454,6 +501,7 @@ fi
 systemctl restart plexpie
 yes_ "${ENABLE_AIRPLAY:-yes}" && systemctl restart plexpie-airplay
 yes_ "${ENABLE_MUSIC_ASSISTANT:-yes}" && systemctl restart plexpie-squeezelite
+yes_ "${ENABLE_CALDERA:-no}" && systemctl restart plexpie-caldera
 yes_ "${ENABLE_SPOTIFY:-no}" && [ -x /usr/local/bin/go-librespot ] && systemctl restart plexpie-spotify
 yes_ "${ENABLE_BLUETOOTH:-yes}" && systemctl is-enabled --quiet plexpie-bluetooth 2>/dev/null && systemctl restart bluetooth plexpie-bluetooth
 
@@ -470,7 +518,7 @@ sleep 4
 step "Status"
 apt-get clean >/dev/null 2>&1 || true              # downloaded package files aren't needed any more
 echo "    free space on the memory card: $(df -Ph / | awk 'NR==2{print $4}')"
-for unit in plexamp plexpie plexpie-airplay plexpie-squeezelite plexpie-spotify nqptp; do
+for unit in plexamp plexpie plexpie-airplay plexpie-squeezelite plexpie-spotify plexpie-caldera nqptp; do
   printf '    %-22s %s\n' "$unit" "$(systemctl is-active "$unit" 2>/dev/null || true)"
 done
 if curl -fs --max-time 3 http://127.0.0.1:8080/api/state >/dev/null; then ok "launcher answering on the Pi"; fi
