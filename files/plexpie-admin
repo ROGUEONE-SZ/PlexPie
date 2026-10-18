@@ -202,6 +202,35 @@ if not done:
             dbus.Interface(bus.get_object("org.bluez", path), "org.bluez.Device1").Disconnect()
 PY
     ;;
+  exit-screen)      # exit-screen desktop|console: leave the PlexPie screen until the next restart
+    want=${2:-desktop}
+    systemctl cat lightdm.service >/dev/null 2>&1 || want=console       # Raspberry Pi OS Lite: no desktop
+    install -d -m 755 /run/plexpie
+    echo "$want" > /run/plexpie/paused          # in /run, so a restart always comes back to PlexPie
+    systemd-run --quiet --collect --unit="plexpie-exit-$(date +%s)" /opt/plexpie/plexpie-admin exit-do "$want" ;;
+  exit-do)
+    if [ "$2" = desktop ]; then
+      UHOME=$(getent passwd "$U" | cut -d: -f6)
+      if [ -d "$UHOME/Desktop" ] || install -d -o "$U" -g "$U" "$UHOME/Desktop"; then
+        install -o "$U" -g "$U" -m 755 /usr/share/applications/plexpie-back.desktop "$UHOME/Desktop/" 2>/dev/null || true
+      fi
+    fi
+    for s in $(loginctl list-sessions --no-legend 2>/dev/null | awk '{print $1}'); do   # end the screen session on tty1
+      [ "$(loginctl show-session "$s" -p TTY --value 2>/dev/null)" = tty1 ] && loginctl terminate-session "$s"
+    done
+    sleep 2
+    [ "$2" = desktop ] && systemctl start lightdm.service
+    true ;;
+  resume)           # back to the PlexPie screen (the "Back to PlexPie" icon, or typing: plexpie)
+    rm -f /run/plexpie/paused
+    systemd-run --quiet --collect --unit="plexpie-resume-$(date +%s)" /opt/plexpie/plexpie-admin resume-do ;;
+  resume-do)
+    systemctl stop lightdm.service 2>/dev/null || true
+    chvt 1 2>/dev/null || true
+    for s in $(loginctl list-sessions --no-legend 2>/dev/null | awk '{print $1}'); do
+      [ "$(loginctl show-session "$s" -p TTY --value 2>/dev/null)" = tty1 ] && loginctl terminate-session "$s"
+    done
+    systemctl restart getty@tty1.service ;;   # autologin starts the PlexPie screen again
   update-status)
     # A restart or power cut in the middle of an update leaves "running" behind: clear it.
     if grep -q '"running":true' "$STATE/update-run.json" 2>/dev/null && ! systemctl is-active --quiet plexpie-update; then

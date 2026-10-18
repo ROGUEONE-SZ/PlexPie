@@ -25,7 +25,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 
-VERSION = "2.11.1"
+VERSION = "2.12.0"
 CONF_PATH = os.environ.get("PLEXPIE_CONF", "/etc/plexpie/plexpie.conf")
 WWW = os.path.join(os.path.dirname(os.path.abspath(__file__)), "www")
 HTTP_PORT = int(os.environ.get("PLEXPIE_HTTP_PORT", "8080"))
@@ -1962,6 +1962,9 @@ def slow_poller():
         time.sleep(10)
 
 
+PAUSED_FLAG = "/run/plexpie/paused"
+
+
 def screen_loop():
     off_after = cfg_int("SCREEN_OFF_AFTER_SECS", 60)
     while True:
@@ -1969,6 +1972,9 @@ def screen_loop():
             with ST.lock:
                 on = ST.screen_on
                 playing = ST.now_source() is not None
+            if os.path.exists(PAUSED_FLAG):          # someone is using the desktop or command line
+                time.sleep(2)
+                continue
             if on and off_after > 0 and not playing and SCREEN.idle_secs() >= off_after:
                 SCREEN.set(False, "idle")
         except Exception as e:
@@ -2454,7 +2460,9 @@ def settings_json(local, host=None, token=None):
     return {"values": vals, "wifi": wifi, "protect": prot, "bluetooth": read_bt() if "bluetooth" in SOURCES else None,
             "eq_presets": {k: {"name": v["name"], "filters": v["filters"]} for k, v in EQ_PRESETS.items()}, "updates": update_info(), "installed": installed, "accounts": accounts(), "player_name": PLAYER_NAME,
             "version": VERSION, "devices": devices_json(token), "address_change": dict(ADDRESS_CHANGE),
-            "vnc": {"on": screen_sharing_on(), "address": addr}, "sources": sorted(SOURCES),
+            "vnc": {"on": screen_sharing_on(), "address": addr},
+            "paused": os.path.exists(PAUSED_FLAG),
+            "desktop": subprocess.run(["systemctl", "cat", "lightdm.service"], capture_output=True).returncode == 0, "sources": sorted(SOURCES),
             "phone_url": f"http://{host}/settings" if host else (f"http://{addr}:{HTTP_PORT}/settings" if addr else ""),
             "local": local}
 
@@ -2716,6 +2724,13 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 spawn(lambda: (time.sleep(0.5), sudo("/usr/sbin/reboot")))
             elif what == "shutdown":
                 spawn(shutdown)
+            elif what == "resume":
+                ok, out = admin("resume", timeout=20)
+                return self._send(200 if ok else 500, json.dumps({"ok": ok}).encode())
+            elif what in ("exit-desktop", "exit-console"):
+                SCREEN.set(True, "exit")
+                ok, out = admin("exit-screen", what.split("-")[1], timeout=20)
+                return self._send(200 if ok else 500, json.dumps({"ok": ok, "error": out.strip()[-200:]}).encode())
             elif what == "plexamp-reset":
                 spawn(reset_plexamp_screen)
             elif what in ("protect-on", "protect-off"):

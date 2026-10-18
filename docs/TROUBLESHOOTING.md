@@ -57,6 +57,12 @@ curl -fsSL https://raw.githubusercontent.com/ROGUEONE-SZ/plexamp-raspberry-pi-in
 
 ## Updates
 
+### I tapped Update and nothing happened, so I tapped it again
+
+Fixed in 2.12: the button now switches to "Starting…" right away. Before that, it took a few seconds
+for the update to show, so it looked like the first tap didn't register (both taps start the same
+update, so no harm done).
+
 ### The update stays at 1%, or "Updating…" never ends
 
 - **Restarted during an update?** A reboot or power cut in the middle leaves the old "Updating"
@@ -119,6 +125,15 @@ rotated, set `TOUCH_ROTATE` (above). The log shows what the touchscreen reports:
 `journalctl -u plexpie | grep -i touch`.
 
 ---
+
+### I want to use the Pi's desktop or command line
+
+- **Settings › System › Exit to the Raspberry Pi desktop** (or **Exit to the command line** on Raspberry
+  Pi OS Lite). Music keeps playing. It lasts until the next restart.
+- To come back: the **Back to PlexPie** icon on the desktop, type `plexpie` in a terminal, tap
+  **Back to PlexPie** in Settings on your phone, or restart.
+- Without exiting: **Ctrl + Alt + F2** opens a text login, **Ctrl + Alt + F1** returns to PlexPie, and
+  `ssh` works from any computer.
 
 ## Plexamp
 

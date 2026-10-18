@@ -393,9 +393,16 @@ cat > "$UHOME/.bash_profile" <<'EOF'
 
 # PlexPie: start the touchscreen session on the local console only
 if [ -z "$DISPLAY" ] && [ "$(tty)" = "/dev/tty1" ]; then
-  # unclutter hides the pointer for touch and shows it for a mouse; without it, no pointer at all
-  if command -v unclutter >/dev/null; then startx; else startx -- -nocursor; fi
-  logout
+  if [ -f /run/plexpie/paused ]; then
+    echo
+    echo "  PlexPie is paused. Type  plexpie  and press Enter to go back to the PlexPie screen"
+    echo "  (restarting the Pi does the same)."
+    echo
+  else
+    # unclutter hides the pointer for touch and shows it for a mouse; without it, no pointer at all
+    if command -v unclutter >/dev/null; then startx; else startx -- -nocursor; fi
+    logout
+  fi
 fi
 EOF
 chown "$U:$U" "$UHOME/.xinitrc" "$UHOME/.bash_profile"
@@ -406,6 +413,20 @@ if [ ! -f /etc/systemd/system/getty@tty1.service.d/autologin.conf ]; then
     > /etc/systemd/system/getty@tty1.service.d/autologin.conf
 fi
 systemctl enable getty@tty1.service >/dev/null 2>&1
+# "plexpie" command and a "Back to PlexPie" menu/desktop entry, for after Settings > System > Exit
+printf '#!/bin/sh\n# Back to the PlexPie screen after "Exit to desktop / command line"\nexec sudo -n /opt/plexpie/plexpie-admin resume\n' \
+  > /usr/local/bin/plexpie
+chmod 755 /usr/local/bin/plexpie
+cat > /usr/share/applications/plexpie-back.desktop <<'DEOF'
+[Desktop Entry]
+Type=Application
+Name=Back to PlexPie
+Comment=Switch the screen back to the PlexPie music player
+Exec=/usr/local/bin/plexpie
+Icon=audio-x-generic
+Terminal=false
+Categories=AudioVideo;
+DEOF
 ok "console autologin -> startx -> plexpie-session"
 
 # -------------------------------------------------------------- 8. start

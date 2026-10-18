@@ -34,5 +34,6 @@ done < "$BACKUP_DIR/state.txt"
 systemctl daemon-reload
 
 echo
+rm -f /usr/local/bin/plexpie /usr/share/applications/plexpie-back.desktop 2>/dev/null || true
 echo "Rolled back. Packages and the AirPlay build stay installed but unused."
 echo "Reboot to finish:  sudo reboot"

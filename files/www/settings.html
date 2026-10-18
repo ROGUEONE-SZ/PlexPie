@@ -384,6 +384,8 @@
         <div class="group hidden" id="protgroup"><div class="row"><div class="t"><b>Power-cut protection</b><small>Makes the memory card read-only, so pulling the plug can't damage it. Settings changes and updates need it off. Restarts the player.</small></div>
           <label class="sw"><input type="checkbox" id="protect" data-noform><span></span></label></div></div>
         <div class="group">
+          <div class="row"><div class="t"><b id="exittitle">Exit to the Raspberry Pi desktop</b><small id="exitsub"></small></div>
+            <button class="btn" id="exitbtn">Exit</button></div>
           <div class="row"><div class="t"><b>Restart PlexPie</b><small>Reloads the screen and the apps</small></div>
             <button class="btn" data-sys="restart">Restart</button></div>
           <div class="row"><div class="t"><b>Reboot</b><small>Restarts the whole Raspberry Pi</small></div><button class="btn danger" data-sys="reboot">Reboot</button></div>
@@ -593,6 +595,12 @@ function render() {
   $("phoneurl").textContent = data.phone_url || "(no network)";
   $("pinshow").textContent = v.PHONE_PIN || "";
   $("ver").textContent = data.version;
+  $("exittitle").textContent = data.paused ? "The screen is showing the " + (data.desktop ? "desktop" : "command line")
+    : data.desktop ? "Exit to the Raspberry Pi desktop" : "Exit to the command line";
+  $("exitbtn").textContent = data.paused ? "Back to PlexPie" : "Exit";
+  $("exitsub").innerHTML = (data.desktop ? "Use the Pi as a computer for a while. Music keeps playing. "
+      + "To come back: the <b>Back to PlexPie</b> icon on the desktop, typing <code>plexpie</code> in a terminal, or a restart."
+      : "A text screen for a keyboard. Music keeps playing. To come back: type <code>plexpie</code>, or restart.");
   const vnc = data.vnc || {};
   $("vncsub").innerHTML = vnc.on ? `On · connect to <code>vnc://${esc(vnc.address)}</code> with your Remote access PIN`
     : v.SCREEN_SHARING ? "Starting…" : "See and use this screen from a Mac, iPad or iPhone on your Wi-Fi";
@@ -672,14 +680,20 @@ async function refreshQuick() {         // devices and updates, without re-rende
 const fmtT = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 function updCard(kind, u, run) {
   const isPP = kind === "plexpie";
-  const busy = run.running && (run.kind === kind || run.kind === "all" && (isPP ? run.percent >= 60 : run.percent < 60));
+  const st = renderUpdates.starting;
+  if (st && (run.running || Date.now() > st.until)) renderUpdates.starting = null;
+  const starting = renderUpdates.starting && renderUpdates.starting.kind === kind;
+  const busy = starting || run.running && (run.kind === kind || run.kind === "all" && (isPP ? run.percent >= 60 : run.percent < 60));
   const other = run.running && !busy;
   const icon = isPP ? `<div class="icon" style="background:#e5a00d">${I.plex}</div>` : `<div class="icon" style="background:#c51a4a">${I.update}</div>`;
   const name = isPP ? "PlexPie" : "Raspberry Pi OS";
   const n = isPP ? +u.behind || 0 : +u.count || 0;
   const prot = (data.protect || {}).active;
   let title, sub, btn = "", extra = "";
-  if (busy) {
+  if (busy && starting) {
+    title = `${isPP ? "Updating PlexPie" : "Updating Raspberry Pi OS"}`; sub = "Starting…";
+    extra = `<div class="prog indet"><b></b></div>`;
+  } else if (busy) {
     const pct = Math.max(1, Math.min(100, +run.percent || 1));
     const el = run.started ? Date.now() / 1000 - run.started : 0;
     title = `${isPP ? "Updating PlexPie" : "Updating Raspberry Pi OS"} <span class="pct">${pct}%</span>`;
@@ -712,12 +726,13 @@ function updCard(kind, u, run) {
 function renderUpdates(u) {
   u = u || {}; const run = u.run || {};
   data.updates = u;
-  $("upd-plexpie").innerHTML = updCard("plexpie", u.plexpie || {}, run);
-  $("upd-os").innerHTML = updCard("os", u.os || {}, run);
+  // Only rebuild a card when it changed: rebuilding it under your finger swallows the tap
+  for (const [id, html] of [["upd-plexpie", updCard("plexpie", u.plexpie || {}, run)], ["upd-os", updCard("os", u.os || {}, run)]])
+    if ($(id).dataset.html !== html) { $(id).innerHTML = html; $(id).dataset.html = html; }
   $("updnote").textContent = (data.protect || {}).active ? "Turn off power-cut protection (System) to install updates." :
     run.running ? "You can leave this page: the update keeps going, and the player tells you when it's done." : "";
   renderNav();
-  const active = run.running || (u.plexpie || {}).checking || (u.os || {}).checking;
+  const active = run.running || renderUpdates.starting || (u.plexpie || {}).checking || (u.os || {}).checking;
   clearTimeout(renderUpdates.t);
   if (active) renderUpdates.t = setTimeout(pollUpdate, 1000);
 }
@@ -736,9 +751,10 @@ document.addEventListener("click", async e => {
   if (u) {
     const pp = u.dataset.updRun === "plexpie";
     if (!confirm(pp ? "Update PlexPie now? The screen reloads at the end." : "Install Raspberry Pi OS updates now? Music may stop for a minute.")) return;
-    u.disabled = true; u.textContent = "Starting…";
+    renderUpdates.starting = {kind: u.dataset.updRun, until: Date.now() + 20000};   // show it right away
+    renderUpdates(data.updates);
     const r = await api("/api/system", {action: "update-run", kind: u.dataset.updRun});
-    if (!r.ok) { const j = await r.json().catch(() => ({})); toast(j.error || "Couldn't start the update"); }
+    if (!r.ok) { renderUpdates.starting = null; const j = await r.json().catch(() => ({})); toast(j.error || "Couldn't start the update"); }
     pollUpdate();
   }
 });
@@ -820,6 +836,16 @@ document.addEventListener("click", async e => {
     if (sys.dataset.sys === "restart") waitBack();
   }
 });
+$("exitbtn").onclick = async () => {
+  if (data.paused) { await api("/api/system", {action: "resume"}); toast("Back to PlexPie…"); setTimeout(load, 3000); return; }
+  const msg = data.desktop
+    ? "Switch the screen to the Raspberry Pi desktop? It comes back to PlexPie after a restart, or with the Back to PlexPie icon."
+    : "Switch the screen to the command line? You'll need a keyboard there. Type plexpie (or restart) to come back.";
+  if (!confirm(msg)) return;
+  const r = await api("/api/system", {action: data.desktop ? "exit-desktop" : "exit-console"});
+  toast(r.ok ? "Switching…" : "Couldn't switch");
+  if (!data.local) setTimeout(load, 4000);
+};
 $("plexreset").onclick = async () => {
   if (!confirm("Reset the Plexamp screen? It reloads, and Plex asks you to sign in once on the screen. Music keeps playing.")) return;
   await api("/api/system", {action: "plexamp-reset"});
