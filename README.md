@@ -19,6 +19,8 @@
   <a href="CHANGELOG.md"><b>What's new</b></a>
 </p>
 
+<p align="center"><img src="docs/demo.gif" width="560" alt="Swiping home from Plexamp's now playing to the PlexPie launcher, then opening the Home Assistant dashboard"></p>
+
 Turn a Raspberry Pi with a touchscreen and a DAC into a one-screen music player:
 **Plexamp**, **AirPlay 2**, **Spotify Connect**, the **Apple Music** web player, **Bluetooth**, **Music Assistant** and **Caldera Music**, all
 on one launcher and all controllable from **Home Assistant**.
