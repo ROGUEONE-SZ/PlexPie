@@ -15,7 +15,8 @@
 <p align="center">
   <a href="docs/INSTALL.md"><b>Step-by-step guide</b></a> ·
   <a href="docs/PlexPie-Setup-Guide.pdf"><b>Setup guide (PDF)</b></a> ·
-  <a href="docs/TROUBLESHOOTING.md"><b>Troubleshooting</b></a>
+  <a href="docs/TROUBLESHOOTING.md"><b>Troubleshooting</b></a> ·
+  <a href="CHANGELOG.md"><b>What's new</b></a>
 </p>
 
 Turn a Raspberry Pi with a touchscreen and a DAC into a one-screen music player:
