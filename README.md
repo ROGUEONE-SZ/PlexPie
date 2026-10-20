@@ -4,7 +4,7 @@
 
 <p align="center">
   <a href="#install"><img src="https://img.shields.io/badge/version-2.15-0a84ff" alt="Version 2.15"></a>
-  <a href="LICENSE.md"><img src="https://img.shields.io/badge/license-PolyForm%20Noncommercial-8e8e93" alt="License: PolyForm Noncommercial"></a>
+  <a href="LICENSE.md"><img src="https://img.shields.io/badge/license-source--available%20(PolyForm%20NC)-8e8e93" alt="License: source-available, PolyForm Noncommercial"></a>
   <img src="https://img.shields.io/badge/Raspberry%20Pi-4%20%7C%205-c51a4a?logo=raspberrypi&logoColor=white" alt="Raspberry Pi 4 or 5">
   <img src="https://img.shields.io/badge/Raspberry%20Pi%20OS-64--bit%20Lite%20or%20Desktop-c51a4a" alt="Raspberry Pi OS 64-bit">
   <img src="https://img.shields.io/badge/Home%20Assistant-MQTT-41bdf5?logo=homeassistant&logoColor=white" alt="Home Assistant via MQTT">
@@ -374,6 +374,10 @@ endorsed by any of them.
 **Free for personal, non-commercial use** under the [PolyForm Noncommercial License 1.0.0](LICENSE.md):
 use it at home, change it, share it with friends, learn from it. The license covers PlexPie's own code
 only, not the projects it installs.
+
+PlexPie is **source-available, not "open source"** in the OSI sense: all the code is public and you can
+read, change and share it, but the license doesn't allow commercial use. That's on purpose: it keeps
+companies from turning a hobby project into a product without asking.
 
 **Commercial use is not allowed without permission.** That includes selling devices or kits
 with PlexPie on them, offering it as a paid service, or building it into a product. If you'd
