@@ -1,7 +1,25 @@
-# PlexPie
+<p align="center"><img src="docs/logo.png" width="96" alt="PlexPie logo"></p>
+<h1 align="center">PlexPie</h1>
+<p align="center"><b>A Raspberry Pi music appliance: one touchscreen for all your music, controlled from Home Assistant.</b></p>
+
+<p align="center">
+  <a href="#install"><img src="https://img.shields.io/badge/version-2.15-0a84ff" alt="Version 2.15"></a>
+  <a href="LICENSE.md"><img src="https://img.shields.io/badge/license-PolyForm%20Noncommercial-8e8e93" alt="License: PolyForm Noncommercial"></a>
+  <img src="https://img.shields.io/badge/Raspberry%20Pi-4%20%7C%205-c51a4a?logo=raspberrypi&logoColor=white" alt="Raspberry Pi 4 or 5">
+  <img src="https://img.shields.io/badge/Raspberry%20Pi%20OS-64--bit%20Lite%20or%20Desktop-c51a4a" alt="Raspberry Pi OS 64-bit">
+  <img src="https://img.shields.io/badge/Home%20Assistant-MQTT-41bdf5?logo=homeassistant&logoColor=white" alt="Home Assistant via MQTT">
+  <a href="https://github.com/ROGUEONE-SZ/plexamp-raspberry-pi-install/stargazers"><img src="https://img.shields.io/github/stars/ROGUEONE-SZ/plexamp-raspberry-pi-install?style=flat&color=f5a524" alt="GitHub stars"></a>
+  <a href="#how-this-was-built"><img src="https://img.shields.io/badge/built%20with-Claude-d97757" alt="Built with Claude"></a>
+</p>
+
+<p align="center">
+  <a href="docs/INSTALL.md"><b>Step-by-step guide</b></a> ·
+  <a href="docs/PlexPie-Setup-Guide.pdf"><b>Setup guide (PDF)</b></a> ·
+  <a href="docs/TROUBLESHOOTING.md"><b>Troubleshooting</b></a>
+</p>
 
 Turn a Raspberry Pi with a touchscreen and a DAC into a one-screen music player:
-**Plexamp**, **AirPlay 2**, **Spotify Connect**, the **Apple Music** web player, **Music Assistant** and **Caldera Music**, all
+**Plexamp**, **AirPlay 2**, **Spotify Connect**, the **Apple Music** web player, **Bluetooth**, **Music Assistant** and **Caldera Music**, all
 on one launcher and all controllable from **Home Assistant**.
 
 > **New to Raspberry Pi?** Follow the **[step-by-step guide](docs/INSTALL.md)**: shopping list,
