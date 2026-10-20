@@ -48,6 +48,7 @@ How it behaves:
 - **Backup and restore.** Send all your settings as one file to a registered phone, tablet or computer (scan a QR code on the screen), and restore them on a new memory card.
 - **Setup guides built in.** Plain-English, step-by-step instructions for every app, on the player itself (offline, always matching your version). Save one as a PDF, share it, or download the [full setup guide (PDF)](docs/PlexPie-Setup-Guide.pdf).
 - **Power-cut protection.** An optional read-only mode, so pulling the plug can't damage the memory card.
+- **Looks like an appliance.** The PlexPie logo while it starts and shuts down, straight into the launcher: no Raspberry Pi text (switch it off in Settings › System for troubleshooting).
 - **Screen sharing.** See and use the player's screen from a Mac (Screen Sharing), iPad or iPhone (RealVNC Viewer); off by default, home network only, password = your PIN.
 - **Works with a mouse, keyboard or any monitor.** A Home tab appears for a mouse or screen sharing, the Home key or Esc twice go home, the pointer hides for touch, and the screen fills anything from a 7" touchscreen to an ultrawide.
 - **Exit to the desktop.** Settings › System › Exit switches to the Raspberry Pi desktop (or the command line on Lite) until the next restart; the Back to PlexPie icon or `plexpie` brings it back.

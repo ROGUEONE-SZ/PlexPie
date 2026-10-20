@@ -43,10 +43,13 @@ def same_output(name):
 
 
 def wayland_transform(t):
+    """Wayland counts its transform counter-clockwise; PlexPie (like xrandr and cmdline.txt) clockwise.
+    So the desktop's "transform 270" is a quarter turn to the right (confirmed on a Touch Display 2)."""
     t = t.strip().lower()
     if t.startswith("flipped"):
         t = t.replace("flipped", "").strip("-") or "0"
-    return {"normal": 0, "0": 0, "90": 90, "180": 180, "270": 270}.get(t)
+    deg = {"normal": 0, "0": 0, "90": 90, "180": 180, "270": 270}.get(t)
+    return None if deg is None else (360 - deg) % 360
 
 
 def from_kanshi():

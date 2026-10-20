@@ -231,6 +231,46 @@ PY
       [ "$(loginctl show-session "$s" -p TTY --value 2>/dev/null)" = tty1 ] && loginctl terminate-session "$s"
     done
     systemctl restart getty@tty1.service ;;   # autologin starts the PlexPie screen again
+  boot-look)        # boot-look on|off: PlexPie start-up screen instead of Raspberry Pi boot text (next restart)
+    want=${2:-on}
+    CMD=/boot/firmware/cmdline.txt; [ -f "$CMD" ] || CMD=/boot/cmdline.txt
+    CFG=/boot/firmware/config.txt; [ -f "$CFG" ] || CFG=/boot/config.txt
+    UHOME=$(getent passwd "$U" | cut -d: -f6)
+    QUIET="quiet splash loglevel=3 logo.nologo vt.global_cursor_default=0 plymouth.ignore-serial-consoles"
+    [ -f "$CMD" ] || { echo "no cmdline.txt"; exit 0; }
+    line=$(head -n1 "$CMD")
+    # Remember what the card had before PlexPie touched it, so "off" puts exactly that back.
+    [ -f "$STATE/cmdline-orig" ] || printf '%s\n' "$line" > "$STATE/cmdline-orig"
+    orig=" $(cat "$STATE/cmdline-orig") "
+    new=" $line "
+    if [ "$want" = on ]; then
+      for t in $QUIET; do [[ "$new" == *" $t "* ]] || new="$new$t "; done
+      new=${new// console=tty1 / console=tty3 }          # boot messages to a hidden console
+      grep -q '^disable_splash=1' "$CFG" 2>/dev/null || echo 'disable_splash=1' >> "$CFG"   # no rainbow square
+      if [ -d /usr/share/plymouth/themes/plexpie ] && command -v plymouth-set-default-theme >/dev/null; then
+        [ "$(plymouth-set-default-theme 2>/dev/null)" = plexpie ] || plymouth-set-default-theme -R plexpie >/dev/null 2>&1 || true
+      fi
+      mkdir -p /etc/systemd/system/getty@tty1.service.d
+      printf '[Service]\nExecStart=\nExecStart=-/sbin/agetty --autologin %s --noclear --noissue --nonewline --skip-login %%I $TERM\n' "$U" \
+        > /etc/systemd/system/getty@tty1.service.d/zz-plexpie-quiet.conf
+      [ -n "$UHOME" ] && install -o "$U" -g "$U" -m 644 /dev/null "$UHOME/.hushlogin"
+    else
+      for t in $QUIET; do [[ "$orig" == *" $t "* ]] || new=${new// $t / }; done
+      [[ "$orig" == *" console=tty1 "* ]] && new=${new// console=tty3 / console=tty1 }
+      sed -i '/^disable_splash=1$/d' "$CFG" 2>/dev/null || true
+      rm -f /etc/systemd/system/getty@tty1.service.d/zz-plexpie-quiet.conf
+      [ -n "$UHOME" ] && rm -f "$UHOME/.hushlogin"
+    fi
+    systemctl daemon-reload
+    new=$(echo $new)                                     # tidy spaces
+    if [ -n "$new" ] && [ "$new" != "$line" ]; then
+      cp -p "$CMD" "$CMD.plexpie-bak"
+      printf '%s\n' "$new" > "$CMD.plexpie-new" && mv "$CMD.plexpie-new" "$CMD"
+    fi
+    echo "$want" > "$STATE/boot-look"
+    echo "boot look: $want (after a restart)" ;;
+  boot-look-bg)     # same, in the background (rebuilding the start-up files takes a minute)
+    systemd-run --quiet --collect --unit="plexpie-bootlook-$(date +%s)" /opt/plexpie/plexpie-admin boot-look "${2:-on}" ;;
   console-rotation) # console-rotation 0|90|180|270: turn the text console like the screen (after a restart)
     deg=${2:-0}
     case "$deg" in 0|90|180|270) ;; *) echo "bad rotation" >&2; exit 2 ;; esac

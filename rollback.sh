@@ -12,6 +12,10 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 U="${APPLIANCE_USER:-${SUDO_USER:-$(getent passwd 1000 | cut -d: -f1)}}"
 UHOME=$(getent passwd "$U" | cut -d: -f6)
 
+echo "==> Putting back the Raspberry Pi start-up screen"
+[ -x /opt/plexpie/plexpie-admin ] && /opt/plexpie/plexpie-admin boot-look off >/dev/null 2>&1
+rm -rf /usr/share/plymouth/themes/plexpie
+
 echo "==> Stopping PlexPie services"
 systemctl disable --now plexpie plexpie-airplay plexpie-squeezelite plexpie-caldera nqptp 2>/dev/null
 rm -f /etc/systemd/system/plexpie.service /etc/systemd/system/plexpie-airplay.service \

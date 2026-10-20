@@ -135,7 +135,7 @@ PKGS=(pipewire pipewire-pulse pipewire-alsa wireplumber pipewire-bin python3 pyt
 yes_ "${ENABLE_BLUETOOTH:-yes}" && PKGS+=(bluez libspa-0.2-bluetooth python3-dbus python3-gi rfkill)
 # Chromium is "chromium" on Trixie and "chromium-browser" on older Raspberry Pi OS;
 # Widevine (needed by the Apple Music web player) comes from Raspberry Pi's repository.
-for alts in "chromium chromium-browser" "libwidevinecdm0" "unclutter-xfixes"; do
+for alts in "chromium chromium-browser" "libwidevinecdm0" "unclutter-xfixes" "plymouth"; do
   # shellcheck disable=SC2086
   p=$(pick_pkg $alts)
   [ -n "$p" ] && PKGS+=("$p")
@@ -345,6 +345,9 @@ install -m 755 -o root -g root "$REPO/files/plexpie-admin" /opt/plexpie/plexpie-
 install -m 755 -o root -g root "$REPO/files/plexpie-bt.py" /opt/plexpie/plexpie-bt.py
 install -m 755 -o root -g root "$REPO/files/caldera-run" /opt/plexpie/caldera-run
 install -m 755 -o root -g root "$REPO/files/plexpie-rotation" /opt/plexpie/plexpie-rotation
+# Start-up screen: the PlexPie tiles instead of Raspberry Pi boot text (BOOT_SPLASH, Settings > System)
+install -d -m 755 /usr/share/plymouth/themes/plexpie
+install -m 644 "$REPO/files/plymouth/"* /usr/share/plymouth/themes/plexpie/
 install -d -m 755 /var/lib/plexpie
 echo "$REPO" > /etc/plexpie/repo_dir
 install -m 644 "$REPO/files/www/"*.html "$REPO/files/www/"*.png "$REPO/files/www/"*.js /opt/plexpie/www/
@@ -446,8 +449,12 @@ if [ -z "$DISPLAY" ] && [ "$(tty)" = "/dev/tty1" ]; then
     echo "  (restarting the Pi does the same)."
     echo
   else
-    # unclutter hides the pointer for touch and shows it for a mouse; without it, no pointer at all
-    if command -v unclutter >/dev/null; then startx; else startx -- -nocursor; fi
+    # unclutter hides the pointer for touch and shows it for a mouse; without it, no pointer at all.
+    # X's start-up text goes to a log, so the screen goes straight from the start-up logo to PlexPie.
+    clear; setterm --cursor off 2>/dev/null
+    mkdir -p "$HOME/.local/state/plexpie"
+    if command -v unclutter >/dev/null; then startx -- -background none >"$HOME/.local/state/plexpie/x.log" 2>&1
+    else startx -- -nocursor -background none >"$HOME/.local/state/plexpie/x.log" 2>&1; fi
     logout
   fi
 fi
@@ -475,6 +482,11 @@ Terminal=false
 Categories=AudioVideo;
 DEOF
 ok "console autologin -> startx -> plexpie-session"
+if yes_ "${BOOT_SPLASH:-yes}"; then
+  /opt/plexpie/plexpie-admin boot-look on >/dev/null 2>&1 && ok "start-up screen: PlexPie logo (after a restart)"
+else
+  /opt/plexpie/plexpie-admin boot-look off >/dev/null 2>&1 || true
+fi
 
 # -------------------------------------------------------------- 8. start
 step "Starting everything"

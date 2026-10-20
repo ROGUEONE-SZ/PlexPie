@@ -18,6 +18,7 @@ x_alive() { xset q >/dev/null 2>&1; }
 xset s off
 xset s noblank
 xset -dpms
+xsetroot -solid "#0b0b0f" 2>/dev/null     # dark, like the start-up logo, until the launcher shows
 
 # Screen rotation (Settings > Screen > Rotation; "auto" follows the Raspberry Pi desktop's setting).
 # The touchscreen is turned to match, so taps land where you touch.

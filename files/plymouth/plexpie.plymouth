@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=PlexPie
+Description=PlexPie start-up screen: the PlexPie tiles on a dark background
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/plexpie
+ScriptFile=/usr/share/plymouth/themes/plexpie/plexpie.script

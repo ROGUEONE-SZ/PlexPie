@@ -35,6 +35,12 @@ echo "== bluetooth"; cat /run/plexpie/bt.json 2>/dev/null; echo
 echo "== packages upgraded today"; grep " upgrade " /var/log/dpkg.log 2>/dev/null | grep "$(date +%F)" | awk '{print $4}' | tr '\n' ' '; echo
 echo "== update log"; tail -4 /var/log/plexpie-update.log 2>/dev/null
 echo "== plexpie log"; journalctl -u plexpie -n 12 --no-pager -o cat 2>/dev/null | cut -c1-160
+echo "== playback health (skips and stutters)"
+echo "power/heat: $(vcgencmd get_throttled 2>/dev/null) (0x0 = fine; anything else = weak power supply or too hot)  temp: $(vcgencmd measure_temp 2>/dev/null)"
+echo "load: $(cut -d' ' -f1-3 /proc/loadavg)  memory free: $(free -m | awk '/Mem/{print $7" MB"}')"
+iw dev 2>/dev/null | awk '/Interface/{print $2}' | while read -r i; do echo "wifi $i: $(iw dev "$i" link 2>/dev/null | grep -E 'signal|tx bitrate' | tr -s ' \t' ' ' | tr '\n' ' ')"; done
+ip -4 -o addr show scope global 2>/dev/null | awk '{print "address: "$2" "$4}'
+journalctl -u plexamp --since "-2h" --no-pager -o cat 2>/dev/null | grep -iE "buffer|underrun|stall|timeout|ECONN|ETIMEDOUT|transcod|skip|error" | tail -15 | cut -c1-160
 echo "== plexamp web"; curl -s -o /dev/null -w "HTTP %{http_code} in %{time_total}s\n" --max-time 5 http://127.0.0.1:32500/
 echo "== plexamp log"; journalctl -u plexamp -n 25 --no-pager -o cat 2>/dev/null | cut -c1-160
 echo "== session log"; grep -av DEPRECATED_ENDPOINT ~/.local/state/plexpie/session.log | tail -12 2>/dev/null

@@ -208,6 +208,8 @@ SWIPE_HOME="${SWIPE_HOME:-yes}"
 # Screen rotation: auto (follow the Raspberry Pi desktop's setting), normal, right, inverted or left.
 # The Pi Touch Display 2 is portrait out of the box: right or left makes it landscape. Also in Settings > Screen.
 SCREEN_ROTATION="${SCREEN_ROTATION:-auto}"
+# Start-up screen: the PlexPie logo instead of Raspberry Pi boot text (no = show the text, for troubleshooting)
+BOOT_SPLASH="${BOOT_SPLASH:-yes}"
 # Only if swipes still go the wrong way after rotating: extra touch rotation in degrees (0, 90, 180, 270)
 TOUCH_ROTATE="${TOUCH_ROTATE:-0}"
 # Starting one source pauses the others

@@ -142,6 +142,12 @@ rotated, set Settings › Screen › Rotation (above). The log shows what the to
 
 ---
 
+### It shows Raspberry Pi text when it starts or shuts down
+
+Since 2.15 it shows the PlexPie logo instead (Settings › System › **PlexPie start-up screen**). The
+change shows from the next restart. Turn it off to see the boot text again when troubleshooting with
+a monitor; the text messages are still on the hidden second console (Ctrl+Alt+F3 with a keyboard).
+
 ### I want to use the Pi's desktop or command line
 
 - **Settings › System › Exit to the Raspberry Pi desktop** (or **Exit to the command line** on Raspberry
@@ -228,6 +234,24 @@ right away.
 
 Remove Plexamp's saved server list and restart it:
 `rm ~/.local/share/Plexamp/Settings/%40Plexamp%3Adiscovery%3Ahubs && sudo systemctl restart plexamp`
+
+### Songs skip or stutter
+
+Go through these in order; the report's **playback health** section (`tools/diag.sh`) shows most of them.
+
+1. **Two players with the same name.** If you set up a second card or a test install, Plex keeps
+   the old player. Your phone may be sending music to the one that's switched off. On plex.tv open
+   **Account › Authorized Devices**, remove the players you no longer use, and pick the player again
+   in Plexamp's speaker list.
+2. **After swapping memory cards or changing the address:** Settings › Configuration › Plexamp ›
+   **Reset the Plexamp screen**, then sign in on the screen once.
+3. **Power:** `power/heat` should say `throttled=0x0`. Anything else means the power supply is too
+   weak or the Pi is too hot: use the official 5 V / 3 A supply (Pi 4) or 5 A (Pi 5), and give it air.
+4. **Wi-Fi:** a signal weaker than about −70 dBm drops lossless music. Move the Pi or router closer,
+   use a network cable, or in Plexamp on your phone lower the quality for this player.
+5. **Your router blocks plex.direct** (see "Album art keeps spinning" above): streams then go the
+   long way through Plex's relay, which stalls.
+6. **Updates:** Settings › Updates. Raspberry Pi OS and PlexPie updates both fix playback problems now and then.
 
 ---
 

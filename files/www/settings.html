@@ -394,6 +394,9 @@
           <div class="row"><div class="t"><b>Screen sharing</b><small id="vncsub">See and use this screen from a Mac, iPad or iPhone on your Wi-Fi</small></div>
             <label class="sw"><input type="checkbox" id="SCREEN_SHARING"><span></span></label></div>
           <div class="row link" data-href="/guide#screen"><div class="t"><b>How to connect</b><small>Mac: Screen Sharing · iPad and iPhone: RealVNC Viewer</small></div><span class="chev">›</span></div></div>
+        <div class="group">
+          <div class="row"><div class="t"><b>PlexPie start-up screen</b><small>The PlexPie logo while it starts and shuts down, instead of Raspberry Pi text. Turn off to see the text when troubleshooting. Takes effect at the next restart.</small></div>
+            <label class="sw"><input type="checkbox" id="BOOT_SPLASH"><span></span></label></div></div>
         <div class="group hidden" id="protgroup"><div class="row"><div class="t"><b>Power-cut protection</b><small>Makes the memory card read-only, so pulling the plug can't damage it. Settings changes and updates need it off. Restarts the player.</small></div>
           <label class="sw"><input type="checkbox" id="protect" data-noform><span></span></label></div></div>
         <div class="group">
@@ -491,7 +494,7 @@ const FIELDS = ["ENABLE_APPLE_MUSIC_WEB", "ENABLE_AIRPLAY", "ENABLE_SPOTIFY", "E
   "SCREEN_OFF_AFTER_SECS", "SCREEN_BRIGHTNESS", "AUTO_SHOW", "SWIPE_HOME", "MQTT_HOST", "MQTT_PORT",
   "MQTT_USER", "MQTT_PASS", "SHORTCUTS", "MA_HOST", "MA_URL", "PHONE_ACCESS",
   "EQ_ENABLED", "EQ_PRESET", "EQ_BANDS", "EQ_CUSTOM_TEXT", "THEME_FROM_ART", "VISUALIZER", "NIGHT_DIM",
-  "NIGHT_START", "NIGHT_END", "NIGHT_BRIGHTNESS", "AUTO_BRIGHTNESS", "HA_URL", "HA_DASHBOARD", "SCREEN_SHARING", "HOME_BUTTON", "SCREEN_ROTATION"];
+  "NIGHT_START", "NIGHT_END", "NIGHT_BRIGHTNESS", "AUTO_BRIGHTNESS", "HA_URL", "HA_DASHBOARD", "SCREEN_SHARING", "HOME_BUTTON", "SCREEN_ROTATION", "BOOT_SPLASH"];
 const INSTALL_FLAG = {apple: null, airplay: "ENABLE_AIRPLAY", spotify: "ENABLE_SPOTIFY", bluetooth: "ENABLE_BLUETOOTH", ma: "ENABLE_MUSIC_ASSISTANT", caldera: "ENABLE_CALDERA"};
 let data = null, page = null, dirty = false;
 const wide = () => matchMedia("(min-width: 700px)").matches;

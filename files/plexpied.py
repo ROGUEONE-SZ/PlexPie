@@ -25,7 +25,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 
-VERSION = "2.14.0"
+VERSION = "2.15.0"
 CONF_PATH = os.environ.get("PLEXPIE_CONF", "/etc/plexpie/plexpie.conf")
 WWW = os.path.join(os.path.dirname(os.path.abspath(__file__)), "www")
 HTTP_PORT = int(os.environ.get("PLEXPIE_HTTP_PORT", "8080"))
@@ -70,7 +70,7 @@ EDITABLE = {
     "SWIPE_HOME": "bool", "MA_HOST": "str", "MA_URL": "str",
     "MQTT_HOST": "str", "MQTT_PORT": "int", "MQTT_USER": "str", "MQTT_PASS": "secret",
     "PHONE_ACCESS": "bool", "PHONE_PIN": "str", "SCREEN_SHARING": "bool", "HOME_BUTTON": "str",
-    "SCREEN_ROTATION": "str",
+    "SCREEN_ROTATION": "str", "BOOT_SPLASH": "bool",
 }
 
 
@@ -2663,7 +2663,10 @@ def apply_settings(data):
         save_sessions()
     rotation_changed = "SCREEN_ROTATION" in clean and \
         (clean["SCREEN_ROTATION"] or "auto").lower() != (cfg("SCREEN_ROTATION") or "auto").lower()
+    splash_changed = "BOOT_SPLASH" in clean and clean["BOOT_SPLASH"] != ("yes" if cfg_yes("BOOT_SPLASH") else "no")
     save_overrides(clean)
+    if splash_changed:
+        admin("boot-look-bg", "on" if clean["BOOT_SPLASH"] == "yes" else "off", timeout=20)
     log.info("settings saved: %s", ", ".join(k for k in clean if k != "MQTT_PASS"))
 
     def restart():                         # systemd starts us again with the new settings

@@ -1,0 +1,31 @@
+# PlexPie start-up and shut-down screen. The tiles look right whichever way the screen is turned.
+Window.SetBackgroundTopColor(0.043, 0.043, 0.059);
+Window.SetBackgroundBottomColor(0.043, 0.043, 0.059);
+
+logo.raw = Image("logo.png");
+size = Math.Min(Window.GetWidth(), Window.GetHeight()) * 0.28;
+logo.image = logo.raw.Scale(size, size);
+logo.sprite = Sprite(logo.image);
+logo.sprite.SetX(Window.GetX() + Window.GetWidth() / 2 - size / 2);
+logo.sprite.SetY(Window.GetY() + Window.GetHeight() / 2 - size / 2);
+logo.sprite.SetOpacity(0);
+
+opacity = 0;
+fun refresh() {
+  if (opacity < 1) {
+    opacity = opacity + 0.03;
+    if (opacity > 1) opacity = 1;
+    logo.sprite.SetOpacity(opacity);
+  }
+}
+Plymouth.SetRefreshFunction(refresh);
+
+# Messages (e.g. a disk check) stay readable, small, under the tiles.
+msg.sprite = Sprite();
+fun message(text) {
+  msg.image = Image.Text(text, 0.6, 0.6, 0.65);
+  msg.sprite.SetImage(msg.image);
+  msg.sprite.SetX(Window.GetX() + Window.GetWidth() / 2 - msg.image.GetWidth() / 2);
+  msg.sprite.SetY(Window.GetY() + Window.GetHeight() / 2 + size / 2 + 30);
+}
+Plymouth.SetMessageFunction(message);
