@@ -75,9 +75,20 @@
   .volnum { width: 38px; font-size: 15px; text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
   html, body { touch-action: pan-x pan-y; } /* plexpie-nopinch: no accidental pinch-zoom on the touchscreen */
   * { scrollbar-width: none; } ::-webkit-scrollbar { display: none; } /* plexpie-noscrollbar: touch scrolling, no desktop scroll bars */
+  /* someone asking to connect from a phone or tablet: approve right here (the screen is always admin) */
+  #access { position: fixed; left: 50%; top: 14px; transform: translateX(-50%); z-index: 50; width: min(560px, calc(100% - 24px));
+    background: #1c1c1f; border: 1px solid #ff9f0a88; border-radius: 16px; padding: 14px 16px; box-shadow: 0 12px 40px #000c; }
+  #access b { display: block; font-size: 17px; margin-bottom: 2px; }
+  #access small { color: #8e8e93; }
+  #access .acts { display: flex; gap: 8px; margin-top: 10px; }
+  #access button { flex: 1; border: 0; border-radius: 12px; padding: 12px; font-size: 15px; font-weight: 700; background: #2c2c30; color: #f4f4f7; }
+  #access button.ok { background: #0a84ff; color: #fff; }
+  #access button.no { color: #ff453a; }
+  .hidden { display: none !important; }
 </style>
 </head>
 <body>
+<div id="access" class="hidden"></div>
 <header>
   <div class="name" id="name">PlexPie</div>
   <div class="np"><span class="chip" id="npchip">Idle</span><span class="track" id="nptrack"></span></div>
@@ -264,7 +275,23 @@ function fit(n) {
 }
 addEventListener("resize", () => fit(document.querySelectorAll(".tile:not([style*='display: none'])").length || 4));
 
-function poll() { fetch("/api/state").then(r => r.json()).then(render).catch(() => {}); }
+function renderAccess(list) {
+  const r = (list || [])[0], el = document.getElementById("access");
+  el.classList.toggle("hidden", !r);
+  if (!r || el.dataset.id === r.id) return;
+  el.dataset.id = r.id;
+  el.innerHTML = `<b></b><small></small><div class="acts"><button class="ok" data-a="full">Allow</button>
+    <button data-a="controls">Controls only</button><button class="no" data-a="deny">Deny</button></div>`;
+  el.querySelector("b").textContent = r.name + " wants to connect";
+  el.querySelector("small").textContent = "From " + r.ip + ". Allow gives it Settings; Controls only gives it the remote.";
+}
+document.getElementById("access").addEventListener("click", e => {
+  const b = e.target.closest("[data-a]"); if (!b) return;
+  const el = document.getElementById("access");
+  fetch("/api/access", {method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({id: el.dataset.id, allow: b.dataset.a})}).then(() => { el.dataset.id = ""; el.classList.add("hidden"); });
+});
+function poll() { fetch("/api/state").then(r => r.json()).then(s => { render(s); renderAccess(s.access_requests); }).catch(() => {}); }
 function clock() {
   const d = new Date();
   $("clock").textContent = d.toLocaleTimeString([], {hour: "numeric", minute: "2-digit"});

@@ -142,6 +142,18 @@ rotated, set Settings › Screen › Rotation (above). The log shows what the to
 
 ---
 
+### I lost my admin phone, or a device has the wrong access
+
+The player's own screen is always admin: Settings › Remote access lets you change any device's level
+(Admin, Full access, Controls only), sign it out, or tap **New PIN** to sign every device out at once.
+Then sign in again on your new phone and tap **Make this my admin device**.
+
+### My other players don't show under "Other PlexPie players"
+
+They find each other with Bonjour/mDNS, like AirPlay. Both players need PlexPie 2.16 or newer and must
+be on the same network (not a guest Wi-Fi). Check on each one: `systemctl is-active avahi-daemon`
+should say `active`. A player that changed its address is found again within a minute.
+
 ### It shows Raspberry Pi text when it starts or shuts down
 
 Since 2.15 it shows the PlexPie logo instead (Settings › System › **PlexPie start-up screen**). The

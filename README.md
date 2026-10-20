@@ -3,7 +3,7 @@
 <p align="center"><b>A Raspberry Pi music appliance: one touchscreen for all your music, controlled from Home Assistant.</b></p>
 
 <p align="center">
-  <a href="#install"><img src="https://img.shields.io/badge/version-2.15-0a84ff" alt="Version 2.15"></a>
+  <a href="#install"><img src="https://img.shields.io/badge/version-2.16-0a84ff" alt="Version 2.16"></a>
   <a href="LICENSE.md"><img src="https://img.shields.io/badge/license-source--available%20(PolyForm%20NC)-8e8e93" alt="License: source-available, PolyForm Noncommercial"></a>
   <img src="https://img.shields.io/badge/Raspberry%20Pi-4%20%7C%205-c51a4a?logo=raspberrypi&logoColor=white" alt="Raspberry Pi 4 or 5">
   <img src="https://img.shields.io/badge/Raspberry%20Pi%20OS-64--bit%20Lite%20or%20Desktop-c51a4a" alt="Raspberry Pi OS 64-bit">
@@ -69,6 +69,8 @@ How it behaves:
 - **Backup and restore.** Send all your settings as one file to a registered phone, tablet or computer (scan a QR code on the screen), and restore them on a new memory card.
 - **Setup guides built in.** Plain-English, step-by-step instructions for every app, on the player itself (offline, always matching your version). Save one as a PDF, share it, or download the [full setup guide (PDF)](docs/PlexPie-Setup-Guide.pdf).
 - **Power-cut protection.** An optional read-only mode, so pulling the plug can't damage the memory card.
+- **Admin phone and one remote for all players.** Make your phone the admin: new devices tap *Ask the admin* instead of typing the PIN, and you choose Full access or Controls only. Link your other PlexPie players once, then control them all (and open their Settings without a PIN) from one remote you add to your home screen.
+  <br><img src="docs/phone-remote-control.png" width="260" alt="Remote control on an iPhone: two players, a pending request to connect, play/pause, volume and apps">
 - **Looks like an appliance.** The PlexPie logo while it starts and shuts down, straight into the launcher: no Raspberry Pi text (switch it off in Settings › System for troubleshooting).
 - **Screen sharing.** See and use the player's screen from a Mac (Screen Sharing), iPad or iPhone (RealVNC Viewer); off by default, home network only, password = your PIN.
 - **Works with a mouse, keyboard or any monitor.** A Home tab appears for a mouse or screen sharing, the Home key or Esc twice go home, the pointer hides for touch, and the screen fills anything from a 7" touchscreen to an ultrawide.

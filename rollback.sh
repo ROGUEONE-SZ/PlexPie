@@ -15,6 +15,7 @@ UHOME=$(getent passwd "$U" | cut -d: -f6)
 echo "==> Putting back the Raspberry Pi start-up screen"
 [ -x /opt/plexpie/plexpie-admin ] && /opt/plexpie/plexpie-admin boot-look off >/dev/null 2>&1
 rm -rf /usr/share/plymouth/themes/plexpie
+rm -f /etc/avahi/services/plexpie.service
 
 echo "==> Stopping PlexPie services"
 systemctl disable --now plexpie plexpie-airplay plexpie-squeezelite plexpie-caldera nqptp 2>/dev/null

@@ -130,7 +130,7 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get update -q
 PKGS=(pipewire pipewire-pulse pipewire-alsa wireplumber pipewire-bin python3 python3-paho-mqtt
       python3-websocket python3-tk python3-evdev xprintidle xdotool curl git avahi-daemon xserver-xorg xinit
-      x11-xserver-utils xinput x11vnc alsa-utils nodejs fonts-dejavu-core python3-numpy python3-pil)
+      x11-xserver-utils xinput x11vnc alsa-utils avahi-daemon avahi-utils nodejs fonts-dejavu-core python3-numpy python3-pil)
 # Bluetooth receiver: BlueZ, PipeWire's Bluetooth plugin, and D-Bus bindings for the pairing helper
 yes_ "${ENABLE_BLUETOOTH:-yes}" && PKGS+=(bluez libspa-0.2-bluetooth python3-dbus python3-gi rfkill)
 # Chromium is "chromium" on Trixie and "chromium-browser" on older Raspberry Pi OS;
@@ -345,6 +345,26 @@ install -m 755 -o root -g root "$REPO/files/plexpie-admin" /opt/plexpie/plexpie-
 install -m 755 -o root -g root "$REPO/files/plexpie-bt.py" /opt/plexpie/plexpie-bt.py
 install -m 755 -o root -g root "$REPO/files/caldera-run" /opt/plexpie/caldera-run
 install -m 755 -o root -g root "$REPO/files/plexpie-rotation" /opt/plexpie/plexpie-rotation
+# Other PlexPie players (and the remote on your phone) find this one on the network
+install -d -m 755 /etc/avahi/services
+python3 - "$PLAYER_NAME" "$(hostname)" > /etc/avahi/services/plexpie.service <<'PY'
+import sys
+from xml.sax.saxutils import escape
+name, node = (escape(a) for a in sys.argv[1:3])
+print(f"""<?xml version="1.0" standalone='no'?>
+<!DOCTYPE service-group SYSTEM "avahi-service.dtd">
+<service-group>
+  <name>PlexPie {name}</name>
+  <service>
+    <type>_plexpie._tcp</type>
+    <port>8080</port>
+    <txt-record>node={node}</txt-record>
+    <txt-record>name={name}</txt-record>
+  </service>
+</service-group>""")
+PY
+systemctl enable avahi-daemon >/dev/null 2>&1 || true
+systemctl reload-or-restart avahi-daemon >/dev/null 2>&1 || true
 # Start-up screen: the PlexPie tiles instead of Raspberry Pi boot text (BOOT_SPLASH, Settings > System)
 install -d -m 755 /usr/share/plymouth/themes/plexpie
 install -m 644 "$REPO/files/plymouth/"* /usr/share/plymouth/themes/plexpie/

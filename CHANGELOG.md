@@ -2,6 +2,15 @@
 
 Already running PlexPie? **Settings › Updates › PlexPie › Update** brings you to the latest version.
 
+## 2.16 (October 20, 2026)
+- **Admin phone:** make your phone the admin device. New phones and tablets tap *Ask the admin* instead of
+  typing the PIN; approve them on your phone or on the player's screen.
+- **Device levels:** Admin, Full access (all of Settings) or Controls only (just the remote).
+- **One remote for all your players** (`/remote`, add it to your home screen): link your other PlexPie
+  players once with their PIN, then play, pause, change volume and switch apps on any of them, and open
+  their Settings without the PIN.
+- Players find each other on the network automatically (Bonjour/mDNS).
+
 ## 2.15 (October 19, 2026)
 - **Looks like an appliance:** the PlexPie logo while it starts and shuts down, no Raspberry Pi boot text.
   Switch it off in Settings › System when troubleshooting with a monitor.

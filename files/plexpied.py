@@ -25,7 +25,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 
-VERSION = "2.15.0"
+VERSION = "2.16.0"
 CONF_PATH = os.environ.get("PLEXPIE_CONF", "/etc/plexpie/plexpie.conf")
 WWW = os.path.join(os.path.dirname(os.path.abspath(__file__)), "www")
 HTTP_PORT = int(os.environ.get("PLEXPIE_HTTP_PORT", "8080"))
@@ -2256,12 +2256,266 @@ def device_label(ua, hint=""):
 
 def devices_json(current=None):
     return sorted(({"id": session_id(t), "name": v.get("name") or "Device", "first": v.get("first", 0),
-                    "last": v.get("last", 0), "this": t == current} for t, v in SESSIONS.items()),
-                  key=lambda d: -(d["last"] or d["first"]))
+                    "last": v.get("last", 0), "this": t == current, "role": role_of(t),
+                    "peer": bool(v.get("peer"))} for t, v in SESSIONS.items()),
+                  key=lambda d: (-rank(d["role"]), -(d["last"] or d["first"])))
 
 
 SESSIONS = _load_sessions()       # registered devices (survive restarts)
 LOGIN_FAILS = {"n": 0, "until": 0.0}
+
+# ------------------------------------------------------------------ device roles
+# admin:    everything, plus approving new devices, seeing the PIN and choosing what others may do
+# full:     all of Settings (what the PIN gives)
+# controls: the remote control only (play/pause, volume, which app is on the screen)
+# The player's own screen is always admin, so a lost admin phone is never a lock-out.
+ROLES = ("controls", "full", "admin")
+
+
+def rank(role):
+    return ROLES.index(role) if role in ROLES else 1
+
+
+def role_of(token):
+    s = SESSIONS.get(token or "")
+    return (s.get("role") or "full") if s else None
+
+
+def lower_role(a, b):
+    return a if rank(a) <= rank(b) else b
+
+
+def has_admin():
+    return any(v.get("role") == "admin" for v in SESSIONS.values())
+
+
+def new_session(name, role, peer=False):
+    import secrets
+    token = secrets.token_urlsafe(24)
+    now = time.time()
+    SESSIONS[token] = {"exp": now + SESSION_DAYS * 86400, "first": now, "last": now, "name": name,
+                       "role": role if role in ROLES else "full"}
+    if peer:
+        SESSIONS[token]["peer"] = True
+    save_sessions()
+    return token
+
+
+# New devices can ask the admin instead of typing the PIN. Requests live 10 minutes, in memory.
+ACCESS = {}
+ACCESS_LOCK = threading.Lock()
+
+
+def access_requests():
+    now = time.time()
+    with ACCESS_LOCK:
+        for k in [k for k, v in ACCESS.items() if now - v["t"] > 600]:
+            del ACCESS[k]
+        return [{"id": k, "name": v["name"], "ip": v["ip"], "t": v["t"]}
+                for k, v in ACCESS.items() if v["status"] == "pending"]
+
+
+def access_request(name, ip):
+    import secrets
+    if len(access_requests()) >= 5:
+        return None
+    rid = secrets.token_urlsafe(12)
+    with ACCESS_LOCK:
+        ACCESS[rid] = {"name": name, "ip": ip, "t": time.time(), "status": "pending", "role": None}
+    log.info("access request from %s (%s)", name, ip)
+    mark_changed()
+    SCREEN.wake("access request")
+    return rid
+
+
+def access_decide(rid, allow):
+    with ACCESS_LOCK:
+        r = ACCESS.get(rid)
+        if not r or r["status"] != "pending":
+            return False
+        if allow in ("full", "controls", "admin"):
+            r.update(status="approved", role=allow)
+        else:
+            r["status"] = "denied"
+    log.info("access request from %s: %s", r["name"], allow if allow in ROLES else "denied")
+    mark_changed()
+    return True
+
+
+# One-time sign-in links, so one admin phone can open another player's Settings without its PIN.
+TICKETS = {}
+
+
+def make_ticket(role, via):
+    import secrets
+    t = secrets.token_urlsafe(18)
+    TICKETS[t] = {"role": role, "via": via, "exp": time.time() + 60}
+    return t
+
+
+def use_ticket(t):
+    tk = TICKETS.pop(t or "", None)
+    for k in [k for k, v in TICKETS.items() if v["exp"] < time.time()]:
+        del TICKETS[k]
+    return tk if tk and tk["exp"] >= time.time() else None
+
+
+# ------------------------------------------------------------- other PlexPie players
+# Found on the network (mDNS: _plexpie._tcp) and, once linked with their PIN, controlled from here.
+PEERS_FILE = os.path.join(SETTINGS_DIR, "peers.json")
+PEERS_LOCK = threading.Lock()
+DISCOVERED = {"t": 0, "list": []}
+NODE = socket.gethostname()
+
+
+def load_peers():
+    try:
+        with open(PEERS_FILE) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
+def save_peers(peers):
+    try:
+        os.makedirs(SETTINGS_DIR, exist_ok=True)
+        with open(PEERS_FILE + ".tmp", "w") as f:
+            json.dump(peers, f)
+        os.chmod(PEERS_FILE + ".tmp", 0o600)
+        os.replace(PEERS_FILE + ".tmp", PEERS_FILE)
+    except OSError as e:
+        log.warning("could not save linked players: %s", e)
+
+
+def _avahi_unescape(s):
+    return re.sub(r"\\(\d{3})", lambda m: chr(int(m.group(1))), s).replace("\\.", ".")
+
+
+def discover_players(force=False):
+    """Other PlexPie players on the network: [{node, name, address, port}]."""
+    if not force:
+        return DISCOVERED["list"]              # kept fresh by discovery_loop
+    found = {}
+    for line in (run(["avahi-browse", "-rtpk", "_plexpie._tcp"], 8) or "").splitlines():
+        f = line.split(";")
+        if len(f) < 10 or f[0] != "=" or f[2] != "IPv4":
+            continue
+        txt = dict(re.findall(r'"([a-z]+)=([^"]*)"', ";".join(f[9:])))
+        node = txt.get("node") or _avahi_unescape(f[6]).split(".")[0]
+        if node.lower() == NODE.lower():
+            continue
+        found[node] = {"node": node, "name": txt.get("name") or node, "address": f[7],
+                       "port": int(f[8]) if f[8].isdigit() else HTTP_PORT}
+    DISCOVERED.update(t=time.time(), list=sorted(found.values(), key=lambda p: p["name"].lower()))
+    with PEERS_LOCK:                      # a linked player that got a new address
+        peers, changed = load_peers(), False
+        for p in found.values():
+            if p["node"] in peers and (peers[p["node"]]["address"], peers[p["node"]]["port"]) != (p["address"], p["port"]):
+                peers[p["node"]].update(address=p["address"], port=p["port"])
+                changed = True
+        if changed:
+            save_peers(peers)
+    return DISCOVERED["list"]
+
+
+def peer_call(peer, path, body=None, timeout=3):
+    """(status, json) from another player, signed in with the token it gave us when we linked."""
+    url = f"http://{peer['address']}:{peer.get('port', HTTP_PORT)}{path}"
+    headers = {"Content-Type": "application/json"}
+    if peer.get("token"):
+        headers["Cookie"] = f"plexpie={peer['token']}"
+    req = urllib.request.Request(url, data=None if body is None else json.dumps(body).encode(),
+                                 method="GET" if body is None else "POST", headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return r.status, json.loads(r.read() or b"{}")
+    except urllib.error.HTTPError as e:
+        try:
+            return e.code, json.loads(e.read() or b"{}")
+        except ValueError:
+            return e.code, {}
+    except Exception as e:
+        return 0, {"error": str(e)[:80]}
+
+
+def peers_json():
+    found = {p["node"]: p for p in discover_players()}
+    with PEERS_LOCK:
+        linked = load_peers()
+    out = []
+    for node in sorted(set(found) | set(linked), key=lambda n: (found.get(n) or linked[n])["name"].lower()):
+        p = dict(found.get(node) or {}, **{k: v for k, v in linked.get(node, {}).items() if k != "token"})
+        p.update(node=node, linked=node in linked, seen=node in found)
+        out.append(p)
+    return out
+
+
+def peer_link(node, pin):
+    found = {p["node"]: p for p in discover_players(force=True)}
+    p = found.get(node)
+    if not p:
+        return False, "That player isn't on the network right now"
+    st, j = peer_call(p, "/api/login", {"pin": str(pin), "device": f"PlexPie · {PLAYER_NAME}", "peer": True,
+                                         "claim": True}, timeout=5)
+    if st != 200 or not j.get("token"):
+        return False, j.get("error") or "Couldn't reach it"
+    with PEERS_LOCK:
+        peers = load_peers()
+        peers[node] = {"name": p["name"], "address": p["address"], "port": p["port"], "token": j["token"],
+                       "role": j.get("role", "full"), "linked": time.time()}
+        save_peers(peers)
+    log.info("linked player %s (%s) as %s", p["name"], p["address"], j.get("role"))
+    return True, ""
+
+
+def peer_unlink(node):
+    with PEERS_LOCK:
+        peers = load_peers()
+        p = peers.pop(node, None)
+        save_peers(peers)
+    if p:
+        peer_call(p, "/api/devices", {"action": "signout", "id": session_id(p["token"])}, timeout=3)
+    return bool(p)
+
+
+PLAYER_FIELDS = ("player_name", "source", "sources", "playing", "now_source", "now_source_name", "now",
+                 "volume", "sleep_left", "version")
+
+
+def players_json():
+    """This player and every linked one, with what's playing."""
+    me = {k: v for k, v in state_json().items() if k in PLAYER_FIELDS}
+    out = [{"node": NODE, "name": PLAYER_NAME, "local": True, "online": True, "state": me}]
+    with PEERS_LOCK:
+        linked = load_peers()
+    results = {}
+
+    def fetch(node, p):
+        results[node] = peer_call(p, "/api/state", timeout=2)
+    threads = [threading.Thread(target=fetch, args=(n, p), daemon=True) for n, p in linked.items()]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(3)
+    for node, p in sorted(linked.items(), key=lambda kv: kv[1]["name"].lower()):
+        st, j = results.get(node, (0, {}))
+        out.append({"node": node, "name": j.get("player_name") or p["name"], "local": False, "online": st == 200,
+                    "address": p["address"], "role": p.get("role", "full"),
+                    "state": {k: v for k, v in j.items() if k in PLAYER_FIELDS} if st == 200 else {},
+                    "error": "" if st == 200 else ("Not allowed: link it again" if st in (401, 403) else "Offline")})
+    return out
+
+
+def discovery_loop():
+    while True:
+        try:
+            discover_players(force=True)
+        except Exception as e:
+            log.warning("player discovery: %s", e)
+        time.sleep(30)
+
+
+PEER_PATHS = ("/api/source", "/api/volume", "/api/playpause", "/api/pause_all", "/api/sleep")
 
 
 def ensure_pin():
@@ -2582,6 +2836,7 @@ def reset_plexamp_screen():
 
 
 def settings_json(local, host=None, token=None):
+    role = "admin" if local else (role_of(token) or "full")
     vals = {}
     for k, kind in EDITABLE.items():
         if kind == "secret":
@@ -2594,8 +2849,8 @@ def settings_json(local, host=None, token=None):
         else:
             vals[k] = cfg(k)
     vals["MA_HOST"] = vals.get("MA_HOST") or cfg("HA_HOST")
-    if not local:
-        vals["PHONE_PIN"] = ""                  # the PIN is only shown on the player itself
+    if role != "admin":
+        vals["PHONE_PIN"] = ""                  # the PIN is only shown on the player itself and the admin device
     vals["AUTO_SHOW"] = bool(cfg("AUTO_SHOW_SOURCES", "plexamp airplay ma spotify bluetooth").strip())
     vals["EQ_PRESET"] = vals.get("EQ_PRESET") or "flat"
     vals["VISUALIZER"] = vals.get("VISUALIZER") or "bars"
@@ -2630,12 +2885,16 @@ def settings_json(local, host=None, token=None):
             "paused": os.path.exists(PAUSED_FLAG),
             "desktop": subprocess.run(["systemctl", "cat", "lightdm.service"], capture_output=True).returncode == 0, "sources": sorted(SOURCES),
             "phone_url": f"http://{host}/settings" if host else (f"http://{addr}:{HTTP_PORT}/settings" if addr else ""),
-            "local": local}
+            "local": local, "role": role, "admin_exists": has_admin(),
+            "access_requests": access_requests() if role == "admin" else [],
+            "peers": peers_json() if rank(role) >= rank("full") else []}
 
 
-def apply_settings(data):
+def apply_settings(data, role="admin"):
     clean = {}
     for k, v in data.items():
+        if k in ("PHONE_PIN", "PHONE_ACCESS") and role != "admin":
+            continue                       # only the player's screen and the admin device change these
         if k == "AUTO_SHOW":
             clean["AUTO_SHOW_SOURCES"] = "plexamp airplay ma spotify bluetooth" if v else ""
             continue
@@ -2702,10 +2961,19 @@ class Handler(http.server.BaseHTTPRequestHandler):
         except OSError:
             self._send(404, b"not found", "text/plain")
 
-    # Other devices (phones, tablets, computers) reach only Settings and the guides, and only with the PIN.
-    REMOTE_OPEN = ("/settings", "/api/login", "/manifest.json", "/icon.png", "/qrcode.js")
+    # Other devices (phones, tablets, computers) reach Settings, the guides and the remote control,
+    # after the PIN or the admin's OK. What each may use depends on its role (controls < full < admin).
+    REMOTE_OPEN = ("/settings", "/remote", "/api/login", "/manifest.json", "/remote.webmanifest", "/icon.png",
+                   "/qrcode.js", "/api/whoami", "/api/access/request", "/api/access/status")
+    REMOTE_CONTROLS = ("/api/state", "/api/art", "/api/players", "/api/peer", "/api/peer/open", "/api/handoff",
+                       "/api/source", "/api/volume", "/api/playpause", "/api/pause_all", "/api/sleep")
     REMOTE_AUTH = ("/api/settings", "/api/account", "/api/system", "/api/backup", "/api/restore", "/api/bluetooth",
-                   "/api/devices", "/guide", "/guide.pdf")
+                   "/api/devices", "/guide", "/guide.pdf", "/api/access", "/api/peers")
+
+    def _role(self):
+        if self._local():
+            return "admin"
+        return role_of(self._token()) if self._authed() else None
 
     def _local(self):
         return self.client_address[0] in ("127.0.0.1", "::1", "::ffff:127.0.0.1")
@@ -2735,22 +3003,84 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if not cfg_yes("PHONE_ACCESS"):
             self._send(403, b'{"error":"remote access is off"}')
             return False
-        if path in self.REMOTE_OPEN or (path in self.REMOTE_AUTH and self._authed()) or \
-                (path.startswith("/img/") and self._authed()):
+        if path in self.REMOTE_OPEN:
             return True
+        need = "controls" if path in self.REMOTE_CONTROLS else "full" if (
+            path in self.REMOTE_AUTH or path.startswith("/img/")) else None
+        role = self._role() if need else None
+        if need and role and rank(role) >= rank(need):
+            return True
+        if need and role:                  # signed in, but this device is limited to the remote control
+            self._send(403, b'{"error":"controls"}')
+            return False
         if path in ("/guide", "/guide.pdf") and self.command == "GET":   # sign in first, then come back
             self.send_response(302)
             self.send_header("Location", "/settings?next=" + urllib.parse.quote(path))
             self.send_header("Content-Length", "0")
             self.end_headers()
             return False
-        self._send(401 if path in self.REMOTE_AUTH else 404, b'{"error":"not allowed"}')
+        self._send(401 if need else 404, b'{"error":"not allowed"}')
         return False
 
+    def _cookie_redirect(self, token, where):
+        self.send_response(302)
+        self.send_header("Set-Cookie", f"plexpie={token}; Max-Age={SESSION_DAYS * 86400}; HttpOnly; SameSite=Lax; Path=/")
+        self.send_header("Location", where)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def _json_cookie(self, token, obj):
+        body = json.dumps(obj).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Set-Cookie", f"plexpie={token}; Max-Age={SESSION_DAYS * 86400}; HttpOnly; SameSite=Lax; Path=/")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
     def do_GET(self):
-        path = urllib.parse.urlparse(self.path).path
+        url = urllib.parse.urlparse(self.path)
+        path, query = url.path, urllib.parse.parse_qs(url.query)
         if not self._gate(path):
             return
+        if path in ("/settings", "/remote") and query.get("ticket") and not self._local():
+            tk = use_ticket(query["ticket"][0])      # one-time link from another player's admin
+            if tk:
+                token = new_session(f"{device_label(self.headers.get('User-Agent'))} (via {tk['via']})"[:60], tk["role"])
+                return self._cookie_redirect(token, path)
+        if path == "/remote":
+            return self._file("remote.html")
+        if path == "/remote.webmanifest":
+            return self._send(200, json.dumps({
+                "name": f"PlexPie remote", "short_name": "PlexPie", "start_url": "/remote", "scope": "/",
+                "display": "standalone", "background_color": "#0b0b0f", "theme_color": "#0b0b0f",
+                "icons": [{"src": "/icon.png", "sizes": "512x512", "type": "image/png"}]}).encode(),
+                "application/manifest+json")
+        if path == "/api/whoami":
+            role = self._role()
+            out = {"role": role, "admin_exists": has_admin(), "player_name": PLAYER_NAME, "node": NODE,
+                   "access": cfg_yes("PHONE_ACCESS") or self._local(), "local": self._local()}
+            if role == "admin":
+                out["access_requests"] = access_requests()
+            return self._send(200, json.dumps(out).encode())
+        if path == "/api/access/status":
+            rid = (query.get("id") or [""])[0]
+            with ACCESS_LOCK:
+                r = ACCESS.get(rid)
+                if r and r["status"] == "approved":
+                    del ACCESS[rid]
+            if not r:
+                return self._send(200, b'{"status":"expired"}')
+            if r["status"] == "approved":
+                token = new_session(r["name"], r["role"])
+                return self._json_cookie(token, {"status": "approved", "role": r["role"]})
+            return self._send(200, json.dumps({"status": r["status"]}).encode())
+        if path == "/api/access":
+            return self._send(200, json.dumps(access_requests() if self._role() == "admin" else []).encode())
+        if path == "/api/players":
+            return self._send(200, json.dumps({"players": players_json(), "role": self._role()}).encode())
+        if path == "/api/peers":
+            return self._send(200, json.dumps(peers_json()).encode())
         if path in ("/", "/index.html"):
             return self._file("index.html")
         if path in ("/airplay", "/spotify", "/bluetooth", "/caldera"):
@@ -2793,7 +3123,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
             host = None if self._local() else self.headers.get("Host")
             return self._send(200, json.dumps(settings_json(self._local(), host, self._token())).encode())
         if path == "/api/state":
-            return self._send(200, json.dumps(state_json()).encode())
+            st = state_json()
+            if self._local():
+                st["access_requests"] = access_requests()     # the launcher shows them for approval
+            return self._send(200, json.dumps(st).encode())
         if path == "/api/backup":
             body = json.dumps(backup_json(), indent=1).encode()
             name = re.sub(r"[^A-Za-z0-9_-]+", "-", PLAYER_NAME).strip("-") or "plexpie"
@@ -2846,26 +3179,77 @@ class Handler(http.server.BaseHTTPRequestHandler):
             if time.time() < LOGIN_FAILS["until"]:
                 return self._send(429, b'{"error":"too many tries, wait a minute"}')
             if str(data.get("pin", "")) == cfg("PHONE_PIN") and cfg("PHONE_PIN"):
-                import secrets
-                token = secrets.token_urlsafe(24)
-                now = time.time()
-                SESSIONS[token] = {"exp": now + SESSION_DAYS * 86400, "first": now, "last": now,
-                                   "name": device_label(self.headers.get("User-Agent"), data.get("device"))}
-                save_sessions()
+                peer = bool(data.get("peer"))
+                name = (re.sub(r"[^A-Za-z0-9 ._()'·-]", "", str(data.get("device", "")))[:40] or "PlexPie player") \
+                    if peer else device_label(self.headers.get("User-Agent"), data.get("device"))
+                role = "admin" if data.get("claim") and not has_admin() else "full"
+                token = new_session(name, role, peer)
                 LOGIN_FAILS["n"] = 0
-                body = b'{"ok":true}'
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.send_header("Set-Cookie", f"plexpie={token}; Max-Age={SESSION_DAYS * 86400}; HttpOnly; SameSite=Lax; Path=/")
-                self.send_header("Content-Length", str(len(body)))
-                self.end_headers()
-                return self.wfile.write(body)
+                out = {"ok": True, "role": role}
+                if peer:
+                    out["token"] = token          # another PlexPie keeps it to control this one
+                return self._json_cookie(token, out)
             LOGIN_FAILS["n"] += 1
             if LOGIN_FAILS["n"] >= 5:
                 LOGIN_FAILS.update(n=0, until=time.time() + 60)
             return self._send(403, b'{"error":"wrong PIN"}')
+        if path == "/api/access/request":
+            if not cfg_yes("PHONE_ACCESS"):
+                return self._send(403, b'{"error":"remote access is off"}')
+            if not has_admin():
+                return self._send(409, b'{"error":"no admin device yet: use the PIN"}')
+            rid = access_request(device_label(self.headers.get("User-Agent"), data.get("device")),
+                                 self.client_address[0])
+            if not rid:
+                return self._send(429, b'{"error":"too many requests, try again in a few minutes"}')
+            return self._send(200, json.dumps({"id": rid}).encode())
+        if path == "/api/access":
+            if self._role() != "admin":
+                return self._send(403, b'{"error":"only the admin device can do that"}')
+            ok = access_decide(str(data.get("id", "")), str(data.get("allow", "")))
+            return self._send(200 if ok else 404, json.dumps({"ok": ok, "requests": access_requests()}).encode())
+        if path == "/api/handoff":
+            role = self._role()
+            want = str(data.get("role") or role)
+            tk_role = lower_role(want if want in ROLES else "controls", role)
+            if data.get("to") == "settings" and rank(tk_role) < rank("full"):
+                return self._send(403, b'{"error":"not allowed"}')
+            via = (SESSIONS.get(self._token() or "") or {}).get("name", PLAYER_NAME).replace("PlexPie · ", "")
+            return self._send(200, json.dumps({"ticket": make_ticket(tk_role, via)}).encode())
+        if path == "/api/peers":
+            if self._role() != "admin":
+                return self._send(403, b'{"error":"only the admin device can link players"}')
+            if data.get("action") == "link":
+                ok, err = peer_link(str(data.get("node", "")), str(data.get("pin", "")))
+            elif data.get("action") == "unlink":
+                ok, err = peer_unlink(str(data.get("node", ""))), ""
+            else:
+                ok, err = False, "unknown action"
+            return self._send(200 if ok else 400, json.dumps({"ok": ok, "error": err, "peers": peers_json()}).encode())
+        if path == "/api/peer":
+            with PEERS_LOCK:
+                p = load_peers().get(str(data.get("node", "")))
+            sub = str(data.get("path", ""))
+            if not p or sub not in PEER_PATHS:
+                return self._send(404, b'{"error":"not found"}')
+            st, j = peer_call(p, sub, data.get("body") or {}, timeout=4)
+            return self._send(200 if st == 200 else 502, json.dumps({"ok": st == 200, **j}).encode())
+        if path == "/api/peer/open":
+            with PEERS_LOCK:
+                p = load_peers().get(str(data.get("node", "")))
+            to = "settings" if data.get("to") == "settings" else "remote"
+            if not p:
+                return self._send(404, b'{"error":"not found"}')
+            want = lower_role(self._role(), p.get("role", "full"))
+            if to == "settings" and rank(want) < rank("full"):
+                return self._send(403, b'{"error":"this device has music controls only"}')
+            st, j = peer_call(p, "/api/handoff", {"to": to, "role": want}, timeout=4)
+            if st != 200 or not j.get("ticket"):
+                return self._send(502, json.dumps({"error": j.get("error") or "Couldn't reach it"}).encode())
+            return self._send(200, json.dumps(
+                {"url": f"http://{p['address']}:{p.get('port', HTTP_PORT)}/{to}?ticket={j['ticket']}"}).encode())
         if path == "/api/settings":
-            saved = apply_settings(data)
+            saved = apply_settings(data, self._role() or "full")
             return self._send(200, json.dumps({"ok": True, "saved": sorted(saved)}).encode())
         if path == "/api/bluetooth":
             what = data.get("action")
@@ -2879,11 +3263,25 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 ok = False
             return self._send(200 if ok else 400, json.dumps({"ok": ok, "bluetooth": read_bt()}).encode())
         if path == "/api/devices":
-            if data.get("action") == "signout":
-                for t in [t for t in SESSIONS if session_id(t) == str(data.get("id"))]:
-                    del SESSIONS[t]
+            me, role = self._token(), self._role()
+            target = [t for t in SESSIONS if session_id(t) == str(data.get("id"))]
+            action = data.get("action")
+            if action == "signout":
+                for t in target:
+                    if role == "admin" or t == me:        # others only sign themselves out
+                        del SESSIONS[t]
                 save_sessions()
-            return self._send(200, json.dumps(devices_json(self._token())).encode())
+            elif action == "role" and role == "admin" and data.get("role") in ROLES:
+                for t in target:
+                    SESSIONS[t]["role"] = data["role"]
+                save_sessions()
+            elif action == "claim-admin" and me and not has_admin():
+                SESSIONS[me]["role"] = "admin"           # the first admin device, when there's none yet
+                save_sessions()
+                log.info("%s is now the admin device", SESSIONS[me].get("name"))
+            elif action in ("role", "claim-admin"):
+                return self._send(403, b'{"error":"only the admin device can do that"}')
+            return self._send(200, json.dumps(devices_json(me)).encode())
         if path == "/api/restore":
             ok, msg = restore_backup(data)
             return self._send(200 if ok else 400, json.dumps({"ok": ok, "error": msg}).encode())
@@ -3254,7 +3652,7 @@ def main():
         spawn(airplay_reader)
     for fn in (fast_poller, slow_poller, focus_poller, gesture_reader, screen_loop, watchdog, update_checker,
                sleep_loop, eq_manager, dim_loop, theme_loop, knob_reader, screen_share_loop, home_button_loop,
-               rotation_sync):
+               rotation_sync, discovery_loop):
         spawn(fn)
     HA.start()
     while True:

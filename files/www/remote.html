@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PlexPie remote</title>
+<link rel="manifest" href="/remote.webmanifest">
+<link rel="apple-touch-icon" href="/icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="PlexPie">
+<meta name="theme-color" content="#0b0b0f">
+<style>
+  :root { --bg: #000; --panel: #1c1c1f; --panel2: #2a2a2e; --line: #2c2c30; --text: #f4f4f7; --muted: #8e8e93;
+    --accent: #0a84ff; --ok: #30d158; --warn: #ff9f0a; --bad: #ff453a; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); min-height: 100%;
+    font-family: "Inter", system-ui, -apple-system, sans-serif; }
+  button, input, select { font: inherit; }
+  .hidden { display: none !important; }
+  main { max-width: 560px; margin: 0 auto; padding: calc(18px + env(safe-area-inset-top)) 16px calc(28px + env(safe-area-inset-bottom)); }
+  header { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  header img { width: 34px; height: 34px; border-radius: 8px; }
+  header h1 { flex: 1; font-size: 26px; font-weight: 800; margin: 0; letter-spacing: -.01em; }
+  .chip { font-size: 12px; font-weight: 700; padding: 4px 9px; border-radius: 99px; background: var(--panel2); color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+  .chip.admin { background: #0a84ff33; color: #6cb4ff; }
+  .card { background: var(--panel); border-radius: 16px; padding: 16px; margin-bottom: 12px; }
+  .card h2 { margin: 0; font-size: 19px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+  .card h2 small { font-size: 13px; color: var(--muted); font-weight: 500; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
+  .dot.on { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+  .dot.off { background: var(--bad); }
+  .np { margin: 12px 0 4px; min-height: 44px; }
+  .np .src { font-size: 12px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: .06em; }
+  .np .title { font-size: 18px; font-weight: 700; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .np .artist { font-size: 15px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+  .btn { border: 0; border-radius: 12px; background: var(--panel2); color: var(--text); padding: 11px 14px; font-weight: 600; font-size: 15px; cursor: pointer; }
+  .btn:active { opacity: .6; }
+  .btn.primary { background: var(--accent); color: #fff; }
+  .btn.round { width: 48px; height: 48px; padding: 0; border-radius: 50%; font-size: 20px; display: grid; place-items: center; flex: none; }
+  .btn.ghost { background: transparent; color: var(--accent); padding: 8px 4px; }
+  .btn.danger { color: var(--bad); }
+  .btn[disabled] { opacity: .4; }
+  input[type=range] { flex: 1; accent-color: var(--accent); height: 30px; }
+  .vol { font-size: 14px; color: var(--muted); width: 34px; text-align: right; font-variant-numeric: tabular-nums; }
+  .srcs { display: flex; gap: 8px; overflow-x: auto; margin-top: 12px; padding-bottom: 2px; scrollbar-width: none; }
+  .srcs::-webkit-scrollbar { display: none; }
+  .srcs button { flex: none; border: 1px solid var(--line); background: transparent; color: var(--text); border-radius: 99px; padding: 7px 12px; font-size: 14px; }
+  .srcs button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .muted { color: var(--muted); font-size: 14px; line-height: 1.45; }
+  .req { border: 1px solid #ff9f0a66; background: #ff9f0a14; }
+  .req b { display: block; margin-bottom: 2px; }
+  .req .row { flex-wrap: wrap; }
+  #login { text-align: center; padding-top: 10vh; }
+  #login input { width: 100%; text-align: center; font-size: 28px; letter-spacing: .3em; padding: 12px; border-radius: 14px; border: 1px solid var(--line); background: var(--panel); color: var(--text); margin: 18px 0 10px; }
+  #login .btn { width: 100%; padding: 14px; font-size: 17px; margin-top: 8px; }
+  .or { color: var(--muted); font-size: 13px; margin: 14px 0 2px; }
+  .err { color: var(--bad); font-size: 14px; min-height: 20px; margin-top: 8px; }
+  .tip { margin-top: 18px; font-size: 13px; color: var(--muted); text-align: center; line-height: 1.5; }
+</style>
+</head>
+<body>
+<main>
+  <header><img src="/icon.png" alt=""><h1>PlexPie</h1><span class="chip hidden" id="rolechip"></span></header>
+
+  <section id="login" class="hidden">
+    <div class="muted" id="loginsub">Enter the PIN shown on the player under Settings › Remote access.</div>
+    <input id="pin" type="password" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="••••••">
+    <button class="btn primary" id="pinbtn">Unlock</button>
+    <div id="askwrap" class="hidden">
+      <div class="or">or</div>
+      <button class="btn" id="askbtn">Ask the admin</button>
+    </div>
+    <div class="err" id="loginerr"></div>
+  </section>
+
+  <section id="waiting" class="hidden">
+    <div class="card"><h2>Waiting for the admin…</h2>
+      <p class="muted">Approve this device on your admin phone (PlexPie remote or Settings › Remote access), or on the player's screen. This page continues by itself.</p>
+      <button class="btn" id="cancelask">Cancel</button></div>
+  </section>
+
+  <section id="app" class="hidden">
+    <div id="requests"></div>
+    <div id="players"></div>
+    <div class="tip" id="hstip"></div>
+  </section>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+const api = (path, body) => fetch(path, body === undefined ? {} : {method: "POST",
+  headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
+const deviceHint = () => (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1) ? "iPad" : "";
+const ROLE = {admin: "Admin", full: "Full access", controls: "Controls only"};
+let me = null, players = [], timer = null, dragging = null, askId = null;
+
+function show(id) { for (const s of ["login", "waiting", "app"]) $(s).classList.toggle("hidden", s !== id); }
+
+async function start() {
+  try { me = await (await api("/api/whoami")).json(); } catch (e) { setTimeout(start, 3000); return; }
+  if (!me.access) { show("login"); $("loginsub").textContent = "Remote access is off. Turn it on in Settings › Remote access on the player."; $("pin").classList.add("hidden"); $("pinbtn").classList.add("hidden"); return; }
+  if (!me.role) {
+    show("login");
+    $("askwrap").classList.toggle("hidden", !me.admin_exists);
+    return;
+  }
+  $("rolechip").textContent = ROLE[me.role] || me.role; $("rolechip").className = "chip" + (me.role === "admin" ? " admin" : "");
+  show("app"); poll();
+  const standalone = navigator.standalone || matchMedia("(display-mode: standalone)").matches;
+  $("hstip").innerHTML = standalone ? "" : /iPhone|iPad|Macintosh/.test(navigator.userAgent)
+    ? "Tip: tap <b>Share › Add to Home Screen</b> to open this like an app."
+    : "Tip: use your browser's <b>Add to Home screen</b> to open this like an app.";
+}
+
+async function poll() {
+  clearTimeout(timer);
+  try {
+    const r = await api("/api/players");
+    if (r.status === 401) { location.reload(); return; }
+    const j = await r.json(); players = j.players || [];
+    if (!dragging) renderPlayers();
+    if (me.role === "admin") {
+      const w = await (await api("/api/whoami")).json();
+      renderRequests(w.access_requests || []);
+    }
+  } catch (e) {}
+  timer = setTimeout(poll, 2000);
+}
+
+const SKIP = new Set(["home", "settings", "alert", "spotify_web"]);
+function renderPlayers() {
+  $("players").innerHTML = players.map(p => {
+    const s = p.state || {}, now = s.now || {};
+    const playing = !!s.playing;
+    const srcs = Object.entries(s.sources || {}).filter(([k]) => !SKIP.has(k));
+    const canSettings = me.role !== "controls" && (p.local || (p.role || "full") !== "controls");
+    const where = p.local ? "This player" : (p.online ? esc(p.address) : esc(p.error || "Offline"));
+    return `<div class="card" data-node="${esc(p.node)}">
+      <h2><span class="dot ${p.online ? (playing ? "on" : "") : "off"}"></span>${esc(p.name)} <small>${where}</small></h2>
+      ${p.online ? `
+      <div class="np"><div class="src">${playing ? "Playing · " + esc(s.now_source_name || "") : (s.source && s.source !== "home" ? "On screen · " + esc((s.sources || {})[s.source] || s.source) : "Idle")}</div>
+        <div class="title">${esc(now.title || (playing ? s.now_source_name : "Nothing playing"))}</div>
+        <div class="artist">${esc(now.artist || "")}</div></div>
+      <div class="row">
+        <button class="btn round" data-act="playpause" aria-label="Play or pause">${playing ? "❚❚" : "▶"}</button>
+        <button class="btn round" data-act="voldown" aria-label="Volume down">−</button>
+        <input type="range" min="0" max="100" value="${s.volume ?? 0}" data-act="vol" aria-label="Volume">
+        <button class="btn round" data-act="volup" aria-label="Volume up">+</button>
+        <span class="vol">${s.volume ?? "–"}</span>
+      </div>
+      <div class="srcs">${srcs.map(([k, n]) => `<button data-src="${esc(k)}" class="${k === s.source ? "on" : ""}">${esc(n)}</button>`).join("")}</div>
+      <div class="row">
+        ${playing ? `<button class="btn" data-act="pauseall">Pause all</button>` : ""}
+        ${canSettings ? `<button class="btn ghost" data-act="settings">Settings ›</button>` : ""}
+      </div>` : `<p class="muted">${p.error === "Offline" || !p.error ? "Can't reach it right now: it may be off or restarting." : esc(p.error)}</p>`}
+    </div>`;
+  }).join("") || `<div class="card muted">Loading…</div>`;
+}
+
+function renderRequests(list) {
+  $("requests").innerHTML = list.map(r => `<div class="card req" data-req="${esc(r.id)}">
+    <b>${esc(r.name)} wants to connect</b><span class="muted">From ${esc(r.ip)} · ${Math.max(1, Math.round((Date.now() / 1000 - r.t) / 60))} min ago</span>
+    <div class="row"><button class="btn primary" data-allow="full">Allow</button>
+      <button class="btn" data-allow="controls">Controls only</button>
+      <button class="btn danger" data-allow="deny">Deny</button></div></div>`).join("");
+}
+
+async function send(node, path, body) {
+  const p = players.find(x => x.node === node);
+  if (!p) return;
+  if (p.local) await api(path, body); else await api("/api/peer", {node, path, body});
+  poll();
+}
+
+document.addEventListener("click", async e => {
+  const card = e.target.closest("[data-node]"), node = card && card.dataset.node;
+  const act = e.target.closest("[data-act]");
+  if (act && node) {
+    const p = players.find(x => x.node === node), v = (p.state || {}).volume ?? 0;
+    const a = act.dataset.act;
+    if (a === "playpause") return send(node, "/api/playpause", {});
+    if (a === "pauseall") return send(node, "/api/pause_all", {});
+    if (a === "voldown") return send(node, "/api/volume", {delta: -5});
+    if (a === "volup") return send(node, "/api/volume", {delta: 5});
+    if (a === "settings") {
+      if (p.local) { location.href = "/settings"; return; }
+      const r = await api("/api/peer/open", {node, to: "settings"});
+      const j = await r.json().catch(() => ({}));
+      if (j.url) location.href = j.url; else alert(j.error || "Couldn't open it");
+      return;
+    }
+  }
+  const src = e.target.closest("[data-src]");
+  if (src && node) return send(node, "/api/source", {source: src.dataset.src});
+  const allow = e.target.closest("[data-allow]");
+  if (allow) {
+    const id = allow.closest("[data-req]").dataset.req;
+    await api("/api/access", {id, allow: allow.dataset.allow}); poll();
+  }
+});
+document.addEventListener("input", e => {
+  if (e.target.dataset.act !== "vol") return;
+  dragging = e.target; e.target.closest(".row").querySelector(".vol").textContent = e.target.value;
+});
+document.addEventListener("change", async e => {
+  if (e.target.dataset.act !== "vol") return;
+  const node = e.target.closest("[data-node]").dataset.node;
+  dragging = null; await send(node, "/api/volume", {value: +e.target.value});
+});
+
+$("pinbtn").onclick = async () => {
+  const r = await api("/api/login", {pin: $("pin").value, device: deviceHint()});
+  if (r.ok) return start();
+  const j = await r.json().catch(() => ({})); $("loginerr").textContent = j.error || "Wrong PIN";
+};
+$("pin").addEventListener("keydown", e => { if (e.key === "Enter") $("pinbtn").click(); });
+$("askbtn").onclick = async () => {
+  const r = await api("/api/access/request", {device: deviceHint()});
+  const j = await r.json().catch(() => ({}));
+  if (!j.id) { $("loginerr").textContent = j.error || "Couldn't ask"; return; }
+  askId = j.id; show("waiting"); waitAsk();
+};
+async function waitAsk() {
+  if (!askId) return;
+  try {
+    const j = await (await api("/api/access/status?id=" + encodeURIComponent(askId))).json();
+    if (j.status === "approved") { askId = null; return start(); }
+    if (j.status === "denied" || j.status === "expired") {
+      askId = null; show("login"); $("loginerr").textContent = j.status === "denied" ? "The admin said no." : "No answer in time. Try again."; return;
+    }
+  } catch (e) {}
+  setTimeout(waitAsk, 2000);
+}
+$("cancelask").onclick = () => { askId = null; show("login"); };
+document.addEventListener("visibilitychange", () => { if (!document.hidden && me && me.role) poll(); });
+start();
+</script>
+</body>
+</html>

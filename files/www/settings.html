@@ -79,6 +79,10 @@
   .page-intro { color: var(--muted); font-size: 14px; margin: 10px 4px 4px; line-height: 1.4; }
   .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); flex: none; }
   .dot.ok { background: var(--ok); } .dot.no { background: var(--warn); }
+  .row.wrap { flex-wrap: wrap; row-gap: 8px; }
+  .row.wrap > .t { flex: 1 1 calc(100% - 60px); }
+  .row.wrap > .acts { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; flex: 1 1 100%; }
+  @media (min-width: 700px) { .row.wrap > .t { flex: 1 1 auto; } .row.wrap > .acts { flex: none; } }
   .tag { font-size: 12px; color: var(--ok); border: 1px solid var(--ok); border-radius: 6px; padding: 0 5px; margin-left: 6px; vertical-align: 1px; white-space: nowrap; display: inline-block; }
 
   /* ---- controls */
@@ -152,6 +156,10 @@
   <div class="sub">Enter the PIN shown on the player's screen under Settings › Remote access. You only need it once on each device.</div>
   <input id="pin" type="password" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="••••••">
   <button class="btn primary" id="pinbtn">Unlock</button>
+  <div id="askwrap" class="hidden"><div class="note" style="padding:12px 0 4px">or</div>
+    <button class="btn" id="askbtn">Ask the admin</button></div>
+  <div id="askwait" class="hidden"><div class="sub" style="margin-top:16px">Waiting for the admin… Approve this device on your admin phone or on the player's screen.</div>
+    <button class="btn" id="askcancel" style="margin-top:12px">Cancel</button></div>
   <div class="note" id="pinerr"></div>
 </div>
 
@@ -355,13 +363,21 @@
           <div class="row"><div class="t"><b>Settings from other devices</b><small>Any phone, tablet or computer on your Wi-Fi</small></div>
             <label class="sw"><input type="checkbox" id="PHONE_ACCESS"><span></span></label></div>
           <div class="row"><div class="t"><b>Address</b><small>Open <code id="phoneurl"></code> in Safari, Chrome or any browser</small></div></div>
-          <div class="row local-only"><div class="t"><b>PIN</b><small>Asked once on each device</small></div>
+          <div class="row admin-only"><div class="t"><b>PIN</b><small>Asked once on each device</small></div>
             <b id="pinshow" style="font-size:20px;letter-spacing:.15em"></b>
             <button class="btn" id="newpin">New PIN</button></div></div>
         <div class="group local-only" id="remoteqr"></div>
+        <div id="reqwrap" class="hidden"><h3>Asking to connect</h3><div class="group" id="requests"></div></div>
+        <div class="group">
+          <div class="row link" data-href="/remote"><div class="t"><b>Remote control</b><small>Play, pause, volume and apps for this player and your other PlexPie players. On an iPhone: open it, then Share › Add to Home Screen.</small></div><span class="chev">›</span></div>
+          <div class="row" id="adminrow"><div class="t"><b>Admin device</b><small id="adminsub"></small></div>
+            <button class="btn hidden" id="claimadmin">Make this my admin device</button></div></div>
         <h3>Registered devices</h3>
         <div class="group" id="devices"></div>
-        <div class="note">Devices stay signed in for a year after their last visit. <span class="local-only">New PIN signs every device out.</span></div>
+        <div class="note">Devices stay signed in for a year after their last visit. <b>Full access</b>: all of Settings. <b>Controls only</b>: just the remote control. <b>Admin</b>: also approves new devices and sees the PIN. <span class="admin-only">New PIN signs every device out.</span></div>
+        <h3>Other PlexPie players</h3>
+        <div class="group" id="peers"></div>
+        <div class="note">Link your other players once with their PIN, then control them all from one remote, and open their Settings without the PIN.</div>
       </section>
 
       <!-- Backup -->
@@ -594,6 +610,8 @@ function guideRow(id) {
 function render() {
   const v = data.values;
   document.querySelectorAll(".local-only").forEach(e => e.classList.toggle("hidden", !data.local));
+  document.querySelectorAll(".admin-only").forEach(e => e.classList.toggle("hidden", data.role !== "admin"));
+  renderAdmin(); renderRequests(data.access_requests); renderPeers(data.peers);
   document.querySelectorAll(".remote-only").forEach(e => e.classList.toggle("hidden", !!data.local));
   $("who").textContent = data.player_name;
   document.querySelectorAll("[data-name]").forEach(e => e.textContent = data.player_name);
@@ -684,7 +702,12 @@ $("save").onclick = async () => {
 
 async function load() {
   const r = await api("/api/settings");
-  if (r.status === 401) { $("login").classList.remove("hidden"); return; }
+  if (r.status === 401) {
+    $("login").classList.remove("hidden");
+    api("/api/whoami").then(x => x.json()).then(w => $("askwrap").classList.toggle("hidden", !w.admin_exists)).catch(() => {});
+    return;
+  }
+  if (r.status === 403 && (await r.clone().json().catch(() => ({}))).error === "controls") { location.href = "/remote"; return; }
   if (r.status === 403) { document.body.innerHTML = '<div id="login"><h1>Remote access is off</h1><div class="sub">Turn it on in Settings › Remote access on the player.</div></div>'; return; }
   data = await r.json(); render();
   const want = location.hash.slice(1);
@@ -789,10 +812,13 @@ document.addEventListener("click", async e => {
 function renderDevices(list) {
   list = list || [];
   const devIcon = n => /iPad|tablet/i.test(n) ? I.tablet : /iPhone|phone/i.test(n) ? I.phone : /Mac|PC|computer|Chromebook/i.test(n) ? I.laptop : I.devices;
-  $("devices").innerHTML = list.length ? list.map(d => `<div class="row ic"><div class="icon" style="background:#3a3a3f">${devIcon(d.name)}</div>
+  const isAdmin = data && data.role === "admin";
+  const ROLE = {admin: "Admin", full: "Full access", controls: "Controls only"};
+  $("devices").innerHTML = list.length ? list.map(d => `<div class="row ic wrap"><div class="icon" style="background:${d.peer ? "#0a84ff" : "#3a3a3f"}">${d.peer ? I.devices : devIcon(d.name)}</div>
       <div class="t"><b>${esc(d.name)}${d.this ? '<span class="tag">This device</span>' : ""}</b>
-      <small>${d.first ? `Added ${day(d.first)}` : "Signed in"}${d.last ? ` · last used ${day(d.last)}` : ""}</small></div>
-      <button class="btn danger" data-dev-out="${esc(d.id)}">Sign out</button></div>`).join("")
+      <small>${esc(ROLE[d.role] || "Full access")}${d.peer ? " · another PlexPie" : ""} · ${d.first ? `added ${day(d.first)}` : "signed in"}${d.last ? ` · last used ${day(d.last)}` : ""}</small></div>
+      <div class="acts">${isAdmin ? `<select data-dev-role="${esc(d.id)}" style="max-width:150px">${["admin", "full", "controls"].map(r => `<option value="${r}" ${r === d.role ? "selected" : ""}>${ROLE[r]}</option>`).join("")}</select>` : ""}
+      ${isAdmin || d.this ? `<button class="btn danger" data-dev-out="${esc(d.id)}">Sign out</button>` : ""}</div></div>`).join("")
     : `<div class="row"><div class="t"><small>None yet. Open the address above on a phone, tablet or computer and enter the PIN.</small></div></div>`;
 }
 document.addEventListener("click", async e => {
@@ -802,6 +828,72 @@ document.addEventListener("click", async e => {
   const r = await api("/api/devices", {action: "signout", id: b.dataset.devOut});
   if (me) return location.reload();
   renderDevices(await r.json()); toast("Signed out");
+});
+
+document.addEventListener("change", async e => {
+  const s = e.target.closest("[data-dev-role]"); if (!s) return;
+  const r = await api("/api/devices", {action: "role", id: s.dataset.devRole, role: s.value});
+  if (r.ok) { renderDevices(await r.json()); toast("Changed"); } else toast("Only the admin device can do that");
+});
+
+// ---------------- admin device, requests to connect, other players
+function renderAdmin() {
+  const mine = (data.devices || []).find(d => d.this);
+  const admins = (data.devices || []).filter(d => d.role === "admin" && !d.peer);
+  $("claimadmin").classList.toggle("hidden", !(mine && !data.admin_exists));
+  $("adminsub").textContent = mine && mine.role === "admin"
+    ? "This device is the admin: it approves new devices, sees the PIN and chooses what each device can do."
+    : admins.length ? `${admins.map(a => a.name).join(", ")}. The player's own screen can always do the same.`
+    : data.local ? "None yet. On your phone, open Settings here with the PIN and tap Make this my admin device."
+    : "None yet. Make this device the admin to approve new devices without sharing the PIN.";
+}
+$("claimadmin").onclick = async () => {
+  if (!confirm("Make this device the admin? It can approve new devices, see the PIN and change what other devices can do.")) return;
+  const r = await api("/api/devices", {action: "claim-admin"});
+  if (r.ok) { toast("This is now the admin device"); load(); } else toast("There's already an admin device");
+};
+function renderRequests(list) {
+  list = list || [];
+  $("reqwrap").classList.toggle("hidden", !list.length);
+  $("requests").innerHTML = list.map(r => `<div class="row wrap" data-req="${esc(r.id)}"><div class="t"><b>${esc(r.name)}</b><small>From ${esc(r.ip)}</small></div>
+    <div class="acts"><button class="btn primary" data-allow="full">Allow</button><button class="btn" data-allow="controls">Controls only</button>
+    <button class="btn danger" data-allow="deny">Deny</button></div></div>`).join("");
+}
+document.addEventListener("click", async e => {
+  const a = e.target.closest("[data-allow]"); if (!a) return;
+  const r = await api("/api/access", {id: a.closest("[data-req]").dataset.req, allow: a.dataset.allow});
+  const j = await r.json().catch(() => ({})); renderRequests(j.requests || []);
+  toast(a.dataset.allow === "deny" ? "Denied" : "Allowed"); refreshQuick();
+});
+setInterval(async () => {                  // the admin sees new requests without reloading
+  if (!data || data.role !== "admin" || document.hidden) return;
+  try { const w = await (await api("/api/whoami")).json(); renderRequests(w.access_requests); } catch (e) {}
+}, 4000);
+function renderPeers(list) {
+  list = list || [];
+  const admin = data.role === "admin";
+  $("peers").innerHTML = list.length ? list.map(p => `<div class="row wrap" data-peer="${esc(p.node)}"><span class="dot ${p.seen ? "ok" : ""}"></span>
+      <div class="t"><b>${esc(p.name)}</b><small>${esc(p.address || "")}${p.linked ? " · linked" : ""}${p.seen ? "" : " · not seen right now"}</small></div>
+      <div class="acts">${p.linked ? `<button class="btn" data-peer-open="settings">Settings</button>${admin ? `<button class="btn danger" data-peer-unlink>Unlink</button>` : ""}`
+        : admin ? `<input type="password" inputmode="numeric" maxlength="6" placeholder="Its PIN" style="width:110px" data-peer-pin><button class="btn" data-peer-link>Link</button>` : ""}</div></div>`).join("")
+    : `<div class="row"><div class="t"><small>No other PlexPie players found on your network.</small></div></div>`;
+}
+document.addEventListener("click", async e => {
+  const row = e.target.closest("[data-peer]"); if (!row) return;
+  const node = row.dataset.peer;
+  if (e.target.closest("[data-peer-link]")) {
+    const pin = row.querySelector("[data-peer-pin]").value;
+    const r = await api("/api/peers", {action: "link", node, pin});
+    const j = await r.json().catch(() => ({}));
+    toast(j.ok ? "Linked" : (j.error || "Couldn't link")); if (j.peers) renderPeers(j.peers);
+  } else if (e.target.closest("[data-peer-unlink]")) {
+    if (!confirm("Unlink this player? It won't show in the remote any more.")) return;
+    const j = await (await api("/api/peers", {action: "unlink", node})).json().catch(() => ({}));
+    toast("Unlinked"); if (j.peers) renderPeers(j.peers);
+  } else if (e.target.closest("[data-peer-open]")) {
+    const j = await (await api("/api/peer/open", {node, to: "settings"})).json().catch(() => ({}));
+    if (j.url) location.href = j.url; else toast(j.error || "Couldn't open it");
+  }
 });
 
 // ---------------- wi-fi
@@ -895,6 +987,26 @@ $("pinbtn").onclick = async () => {
   } else { const j = await r.json().catch(() => ({})); $("pinerr").textContent = j.error || "Wrong PIN"; }
 };
 $("pin").addEventListener("keydown", e => { if (e.key === "Enter") $("pinbtn").click(); });
+let askId = null;
+$("askbtn").onclick = async () => {
+  const r = await api("/api/access/request", {device: deviceHint()});
+  const j = await r.json().catch(() => ({}));
+  if (!j.id) { $("pinerr").textContent = j.error || "Couldn't ask"; return; }
+  askId = j.id; $("askwrap").classList.add("hidden"); $("askwait").classList.remove("hidden"); waitAsk();
+};
+$("askcancel").onclick = () => { askId = null; $("askwait").classList.add("hidden"); $("askwrap").classList.remove("hidden"); };
+async function waitAsk() {
+  if (!askId) return;
+  try {
+    const j = await (await api("/api/access/status?id=" + encodeURIComponent(askId))).json();
+    if (j.status === "approved") { askId = null; $("login").classList.add("hidden"); return load(); }
+    if (j.status === "denied" || j.status === "expired") {
+      askId = null; $("askwait").classList.add("hidden"); $("askwrap").classList.remove("hidden");
+      $("pinerr").textContent = j.status === "denied" ? "The admin said no." : "No answer in time. Try again."; return;
+    }
+  } catch (e) {}
+  setTimeout(waitAsk, 2000);
+}
 
 // ---------------- backup, restore, power-cut protection
 $("restore").onchange = async (e) => {
