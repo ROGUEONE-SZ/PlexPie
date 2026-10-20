@@ -8,7 +8,7 @@
   <img src="https://img.shields.io/badge/Raspberry%20Pi-4%20%7C%205-c51a4a?logo=raspberrypi&logoColor=white" alt="Raspberry Pi 4 or 5">
   <img src="https://img.shields.io/badge/Raspberry%20Pi%20OS-64--bit%20Lite%20or%20Desktop-c51a4a" alt="Raspberry Pi OS 64-bit">
   <img src="https://img.shields.io/badge/Home%20Assistant-MQTT-41bdf5?logo=homeassistant&logoColor=white" alt="Home Assistant via MQTT">
-  <a href="https://github.com/ROGUEONE-SZ/plexamp-raspberry-pi-install/stargazers"><img src="https://img.shields.io/github/stars/ROGUEONE-SZ/plexamp-raspberry-pi-install?style=flat&color=f5a524" alt="GitHub stars"></a>
+  <a href="https://github.com/ROGUEONE-SZ/PlexPie/stargazers"><img src="https://img.shields.io/github/stars/ROGUEONE-SZ/PlexPie?style=flat&color=f5a524" alt="GitHub stars"></a>
   <a href="#how-this-was-built"><img src="https://img.shields.io/badge/built%20with-Claude-d97757" alt="Built with Claude"></a>
 </p>
 
@@ -90,7 +90,7 @@ it turned out nicer than I expected. Please read this before you start:
   Backup) and keep the memory card you started from if you're nervous.
 - **Getting help:** the [troubleshooting guide](docs/TROUBLESHOOTING.md) covers every problem I've hit.
   Questions, setup and network/router problems go to
-  [Discussions](https://github.com/ROGUEONE-SZ/plexamp-raspberry-pi-install/discussions), where other
+  [Discussions](https://github.com/ROGUEONE-SZ/PlexPie/discussions), where other
   builders can help. Bugs go to Issues, with the diagnostics report the form asks for.
 
 ## How this was built
@@ -130,7 +130,7 @@ What that means for you:
 The [step-by-step guide](docs/INSTALL.md) walks through everything from an empty Pi. The short version, on the Pi, logged in as your normal user (not root):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ROGUEONE-SZ/plexamp-raspberry-pi-install/main/get.sh | bash
+curl -fsSL https://raw.githubusercontent.com/ROGUEONE-SZ/PlexPie/main/get.sh | bash
 ```
 
 This downloads PlexPie to `~/plexpie`, then runs a short setup wizard that asks for:
@@ -152,7 +152,7 @@ Music Assistant on the screen the first time you open them.
 <summary>Prefer to do it by hand?</summary>
 
 ```bash
-git clone https://github.com/ROGUEONE-SZ/plexamp-raspberry-pi-install ~/plexpie
+git clone https://github.com/ROGUEONE-SZ/PlexPie ~/plexpie
 cd ~/plexpie
 bash configure.sh          # or: cp plexpie.conf.example plexpie.conf && nano plexpie.conf
 sudo bash install.sh
@@ -310,7 +310,7 @@ support for it is on the [Plex forums](https://forums.plex.tv/c/plex-labs/16).
 
 **Something not working?** The [troubleshooting guide](docs/TROUBLESHOOTING.md) lists real problems and their fixes in plain English: a cut-off or blank screen, Plexamp spinning (often the router blocking `plex.direct`), updates that don't finish, Bluetooth, Home Assistant, router settings and connecting with `ssh`. The player has a short version under Settings › Setup guides › Troubleshooting.
 
-For a read-only report from another computer: `curl -fsSL https://raw.githubusercontent.com/ROGUEONE-SZ/plexamp-raspberry-pi-install/main/tools/diag.sh | ssh USER@PI-ADDRESS bash`
+For a read-only report from another computer: `curl -fsSL https://raw.githubusercontent.com/ROGUEONE-SZ/PlexPie/main/tools/diag.sh | ssh USER@PI-ADDRESS bash`
 
 | Problem | Where to look |
 |---|---|
@@ -381,7 +381,7 @@ companies from turning a hobby project into a product without asking.
 
 **Commercial use is not allowed without permission.** That includes selling devices or kits
 with PlexPie on them, offering it as a paid service, or building it into a product. If you'd
-like to do that, start a [Discussion](https://github.com/ROGUEONE-SZ/plexamp-raspberry-pi-install/discussions)
+like to do that, start a [Discussion](https://github.com/ROGUEONE-SZ/PlexPie/discussions)
 titled "Commercial license".
 
 Contributions are welcome under the terms in [CONTRIBUTING](CONTRIBUTING.md). Security problems:

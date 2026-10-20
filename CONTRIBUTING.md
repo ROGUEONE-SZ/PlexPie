@@ -5,7 +5,7 @@ contributions are small, focused and tested on a real Pi.
 
 ## Before you start
 
-- **Questions and ideas:** start in [Discussions](https://github.com/ROGUEONE-SZ/plexamp-raspberry-pi-install/discussions).
+- **Questions and ideas:** start in [Discussions](https://github.com/ROGUEONE-SZ/PlexPie/discussions).
 - **Bugs:** open an issue with the diagnostics report (the form asks for it).
 - **Bigger changes:** open a discussion first, so we agree on the approach before you spend time on it.
 

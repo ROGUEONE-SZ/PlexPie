@@ -79,7 +79,7 @@
 
 <main>
   <div class="cover"><h1>PlexPie</h1><p>Setup guide</p><img src="/img/launcher.png" alt=""><p data-ver></p>
-    <p>github.com/ROGUEONE-SZ/plexamp-raspberry-pi-install</p></div>
+    <p>github.com/ROGUEONE-SZ/PlexPie</p></div>
 
   <div class="home">
     <p class="lead">Step-by-step instructions for <b data-name>your player</b>. Tap a guide to open it. Each one can be saved as a PDF, shared or printed.</p>
@@ -138,7 +138,7 @@
       <li>On your computer, open <b>Terminal</b> (Mac: ⌘ Space, type Terminal) or <b>PowerShell</b> (Windows: Start, type PowerShell).</li>
       <li>Type <code>ssh pi@plexpie.local</code> (your username and hostname), press Enter, type <code>yes</code>, then your password. Nothing shows while you type the password; that's normal.</li>
       <li>Paste this line and press Enter:
-        <pre>curl -fsSL https://raw.githubusercontent.com/ROGUEONE-SZ/plexamp-raspberry-pi-install/main/get.sh | bash</pre></li>
+        <pre>curl -fsSL https://raw.githubusercontent.com/ROGUEONE-SZ/PlexPie/main/get.sh | bash</pre></li>
       <li>Answer the short questions (press Enter to accept a suggestion): player name, which apps you want, screen sleep.</li>
       <li>When it asks for a <b>claim code</b>: open <code>plex.tv/claim</code> on any device, copy the code, paste it, press Enter, type the player name, and press Ctrl+C when Plexamp says it's ready.</li>
       <li>It takes 15 to 30 minutes. When it's done, the screen shows the PlexPie home screen.</li>
@@ -366,7 +366,7 @@
       <tr><td>Caldera isn't in Plexamp's speaker list</td><td>Settings › Configuration › Caldera Music: check it's on and signed in. Not signed in: run the installer again from a computer (<code>ssh -t</code>). Caldera needs a 64-bit Raspberry Pi OS on a Pi 4 or 5.</td></tr>
       <tr><td>Caldera plays, but other apps go silent (or the other way round)</td><td>Caldera has the DAC to itself. Set <code>CALDERA_DEVICE="auto"</code> in plexpie.conf, run the installer again and reboot.</td></tr>
     </table>
-    <div class="tip"><b>Report for help:</b> from a computer, run<br><code>curl -fsSL https://raw.githubusercontent.com/ROGUEONE-SZ/plexamp-raspberry-pi-install/main/tools/diag.sh | ssh USER@ADDRESS bash</code><br>and attach the output to an issue on GitHub.</div>
+    <div class="tip"><b>Report for help:</b> from a computer, run<br><code>curl -fsSL https://raw.githubusercontent.com/ROGUEONE-SZ/PlexPie/main/tools/diag.sh | ssh USER@ADDRESS bash</code><br>and attach the output to an issue on GitHub.</div>
   </section>
   <!-- ===================================================================== screen sharing -->
   <section class="g" id="screen" data-group="3" data-sub="See and use the screen from a Mac, iPad or iPhone">

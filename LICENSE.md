@@ -1,4 +1,4 @@
-Required Notice: Copyright 2026 ROGUEONE-SZ (https://github.com/ROGUEONE-SZ/plexamp-raspberry-pi-install)
+Required Notice: Copyright 2026 ROGUEONE-SZ (https://github.com/ROGUEONE-SZ/PlexPie)
 
 # PolyForm Noncommercial License 1.0.0
 

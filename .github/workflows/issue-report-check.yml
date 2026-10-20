@@ -18,7 +18,7 @@ jobs:
             const NEED = "needs-report";
             const hasReport = (body) => /== PlexPie \d|===== VERSIONS =====|PlexPie \d+\.\d+\.\d+ on /.test(body || "");
             const msg = "Thanks for the report! It's missing the diagnostics output, which is the fastest way to find the problem. " +
-              "From another computer, run:\n\n```\ncurl -fsSL https://raw.githubusercontent.com/ROGUEONE-SZ/plexamp-raspberry-pi-install/main/tools/diag.sh | ssh USER@PLAYER-ADDRESS bash\n```\n\n" +
+              "From another computer, run:\n\n```\ncurl -fsSL https://raw.githubusercontent.com/ROGUEONE-SZ/PlexPie/main/tools/diag.sh | ssh USER@PLAYER-ADDRESS bash\n```\n\n" +
               "and paste the output into the issue (edit it, no need for a new one). Network and setup questions are best in Discussions. " +
               "Issues without a report are closed after a week; adding the report reopens the conversation.";
             const { owner, repo } = context.repo;

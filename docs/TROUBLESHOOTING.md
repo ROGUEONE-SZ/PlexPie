@@ -38,7 +38,7 @@ Two read-only checks collect everything needed to find a problem. They change no
 chose when you set up the memory card, and the address with your player's (Settings › Remote access):
 
 ```
-curl -fsSL https://raw.githubusercontent.com/ROGUEONE-SZ/plexamp-raspberry-pi-install/main/tools/diag.sh | ssh USER@192.168.1.42 bash
+curl -fsSL https://raw.githubusercontent.com/ROGUEONE-SZ/PlexPie/main/tools/diag.sh | ssh USER@192.168.1.42 bash
 ```
 
 It shows the PlexPie and browser versions, the real screen size against what each page sees, the
@@ -50,7 +50,7 @@ report and plays a short test tone.
 **Plexamp screen blank or broken?** This one reloads the Plexamp page once and lists every error:
 
 ```
-curl -fsSL https://raw.githubusercontent.com/ROGUEONE-SZ/plexamp-raspberry-pi-install/main/tools/plexamp-check.sh | ssh USER@192.168.1.42 bash
+curl -fsSL https://raw.githubusercontent.com/ROGUEONE-SZ/PlexPie/main/tools/plexamp-check.sh | ssh USER@192.168.1.42 bash
 ```
 
 ---
@@ -205,7 +205,7 @@ there.
 **Older versions:** with Plexamp open on the screen, run this from another computer:
 
 ```
-curl -fsSL https://raw.githubusercontent.com/ROGUEONE-SZ/plexamp-raspberry-pi-install/main/tools/plexamp-reset.sh | ssh USER@192.168.1.42 bash -s fix
+curl -fsSL https://raw.githubusercontent.com/ROGUEONE-SZ/PlexPie/main/tools/plexamp-reset.sh | ssh USER@192.168.1.42 bash -s fix
 ```
 
 It lists the addresses the screen remembered, saves a copy, clears what the screen's browser saved
@@ -221,7 +221,7 @@ Tip: give the player its fixed address **before** you start using it, so this ne
 it's playing:
 
 ```
-curl -fsSL https://raw.githubusercontent.com/ROGUEONE-SZ/plexamp-raspberry-pi-install/main/tools/screenshot.sh | ssh USER@192.168.1.42 bash -s plexamp > plexpie-screen.png
+curl -fsSL https://raw.githubusercontent.com/ROGUEONE-SZ/PlexPie/main/tools/screenshot.sh | ssh USER@192.168.1.42 bash -s plexamp > plexpie-screen.png
 ```
 
 ### Plexamp says it isn't linked, or is linked to the wrong Plex account
@@ -409,9 +409,9 @@ A command wasn't finished (usually a missing quote). Press **Ctrl + C** and past
 ## Still stuck?
 
 - **Questions, setup help, network or router problems:** ask in
-  [Discussions](https://github.com/ROGUEONE-SZ/plexamp-raspberry-pi-install/discussions). Other builders
+  [Discussions](https://github.com/ROGUEONE-SZ/PlexPie/discussions). Other builders
   can help, and the answer helps the next person.
 - **A bug on supported hardware:** run the report from
   [Getting a report from the player](#getting-a-report-from-the-player) and
-  [open an issue](https://github.com/ROGUEONE-SZ/plexamp-raspberry-pi-install/issues/new/choose) with its
+  [open an issue](https://github.com/ROGUEONE-SZ/PlexPie/issues/new/choose) with its
   output. The reports hide passwords and sign-in tokens, but have a look before you paste.

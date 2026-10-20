@@ -1,13 +1,13 @@
 #!/bin/bash
 # PlexPie one-line installer.
 #
-#   curl -fsSL https://raw.githubusercontent.com/ROGUEONE-SZ/plexamp-raspberry-pi-install/main/get.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/ROGUEONE-SZ/PlexPie/main/get.sh | bash
 #
 # Downloads PlexPie to ~/plexpie (or updates it), runs the setup wizard the
 # first time, then runs the installer. Run it as your normal user, not root.
 set -euo pipefail
 
-REPO_URL="${PLEXPIE_REPO:-https://github.com/ROGUEONE-SZ/plexamp-raspberry-pi-install}"
+REPO_URL="${PLEXPIE_REPO:-https://github.com/ROGUEONE-SZ/PlexPie}"
 BRANCH="${PLEXPIE_BRANCH:-main}"
 DEST="${PLEXPIE_DIR:-$HOME/plexpie}"
 

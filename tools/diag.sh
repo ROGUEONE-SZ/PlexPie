@@ -1,6 +1,6 @@
 #!/bin/bash
 # PlexPie diagnostics: prints what's needed to troubleshoot the screen. Changes nothing.
-# Run from another computer:  curl -fsSL https://raw.githubusercontent.com/ROGUEONE-SZ/plexamp-raspberry-pi-install/main/tools/diag.sh | ssh USER@PI bash
+# Run from another computer:  curl -fsSL https://raw.githubusercontent.com/ROGUEONE-SZ/PlexPie/main/tools/diag.sh | ssh USER@PI bash
 redact() { sed -E 's/(X-Plex-Token=|[Tt]oken["=: ]+|authToken["=: ]+)[A-Za-z0-9_.~-]{6,}/\1(hidden)/g; s/((password|passwd|psk|secret)["=: ]+)[^ ",]+/\1(hidden)/Ig'; }
 {
 echo "== PlexPie $(sed -n 's/^VERSION = "\(.*\)"/\1/p' /opt/plexpie/plexpied.py) on $(hostname), up $(uptime -p)"

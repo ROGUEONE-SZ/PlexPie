@@ -3069,7 +3069,7 @@ class HomeAssistant:
         self.disc("update", "software", {"name": "PlexPie update", "device_class": "firmware",
                                          "state_topic": f"{b}/update", "command_topic": f"{b}/update/set",
                                          "payload_install": "install", "title": "PlexPie",
-                                         "release_url": "https://github.com/ROGUEONE-SZ/plexamp-raspberry-pi-install"})
+                                         "release_url": "https://github.com/ROGUEONE-SZ/PlexPie"})
         self.disc("update", "os_update", {"name": "Raspberry Pi OS update", "icon": "mdi:raspberry-pi",
                                           "state_topic": f"{b}/os_update", "command_topic": f"{b}/os_update/set",
                                           "payload_install": "install", "title": "Raspberry Pi OS"})

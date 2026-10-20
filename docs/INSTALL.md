@@ -117,7 +117,7 @@ Don't plug in the power yet.
 Still in the terminal connected to the Pi, copy this whole line, paste it, and press <kbd>Enter</kbd>:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ROGUEONE-SZ/plexamp-raspberry-pi-install/main/get.sh | bash
+curl -fsSL https://raw.githubusercontent.com/ROGUEONE-SZ/PlexPie/main/get.sh | bash
 ```
 
 A short setup wizard asks a few questions. Press <kbd>Enter</kbd> to accept the suggested answer
@@ -348,7 +348,7 @@ Try the quick fixes first: wait two minutes after a restart, then **Settings ›
 | Home screen too big / cut off | Pinch-zoom: update to 2.9.2+ and reboot |
 | Can't find the address for other devices | It's in Settings → Remote access on the player (with a QR code) |
 | The screen is black | Tap it: it's probably asleep. Still black? Unplug the power for 10 seconds |
-| Anything else | See the [troubleshooting guide](TROUBLESHOOTING.md), or run `bash ~/plexpie/tools/diagnose.sh` and [open an issue](https://github.com/ROGUEONE-SZ/plexamp-raspberry-pi-install/issues) with its output |
+| Anything else | See the [troubleshooting guide](TROUBLESHOOTING.md), or run `bash ~/plexpie/tools/diagnose.sh` and [open an issue](https://github.com/ROGUEONE-SZ/PlexPie/issues) with its output |
 
 ---
 

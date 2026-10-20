@@ -3,7 +3,7 @@
 PlexPie runs on your home network and can control your player, so security problems matter.
 
 **Please report them privately**, not in a public issue:
-[Report a vulnerability](https://github.com/ROGUEONE-SZ/plexamp-raspberry-pi-install/security/advisories/new).
+[Report a vulnerability](https://github.com/ROGUEONE-SZ/PlexPie/security/advisories/new).
 Include what you found, how to reproduce it, and which version (Settings › System).
 
 This is a one-person hobby project: I'll reply as soon as I can, usually within a week, and credit you

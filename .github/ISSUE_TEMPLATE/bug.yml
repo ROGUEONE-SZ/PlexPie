@@ -6,8 +6,8 @@ body:
     attributes:
       value: |
         Thanks for helping make PlexPie better. Before you open a bug:
-        - Try the quick fixes and the [troubleshooting guide](https://github.com/ROGUEONE-SZ/plexamp-raspberry-pi-install/blob/main/docs/TROUBLESHOOTING.md).
-        - Questions, network or router problems (AirPlay not showing up, addresses, Wi-Fi) and setup help belong in [Discussions](https://github.com/ROGUEONE-SZ/plexamp-raspberry-pi-install/discussions), where other builders can help too.
+        - Try the quick fixes and the [troubleshooting guide](https://github.com/ROGUEONE-SZ/PlexPie/blob/main/docs/TROUBLESHOOTING.md).
+        - Questions, network or router problems (AirPlay not showing up, addresses, Wi-Fi) and setup help belong in [Discussions](https://github.com/ROGUEONE-SZ/PlexPie/discussions), where other builders can help too.
         - PlexPie is a hobby project, tested on a Raspberry Pi 4/5 with an official or HDMI touchscreen and a USB DAC. Other hardware is welcome but community-supported.
   - type: textarea
     id: what
@@ -36,7 +36,7 @@ body:
       label: Report (required)
       description: |
         From another computer, run this (use your username and your player's address) and paste everything it prints:
-        `curl -fsSL https://raw.githubusercontent.com/ROGUEONE-SZ/plexamp-raspberry-pi-install/main/tools/diag.sh | ssh USER@PLAYER-ADDRESS bash`
+        `curl -fsSL https://raw.githubusercontent.com/ROGUEONE-SZ/PlexPie/main/tools/diag.sh | ssh USER@PLAYER-ADDRESS bash`
         Or, on the Pi: `bash ~/plexpie/tools/diagnose.sh`. Both hide passwords and sign-in tokens, but have a look before you paste.
       render: text
     validations:
