@@ -2,6 +2,15 @@
 
 Already running PlexPie? **Settings › Updates › PlexPie › Update** brings you to the latest version.
 
+## 2.17 (October 21, 2026)
+- **Album covers on the home screen:** the playing tile shows the cover (Plexamp, AirPlay, Spotify,
+  Apple Music and the web players), with the track name when there's room.
+- **YouTube Music and BBC Sounds** web players on the screen (optional, Settings › Configuration).
+- Fix: in portrait, a long track title no longer pushes the home screen wider than the display; it
+  glides back and forth instead. The bottom bar fits narrow screens too.
+
+Thanks to starbow777 for the ideas and the bug report.
+
 ## 2.16 (October 20, 2026)
 - **Admin phone:** make your phone the admin device. New phones and tablets tap *Ask the admin* instead of
   typing the PIN; approve them on your phone or on the player's screen.

@@ -7,12 +7,12 @@
 <style>
   :root {
     --bg: #0b0b0f; --panel: #16161c; --line: #26262e; --text: #f4f4f7; --muted: #8e8e99;
-    --plexamp: #f5a524; --apple: #fa3c5a; --airplay: #3b8cf6; --ma: #19c2a8; --spotify: #1ed760; --timer: #ff5a4f; --bt: #7b8cff; --ha: #41bdf5; --caldera: #ff8a3d; --lamp: #ffd166;
+    --plexamp: #f5a524; --apple: #fa3c5a; --airplay: #3b8cf6; --ma: #19c2a8; --spotify: #1ed760; --timer: #ff5a4f; --bt: #7b8cff; --ha: #41bdf5; --caldera: #ff8a3d; --ytm: #ff3355; --bbc: #ff7a2e; --lamp: #ffd166;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden;
     font-family: "Inter", "Noto Sans", "DejaVu Sans", system-ui, sans-serif; }
-  body { display: grid; grid-template-rows: var(--hh, 54px) 1fr var(--fh, 76px); height: 100vh;
+  body { display: grid; grid-template-rows: var(--hh, 54px) 1fr var(--fh, 76px); grid-template-columns: minmax(0, 1fr); height: 100vh;
     padding: 0 var(--pad, 14px); font-size: var(--fs, 16px); }
 
   header, footer { zoom: var(--z, 1); }
@@ -20,12 +20,27 @@
   body.themed { background: radial-gradient(130% 75% at 50% -10%, color-mix(in srgb, var(--art) 30%, transparent), transparent 70%), var(--bg); }
   body.themed .np .chip { background: color-mix(in srgb, var(--art) 30%, var(--panel)); color: var(--art); }
   body.themed .bar b { background: var(--art); }
-  header { display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--line); }
+  header { display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--line); min-width: 0; overflow: hidden; }
+  footer { min-width: 0; }
   .name { font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
   .np { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; justify-content: center; }
   .np .chip { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
     padding: 4px 9px; border-radius: 999px; background: var(--panel); color: var(--muted); white-space: nowrap; }
-  .np .track { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .np .track { font-size: 15px; white-space: nowrap; overflow: hidden; min-width: 0; }
+  .np .track span { display: inline-block; }
+  /* a long title glides back and forth instead of pushing the screen wider */
+  .np .track.long span { animation: glide var(--glide, 10s) ease-in-out infinite alternate; }
+  @keyframes glide { 0%, 15% { transform: translateX(0); } 85%, 100% { transform: translateX(var(--dx, 0)); } }
+  /* the playing tile shows the album cover */
+  .tile .cover { position: absolute; inset: 0; border-radius: inherit; background-size: cover; background-position: center;
+    opacity: 0; transition: opacity .6s; pointer-events: none; }
+  .tile .cover::after { content: ""; position: absolute; inset: 0; border-radius: inherit;
+    background: linear-gradient(180deg, rgba(10,10,14,.15) 0%, rgba(10,10,14,.55) 55%, rgba(10,10,14,.92) 100%); }
+  .tile.has-cover .cover { opacity: 1; }
+  .tile > *:not(.cover):not(.eq) { position: relative; z-index: 1; }
+  .tile .eq { z-index: 1; }
+  .tile > div { min-width: 0; max-width: 100%; }
+  .tile.has-cover .sub { color: #fff; }
   .clock { font-size: 20px; font-variant-numeric: tabular-nums; font-weight: 600; }
   .gear { width: 40px; height: 40px; border: 0; border-radius: 12px; background: transparent; color: var(--muted);
     display: grid; place-items: center; margin-right: -6px; }
@@ -48,7 +63,8 @@
   .tile { padding: clamp(10px, 8cqmin, 28px); border-radius: clamp(14px, 9cqmin, 28px); }
   .tile svg { width: clamp(28px, 26cqmin, 110px); height: clamp(28px, 26cqmin, 110px); color: var(--c); }
   .tile .label { font-size: clamp(15px, 11cqmin, 34px); font-weight: 700; line-height: 1.15; }
-  .tile .sub { margin-top: .35em; font-size: clamp(11px, 6.5cqmin, 18px); color: var(--muted); min-height: 1.3em; }
+  .tile .sub { margin-top: .35em; font-size: clamp(11px, 6.5cqmin, 18px); color: var(--muted); min-height: 1.3em;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   @container (max-height: 150px) { .tile .sub { display: none; } }
   .tile.playing { box-shadow: inset 0 0 0 2px var(--c), 0 0 24px -6px var(--c); }
   .tile.playing .sub { color: var(--c); font-weight: 600; }
@@ -72,6 +88,15 @@
   .sc.on { background: color-mix(in srgb, var(--lamp) 28%, var(--panel)); color: var(--lamp);
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--lamp) 50%, transparent); }
   .sc span { max-width: 9em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* narrow (portrait) screens: room for the track title and the volume bar */
+  @media (max-width: 760px) { .sc span { display: none; } }
+  .bar { min-width: 70px; }
+  @media (max-width: 600px) {
+    .name { display: none; }
+    #pauselabel, .sc span { display: none; }
+    .btn { padding: 0 12px; }
+    .vol { flex: 1; min-width: 120px; }
+  }
   .volnum { width: 38px; font-size: 15px; text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
   html, body { touch-action: pan-x pan-y; } /* plexpie-nopinch: no accidental pinch-zoom on the touchscreen */
   * { scrollbar-width: none; } ::-webkit-scrollbar { display: none; } /* plexpie-noscrollbar: touch scrolling, no desktop scroll bars */
@@ -91,7 +116,7 @@
 <div id="access" class="hidden"></div>
 <header>
   <div class="name" id="name">PlexPie</div>
-  <div class="np"><span class="chip" id="npchip">Idle</span><span class="track" id="nptrack"></span></div>
+  <div class="np"><span class="chip" id="npchip">Idle</span><span class="track" id="nptrack"><span></span></span></div>
   <button class="sleep" id="sleep" aria-label="Sleep timer" title="Sleep timer: tap for 15, 30, 45, 60, 90 minutes, off">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <path d="M2 14h6l-6 6h6M12 4h5l-5 5h5M16 13h4l-4 4h4"/></svg><span id="sleepleft"></span></button>
@@ -145,6 +170,18 @@
       <rect x="3" y="7" width="7" height="12" rx="1.5"/><rect x="14" y="7" width="7" height="12" rx="1.5"/><circle cx="6.5" cy="14.5" r="1.8"/><circle cx="17.5" cy="14.5" r="1.8"/><path d="M8.5 4.5c2-1.3 5-1.3 7 0"/></svg>
     <div><div class="label">Caldera</div><div class="sub">Multi-room</div></div>
   </button>
+  <button class="tile" data-src="youtube_music" style="--c: var(--ytm)">
+    <span class="eq"><i></i><i></i><i></i></span>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><path d="M10.8 10.2v3.6l3-1.8z" fill="currentColor"/></svg>
+    <div><div class="label">YouTube Music</div><div class="sub">On this screen</div></div>
+  </button>
+  <button class="tile" data-src="bbc_sounds" style="--c: var(--bbc)">
+    <span class="eq"><i></i><i></i><i></i></span>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="8" width="18" height="12" rx="2"/><path d="M7 8l9-5"/><circle cx="15.5" cy="14" r="2.5"/><path d="M6 12h4M6 15h4"/></svg>
+    <div><div class="label">BBC Sounds</div><div class="sub">Radio · podcasts</div></div>
+  </button>
   <button class="tile" data-src="ha" style="--c: var(--ha)">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <path d="M3 11.5L12 4l9 7.5"/><path d="M5.5 9.5V20h13V9.5"/><circle cx="12" cy="14" r="2"/><path d="M12 16v4M10.5 12.6L8.5 11M13.5 12.6l2-1.6"/></svg>
@@ -183,7 +220,7 @@ const post = (path, body) => fetch(path, {method: "POST", headers: {"Content-Typ
   body: JSON.stringify(body || {})}).then(r => r.json()).then(j => j.state && render(j.state)).catch(() => {});
 const SUBS = {plexamp: "Your library", apple: "On this screen", airplay: "iPhone, iPad, Mac",
               spotify: "Spotify Connect", ma: "Your speakers", timer: "Intervals · countdown", bluetooth: "Any device", ha: "Your dashboard",
-              caldera: "Multi-room"};
+              caldera: "Multi-room", youtube_music: "On this screen", bbc_sounds: "Radio · podcasts"};
 const ICON_PAUSE = '<rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/>';
 const ICON_PLAY = '<path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/>';
 const POWER = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v9"/><path d="M6.3 7.3a8 8 0 1 0 11.4 0"/></svg>';
@@ -203,6 +240,20 @@ function renderShortcuts(list) {
     b.classList.toggle("on", !!x.on); b.querySelector("span").textContent = x.name; });
 }
 
+function setTrack(text) {
+  const box = $("nptrack"), span = box.firstElementChild;
+  if (span.textContent === text) return;
+  span.textContent = text;
+  box.classList.remove("long");
+  requestAnimationFrame(() => {
+    const over = span.scrollWidth - box.clientWidth;
+    if (over > 4) {
+      box.style.setProperty("--dx", `-${over + 8}px`);
+      box.style.setProperty("--glide", `${Math.max(6, over / 25)}s`);
+      box.classList.add("long");
+    }
+  });
+}
 function render(s) {
   $("name").textContent = s.player_name || "PlexPie";
   const tiles = [...document.querySelectorAll(".tile")];
@@ -218,7 +269,13 @@ function render(s) {
     const off = src === "ma" && !s.ma_up;
     t.classList.toggle("off", off);
     let sub = SUBS[src];
-    if (playing) sub = "Playing";
+    const isNow = s.now_source === src;
+    const cover = playing && isNow ? (s.art || "") : "";
+    let cv = t.querySelector(".cover");
+    if (!cv) { cv = document.createElement("span"); cv.className = "cover"; t.prepend(cv); }
+    if (cv.dataset.url !== cover) { cv.dataset.url = cover; if (cover) cv.style.backgroundImage = `url("${cover}")`; }
+    t.classList.toggle("has-cover", !!cover);
+    if (playing) sub = isNow && s.now && s.now.title ? [s.now.title, s.now.artist].filter(Boolean).join(" — ") : "Playing";
     else if (off) sub = "Off — start it in Home Assistant";
     else if (src === "airplay") sub = `Pick “${s.player_name}”`;
     else if (src === "bluetooth" && s.bluetooth && s.bluetooth.connected) sub = s.bluetooth.connected;
@@ -234,10 +291,10 @@ function render(s) {
   if (s.playing) {
     $("npchip").textContent = s.now_source_name;
     const n = s.now || {};
-    $("nptrack").textContent = [n.title, n.artist].filter(Boolean).join(" — ");
+    setTrack([n.title, n.artist].filter(Boolean).join(" — "));
   } else {
     $("npchip").textContent = "Idle";
-    $("nptrack").textContent = "";
+    setTrack("");
   }
   const v = s.volume;
   $("volbar").style.width = (v == null ? 0 : v) + "%";

@@ -17,6 +17,9 @@ ENABLE_SPOTIFY="no"
 ENABLE_SPOTIFY_WEB="no"
 # Caldera Music (Plex Labs): multi-room with other Caldera speakers; shows up in Plexamp's speaker list
 ENABLE_CALDERA="no"
+# Web players on the screen, like Apple Music (sign in on the screen)
+ENABLE_YOUTUBE_MUSIC="no"
+ENABLE_BBC_SOUNDS="no"
 # Where Caldera plays: auto = shared with the other sources, caldera = Caldera's own pick (often the DAC alone)
 CALDERA_DEVICE="auto"
 # A push button between pins 5 and 6 (GPIO3 and ground) shuts the Pi down and starts it again

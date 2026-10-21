@@ -207,6 +207,24 @@
         <div class="group" data-guide="apple"></div>
       </section>
 
+      <section data-page="app-youtube_music" data-parent="config" data-title="YouTube Music">
+        <div class="group"><div class="row"><div class="t"><b>YouTube Music</b><small>The YouTube Music web player on the screen</small></div>
+          <label class="sw"><input type="checkbox" id="ENABLE_YOUTUBE_MUSIC"><span></span></label></div>
+          <div class="row"><div class="t"><b>Google account</b><small>Sign in on the screen (optional; Premium has no ads)</small></div>
+            <button class="btn" data-signout="youtube_music">Sign out</button></div></div>
+        <div class="note">Your Google password is never stored by PlexPie. YouTube keeps you signed in on its own page.</div>
+        <div class="group" data-guide="youtube_music"></div>
+      </section>
+
+      <section data-page="app-bbc_sounds" data-parent="config" data-title="BBC Sounds">
+        <div class="group"><div class="row"><div class="t"><b>BBC Sounds</b><small>BBC radio stations, shows and podcasts on the screen</small></div>
+          <label class="sw"><input type="checkbox" id="ENABLE_BBC_SOUNDS"><span></span></label></div>
+          <div class="row"><div class="t"><b>BBC account</b><small>Sign in on the screen</small></div>
+            <button class="btn" data-signout="bbc_sounds">Sign out</button></div></div>
+        <div class="note">Live radio plays in most countries; many shows and podcasts are UK only. PlexPie never stores your BBC password.</div>
+        <div class="group" data-guide="bbc_sounds"></div>
+      </section>
+
       <section data-page="app-airplay" data-parent="config" data-title="AirPlay">
         <div class="group"><div class="row"><div class="t"><b>AirPlay</b><small>Play from an iPhone, iPad or Mac</small></div>
           <label class="sw"><input type="checkbox" id="ENABLE_AIRPLAY"><span></span></label></div>
@@ -450,6 +468,8 @@ const I = {
   spotify: svg('<circle cx="12" cy="12" r="10"/><path d="M7 9.5c3.5-1 7-.6 10 1M7.5 13c3-.8 5.6-.4 8 .8M8 16.3c2.4-.6 4.4-.3 6 .6"/>'),
   bt: svg('<path d="m7 7 10 10-5 5V2l5 5L7 17"/>'),
   ma: svg('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3"/>'),
+  ytm: svg('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><path d="M10.8 10.2v3.6l3-1.8z" fill="currentColor"/>'),
+  radio: svg('<rect x="3" y="8" width="18" height="12" rx="2"/><path d="M7 8l9-5"/><circle cx="15.5" cy="14" r="2.5"/><path d="M6 12h4M6 15h4"/>'),
   caldera: svg('<rect x="3" y="7" width="7" height="12" rx="1.5"/><rect x="14" y="7" width="7" height="12" rx="1.5"/><circle cx="6.5" cy="14.5" r="1.8"/><circle cx="17.5" cy="14.5" r="1.8"/><path d="M8.5 4.5c2-1.3 5-1.3 7 0"/>'),
   ha: svg('<path d="M3 11 12 3l9 8"/><path d="M5 9.5V20h14V9.5"/><circle cx="12" cy="14" r="2"/>'),
   timer: svg('<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6"/>'),
@@ -484,6 +504,8 @@ const APPS = [
   ["bluetooth", "Bluetooth", I.bt, "#0a6cff", "music", "ENABLE_BLUETOOTH"],
   ["ma", "Music Assistant", I.ma, "#18a0e0", "music", "ENABLE_MUSIC_ASSISTANT"],
   ["caldera", "Caldera Music", I.caldera, "#e8742c", "music", "ENABLE_CALDERA"],
+  ["youtube_music", "YouTube Music", I.ytm, "#ff0033", "music", "ENABLE_YOUTUBE_MUSIC"],
+  ["bbc_sounds", "BBC Sounds", I.radio, "#ff4c00", "music", "ENABLE_BBC_SOUNDS"],
   ["ha", "Home Assistant", I.ha, "#18bcf2", "home", null],
   ["timer", "Workout timer", I.timer, "#ff9f0a", "home", "ENABLE_TIMER"],
 ];
@@ -496,6 +518,8 @@ const GUIDES = [
   ["bluetooth", "Bluetooth", "Pair a phone, tablet or computer", I.bt, "#0a6cff"],
   ["ma", "Music Assistant", "Use it as a Music Assistant speaker", I.ma, "#18a0e0"],
   ["caldera", "Caldera Music", "Multi-room with other Caldera speakers", I.caldera, "#e8742c"],
+  ["youtube_music", "YouTube Music", "The YouTube Music web player on the screen", I.ytm, "#ff0033"],
+  ["bbc_sounds", "BBC Sounds", "BBC radio and podcasts on the screen", I.radio, "#ff4c00"],
   ["ha", "Home Assistant", "Controls, dashboard tile, launcher buttons", I.ha, "#18bcf2"],
   ["timer", "Workout timer", "Intervals, countdown, stopwatch", I.timer, "#ff9f0a"],
   ["eq", "Equalizer", "Presets and room correction", I.eq, "#ff375f"],
@@ -505,7 +529,7 @@ const GUIDES = [
   ["backup", "Backup and restore", "Keep your settings safe", I.backup, "#ff9f0a"],
   ["help", "Troubleshooting", "Quick fixes for common problems", I.update, "#8e8e93"],
 ];
-const FIELDS = ["ENABLE_APPLE_MUSIC_WEB", "ENABLE_AIRPLAY", "ENABLE_SPOTIFY", "ENABLE_SPOTIFY_WEB", "ENABLE_MUSIC_ASSISTANT", "ENABLE_CALDERA",
+const FIELDS = ["ENABLE_APPLE_MUSIC_WEB", "ENABLE_AIRPLAY", "ENABLE_SPOTIFY", "ENABLE_SPOTIFY_WEB", "ENABLE_MUSIC_ASSISTANT", "ENABLE_CALDERA", "ENABLE_YOUTUBE_MUSIC", "ENABLE_BBC_SOUNDS",
   "ENABLE_BLUETOOTH", "ENABLE_TIMER", "ENABLE_HA_DASHBOARD",
   "SCREEN_OFF_AFTER_SECS", "SCREEN_BRIGHTNESS", "AUTO_SHOW", "SWIPE_HOME", "MQTT_HOST", "MQTT_PORT",
   "MQTT_USER", "MQTT_PASS", "SHORTCUTS", "MA_HOST", "MA_URL", "PHONE_ACCESS",
@@ -549,6 +573,7 @@ function appState(id) {
   const ac = acct(id);
   if (id === "plexamp") return (data.address_change || {}).new ? "Address changed: open to fix" : (ac.status || "On");
   if (id === "apple") return ac.ok ? "On · signed in" : ac.ok === false ? "On · not signed in" : "On";
+  if (id === "youtube_music" || id === "bbc_sounds") return "On · sign in on the screen";
   if (id === "bluetooth") { const b = data.bluetooth || {}; return b.connected ? `On · ${b.connected}` : "On"; }
   if (id === "ma") return ac.ok ? "On · server reachable" : "On · server not reachable";
   if (id === "caldera") { const c = data.caldera || {};

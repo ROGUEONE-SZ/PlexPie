@@ -25,7 +25,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 
-VERSION = "2.16.0"
+VERSION = "2.17.0"
 CONF_PATH = os.environ.get("PLEXPIE_CONF", "/etc/plexpie/plexpie.conf")
 WWW = os.path.join(os.path.dirname(os.path.abspath(__file__)), "www")
 HTTP_PORT = int(os.environ.get("PLEXPIE_HTTP_PORT", "8080"))
@@ -62,7 +62,7 @@ SETTINGS_ENV = os.path.join(SETTINGS_DIR, "settings.env")      # read by the sys
 # What the Settings page may change, and how
 EDITABLE = {
     "ENABLE_APPLE_MUSIC_WEB": "bool", "ENABLE_AIRPLAY": "bool", "ENABLE_SPOTIFY": "bool",
-    "ENABLE_SPOTIFY_WEB": "bool", "ENABLE_MUSIC_ASSISTANT": "bool", "ENABLE_CALDERA": "bool", "ENABLE_TIMER": "bool", "SHORTCUTS": "str",
+    "ENABLE_SPOTIFY_WEB": "bool", "ENABLE_MUSIC_ASSISTANT": "bool", "ENABLE_CALDERA": "bool", "ENABLE_YOUTUBE_MUSIC": "bool", "ENABLE_BBC_SOUNDS": "bool", "ENABLE_TIMER": "bool", "SHORTCUTS": "str",
     "VISUALIZER": "str", "THEME_FROM_ART": "bool", "NIGHT_DIM": "bool", "NIGHT_START": "str", "NIGHT_END": "str",
     "NIGHT_BRIGHTNESS": "int", "AUTO_BRIGHTNESS": "bool", "ENABLE_HA_DASHBOARD": "bool", "HA_URL": "str", "HA_DASHBOARD": "str",
     "ENABLE_BLUETOOTH": "bool", "EQ_ENABLED": "bool", "EQ_PRESET": "str", "EQ_BANDS": "str", "EQ_CUSTOM": "str",
@@ -130,6 +130,8 @@ SOURCES = {
     "bluetooth": {"name": "Bluetooth", "url": f"http://127.0.0.1:{HTTP_PORT}/bluetooth"},
     "ma": {"name": "Music Assistant", "url": MA_URL + "/"},
     "caldera": {"name": "Caldera", "url": f"http://127.0.0.1:{HTTP_PORT}/caldera"},
+    "youtube_music": {"name": "YouTube Music", "url": "https://music.youtube.com/"},
+    "bbc_sounds": {"name": "BBC Sounds", "url": "https://www.bbc.co.uk/sounds"},
     "timer": {"name": "Timer", "url": f"http://127.0.0.1:{HTTP_PORT}/timer"},
     "alert": {"name": "Alert", "url": f"http://127.0.0.1:{HTTP_PORT}/alert", "hidden": True},
     "settings": {"name": "Settings", "url": f"http://127.0.0.1:{HTTP_PORT}/settings", "hidden": True},
@@ -140,12 +142,19 @@ if HA_BASE and cfg_yes("ENABLE_HA_DASHBOARD", "yes"):
 for key, flag, default in (("airplay", "ENABLE_AIRPLAY", "yes"), ("ma", "ENABLE_MUSIC_ASSISTANT", "yes"),
                            ("apple", "ENABLE_APPLE_MUSIC_WEB", "yes"), ("spotify", "ENABLE_SPOTIFY", "no"),
                            ("spotify_web", "ENABLE_SPOTIFY_WEB", "no"), ("timer", "ENABLE_TIMER", "yes"),
-                           ("bluetooth", "ENABLE_BLUETOOTH", "yes"), ("caldera", "ENABLE_CALDERA", "no")):
+                           ("bluetooth", "ENABLE_BLUETOOTH", "yes"), ("caldera", "ENABLE_CALDERA", "no"),
+                           ("youtube_music", "ENABLE_YOUTUBE_MUSIC", "no"), ("bbc_sounds", "ENABLE_BBC_SOUNDS", "no")):
     if not cfg_yes(flag, default):
         SOURCES.pop(key)
 if "spotify" not in SOURCES:
     SOURCES.pop("spotify_web", None)
-WEB_APPS = ("plexamp", "apple", "ma", "spotify_web", "settings", "ha")     # pages that may need the keyboard
+WEB_APPS = ("plexamp", "apple", "ma", "spotify_web", "settings", "ha", "youtube_music", "bbc_sounds")
+# Web players that play on the screen: (source, host suffixes, sign-in origins to clear on sign-out)
+WEB_PLAYERS = {"spotify_web": (("spotify.com",), ()),
+               "youtube_music": (("music.youtube.com", "accounts.google.com", "accounts.youtube.com"), ("https://music.youtube.com", "https://www.youtube.com",
+                                                          "https://accounts.google.com", "https://www.google.com")),
+               "bbc_sounds": (("bbc.co.uk", "bbc.com"), ("https://www.bbc.co.uk", "https://account.bbc.com",
+                                                        "https://session.bbc.co.uk"))}     # pages that may need the keyboard
 SPOTIFY_API = "http://127.0.0.1:3678"
 
 NAME_TO_KEY = {v["name"]: k for k, v in SOURCES.items()}
@@ -172,8 +181,9 @@ def source_for_url(url):
             if u.path.startswith("/" + key):
                 return key
         return "home"
-    if host == "spotify.com" or host.endswith(".spotify.com"):
-        return "spotify_web"
+    for key, (hosts, _) in WEB_PLAYERS.items():
+        if any(host == h or host.endswith("." + h) for h in hosts):
+            return key
     if u.netloc == "127.0.0.1:32500":
         return "plexamp"
     if host == "apple.com" or host.endswith(".apple.com"):
@@ -230,6 +240,8 @@ class State:
         self.art = None
         self.art_type = "image/jpeg"
         self.art_ver = 0
+        self.plex_art = None            # Plexamp's current cover (fetched from your Plex server)
+        self.plex_art_key = None
         self.screen_on = True
         self.last_wake = time.time()
         self.brightness = max(5, min(100, cfg_int("SCREEN_BRIGHTNESS", 100)))
@@ -288,6 +300,17 @@ def mark_changed():
     ST.changed.set()
 
 
+def now_art(src):
+    """Cover of what's playing, for the launcher tile (ST.lock held)."""
+    if src == "airplay" and ST.art:
+        return f"/api/art?v={ST.art_ver}"
+    if src == "plexamp" and ST.plex_art and ST.plex_art_key == (ST.np.get("plexamp") or {}).get("thumb"):
+        return f"/api/art/plexamp?v={abs(hash(ST.plex_art_key)) % 100000}"
+    np = ST.np.get(src) or {}
+    url = np.get("art_url") or np.get("art") or ""
+    return url if url.startswith("https://") else ""
+
+
 def state_json():
     with ST.lock:
         ns = ST.now_source()
@@ -310,6 +333,7 @@ def state_json():
                             stream_type=ST.ap_format.get("styp", ""),
                             format_raw=dict(ST.ap_format)),
             "art_ver": ST.art_ver,
+            "art": now_art(ns),
             "screen_on": ST.screen_on,
             "brightness": ST.brightness,
             "volume": ST.volume,
@@ -569,8 +593,10 @@ FOCUS_JS = """(() => {
 APPLE_STATE_JS = """(() => {
   try {
     const m = MusicKit.getInstance(); const i = m.nowPlayingItem;
+    let art = '';
+    try { art = i ? MusicKit.formatArtworkURL(i.artwork || (i.attributes || {}).artwork, 480, 480) : ''; } catch (e) {}
     return {playing: !!m.isPlaying, title: i ? (i.title || '') : '',
-            artist: i ? (i.artistName || '') : '', album: i ? (i.albumName || '') : ''};
+            artist: i ? (i.artistName || '') : '', album: i ? (i.albumName || '') : '', art: art || ''};
   } catch (e) {
     const a = [...document.querySelectorAll('audio,video')];
     return {playing: a.some(x => !x.paused), title: '', artist: '', album: ''};
@@ -582,7 +608,8 @@ WEB_STATE_JS = """(() => {
   const a = [...document.querySelectorAll('audio,video')];
   return {playing: (navigator.mediaSession && navigator.mediaSession.playbackState === 'playing')
                    || a.some(x => !x.paused),
-          title: m ? m.title : '', artist: m ? m.artist : '', album: m ? m.album : ''};
+          title: m ? m.title : '', artist: m ? m.artist : '', album: m ? m.album : '',
+          art: m && m.artwork && m.artwork.length ? m.artwork[m.artwork.length - 1].src : ''};
 })()"""
 
 WEB_PAUSE_JS = """(() => {
@@ -623,6 +650,11 @@ class Plexamp:
                     md = {"title": tr.get("title", ""),
                           "artist": tr.get("originalTitle") or tr.get("grandparentTitle", ""),
                           "album": tr.get("parentTitle", "")}
+                    thumb = tr.get("parentThumb") or tr.get("thumb") or ""
+                    if thumb and tl.get("address"):
+                        self.server = (tl.get("protocol") or "http", tl.get("address"), tl.get("port") or "32400",
+                                       tl.get("token") or "")
+                        md["thumb"] = thumb
                 return tl.get("state") == "playing", md
         return False, None
 
@@ -647,6 +679,23 @@ class Plexamp:
 
 
 PLEX = Plexamp()
+PLEX.server = None
+
+
+def plex_cover(thumb):
+    """The album cover Plexamp is playing, from your Plex server (the sign-in token stays on the Pi)."""
+    if not PLEX.server or not thumb:
+        return None
+    proto, addr, port, token = PLEX.server
+    if not token:
+        token = (read_file(os.path.expanduser("~/.local/share/Plexamp/Settings/%40Plexamp%3Auser%3Atoken")) or "").strip().strip('"')
+    q = urllib.parse.urlencode({"width": 480, "height": 480, "minSize": 1, "upscale": 1, "url": thumb,
+                                "X-Plex-Token": token})
+    try:
+        return http_get(f"{proto}://{addr}:{port}/photo/:/transcode?{q}", 6, headers=Plexamp.HEADERS)
+    except Exception as e:
+        log.info("plexamp cover not available: %s", type(e).__name__)     # never log the address with the token
+        return None
 
 
 # ---------------------------------------------------------------- Caldera Music
@@ -819,7 +868,7 @@ def on_started(src):
             pause_source(other)
     # Show the app that just started playing (e.g. Plexamp started from the phone).
     auto = cfg("AUTO_SHOW_SOURCES", "plexamp airplay ma spotify bluetooth").replace(",", " ").split()
-    if auto and src in ("bluetooth", "caldera"):    # newer sources follow the on/off switch
+    if auto and src in ("bluetooth", "caldera", "youtube_music", "bbc_sounds"):    # newer sources follow the on/off switch
         auto.append(src)
     if src == "airplay" and not cfg_yes("AUTO_SHOW_AIRPLAY"):
         auto = [a for a in auto if a != "airplay"]
@@ -855,8 +904,8 @@ def pause_source(src):
             log.warning("spotify pause failed: %s", e)
     elif src == "bluetooth":
         admin("bt-pause", timeout=10)
-    elif src == "spotify_web":
-        BROWSER.evaluate("spotify_web", WEB_PAUSE_JS)
+    elif src in WEB_PLAYERS:
+        BROWSER.evaluate(src, WEB_PAUSE_JS)
 
 
 def pause_all():
@@ -1345,11 +1394,24 @@ def theme_loop():
             with ST.lock:
                 src = ST.now_source() or ST.source
                 key, data, url = None, None, None
+                thumb = (ST.np.get("plexamp") or {}).get("thumb") if src == "plexamp" else None
                 if src == "airplay" and ST.art:
                     key, data = ("airplay", ST.art_ver), ST.art
                 elif src in ("spotify",):
                     url = (ST.np.get("spotify") or {}).get("art_url")
                     key = url
+                elif src and (ST.np.get(src) or {}).get("art", "").startswith("https://"):
+                    url = ST.np[src]["art"]
+                    key = url
+                elif thumb:
+                    key = ("plexamp", thumb)
+                    data = ST.plex_art if ST.plex_art_key == thumb else None
+            if thumb and key == ("plexamp", thumb) and data is None:
+                data = plex_cover(thumb)
+                with ST.lock:
+                    ST.plex_art, ST.plex_art_key = data, thumb
+                if data:
+                    mark_changed()
             if url and url not in cache:
                 try:
                     data = http_get(url, 5)
@@ -1855,21 +1917,24 @@ def fast_poller():
                 poll_spotify()
             if "bluetooth" in SOURCES:
                 poll_bluetooth(n)
-            if "spotify_web" in SOURCES and n % 2 == 1:
-                exists, val = BROWSER.evaluate("spotify_web", WEB_STATE_JS)
+            for web in (w for w in WEB_PLAYERS if w in SOURCES and n % 2 == 1):
+                exists, val = BROWSER.evaluate(web, WEB_STATE_JS)
                 if exists is False:
-                    set_playing("spotify_web", False)
+                    set_playing(web, False)
                 elif isinstance(val, dict):
-                    set_playing("spotify_web", val.get("playing"))
+                    set_playing(web, val.get("playing"))
+                    md = {k: val.get(k, "") or "" for k in ("title", "artist", "album", "art")}
                     with ST.lock:
-                        ST.np["spotify_web"] = {k: val.get(k, "") for k in ("title", "artist", "album")}
+                        if ST.np.get(web) != md:
+                            ST.np[web] = md
+                            mark_changed()
             if "apple" in SOURCES and n % 2 == 0:
                 exists, val = BROWSER.evaluate("apple", APPLE_STATE_JS)
                 if exists is False:
                     set_playing("apple", False)
                 elif isinstance(val, dict):
                     set_playing("apple", val.get("playing"))
-                    md = {k: val.get(k, "") for k in ("title", "artist", "album")}
+                    md = {k: val.get(k, "") for k in ("title", "artist", "album", "art")}
                     with ST.lock:
                         if ST.np.get("apple") != md:
                             ST.np["apple"] = md
@@ -2648,6 +2713,8 @@ SIGN_OUT_ORIGINS = {
               "https://authorize.music.apple.com"],
     "spotify_web": ["https://open.spotify.com", "https://spotify.com", "https://www.spotify.com",
                     "https://accounts.spotify.com"],
+    "youtube_music": list(WEB_PLAYERS["youtube_music"][1]),
+    "bbc_sounds": list(WEB_PLAYERS["bbc_sounds"][1]),
 }
 
 
@@ -2686,6 +2753,9 @@ def accounts():
     if "spotify_web" in SOURCES:
         out.append({"id": "spotify_web", "name": "Spotify web player",
                     "status": "Sign in on the screen", "ok": None, "action": "Sign out"})
+    for key, label in (("youtube_music", "YouTube Music"), ("bbc_sounds", "BBC Sounds")):
+        if key in SOURCES:
+            out.append({"id": key, "name": label, "status": "Sign in on the screen", "ok": None, "action": "Sign out"})
     if "ma" in SOURCES:
         out.append({"id": "ma", "name": "Music Assistant",
                     "status": "Reachable" if ST.ma_up else "Not reachable", "ok": ST.ma_up})
@@ -2845,7 +2915,8 @@ def settings_json(local, host=None, token=None):
         elif kind == "bool":
             vals[k] = cfg_yes(k, {"ENABLE_SPOTIFY": "no", "ENABLE_SPOTIFY_WEB": "no", "EQ_ENABLED": "no",
                                   "NIGHT_DIM": "no", "AUTO_BRIGHTNESS": "no",
-                                  "PHONE_ACCESS": "yes", "SCREEN_SHARING": "no", "ENABLE_CALDERA": "no"}.get(k, "yes"))
+                                  "PHONE_ACCESS": "yes", "SCREEN_SHARING": "no", "ENABLE_CALDERA": "no",
+                                  "ENABLE_YOUTUBE_MUSIC": "no", "ENABLE_BBC_SOUNDS": "no"}.get(k, "yes"))
         else:
             vals[k] = cfg(k)
     vals["MA_HOST"] = vals.get("MA_HOST") or cfg("HA_HOST")
@@ -3157,6 +3228,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
             finally:
                 meter_subscribe(-1)
             return
+        if path == "/api/art/plexamp":
+            with ST.lock:
+                art = ST.plex_art
+            return self._send(200, art, "image/jpeg") if art else self._send(404, b"", "text/plain")
         if path == "/api/art":
             with ST.lock:
                 art, typ = ST.art, ST.art_type
