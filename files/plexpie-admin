@@ -248,7 +248,11 @@ PY
       new=${new// console=tty1 / console=tty3 }          # boot messages to a hidden console
       grep -q '^disable_splash=1' "$CFG" 2>/dev/null || echo 'disable_splash=1' >> "$CFG"   # no rainbow square
       if [ -d /usr/share/plymouth/themes/plexpie ] && command -v plymouth-set-default-theme >/dev/null; then
-        [ "$(plymouth-set-default-theme 2>/dev/null)" = plexpie ] || plymouth-set-default-theme -R plexpie >/dev/null 2>&1 || true
+        # Rebuild the start-up files when the theme is new or its logo changed (it lives in the initramfs)
+        sum=$(cat /usr/share/plymouth/themes/plexpie/* 2>/dev/null | md5sum | cut -c1-32)
+        if [ "$(plymouth-set-default-theme 2>/dev/null)" != plexpie ] || [ "$(cat "$STATE/plymouth-theme.sum" 2>/dev/null)" != "$sum" ]; then
+          plymouth-set-default-theme -R plexpie >/dev/null 2>&1 && echo "$sum" > "$STATE/plymouth-theme.sum" || true
+        fi
       fi
       mkdir -p /etc/systemd/system/getty@tty1.service.d
       printf '[Service]\nExecStart=\nExecStart=-/sbin/agetty --autologin %s --noclear --noissue --nonewline --skip-login %%I $TERM\n' "$U" \
