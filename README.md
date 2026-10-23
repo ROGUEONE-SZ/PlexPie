@@ -3,7 +3,7 @@
 <p align="center"><b>A Raspberry Pi music appliance: one touchscreen for all your music, controlled from Home Assistant.</b></p>
 
 <p align="center">
-  <a href="#install"><img src="https://img.shields.io/badge/version-2.17-0a84ff" alt="Version 2.17"></a>
+  <a href="#install"><img src="https://img.shields.io/badge/version-2.18-0a84ff" alt="Version 2.18"></a>
   <a href="LICENSE.md"><img src="https://img.shields.io/badge/license-source--available%20(PolyForm%20NC)-8e8e93" alt="License: source-available, PolyForm Noncommercial"></a>
   <img src="https://img.shields.io/badge/Raspberry%20Pi-4%20%7C%205-c51a4a?logo=raspberrypi&logoColor=white" alt="Raspberry Pi 4 or 5">
   <img src="https://img.shields.io/badge/Raspberry%20Pi%20OS-64--bit%20Lite%20or%20Desktop-c51a4a" alt="Raspberry Pi OS 64-bit">
@@ -50,6 +50,7 @@ on one launcher and all controllable from **Home Assistant**.
 | **Music Assistant** | The Pi becomes a Music Assistant player (Squeezelite), and MA's own interface opens on the screen |
 | **Caldera** | Optional [Caldera Music](https://caldera.homes/music/headless/) (Plex Labs): the Pi joins your other Caldera speakers for multi-room, in sync, from Plexamp's speaker list. Shares the DAC with the other apps |
 | **YouTube Music, BBC Sounds** | Optional web players on the screen, like Apple Music: sign in on the screen (BBC Sounds' shows are mostly UK only) |
+| **Your own web players** | Add any music, radio or audiobook website (TuneIn, SoundCloud, Audible…) as its own tile: Settings › Configuration › Your web players |
 | **Timer** | Workout timer: intervals (work / rest / rounds), countdown and stopwatch, with big digits and beeps |
 | **Home** | The launcher: now playing, volume, pause all, screen off, and your Home Assistant buttons |
 

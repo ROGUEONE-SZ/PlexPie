@@ -2,6 +2,15 @@
 
 Already running PlexPie? **Settings › Updates › PlexPie › Update** brings you to the latest version.
 
+## 2.18 (October 23, 2026)
+- **Your own web players:** add any music, radio or audiobook website as a tile on the home screen
+  (Settings › Configuration › Your web players, up to six).
+- **Network icon** on the home screen: Wi-Fi bars, Ethernet, or a red mark when offline.
+- **Update badge:** a red dot on the Settings gear when an update is ready; Settings opens on Updates.
+- **12/24-hour clock** setting (Settings › Screen › Clock).
+
+Ideas from starbow777 on r/plexamp.
+
 ## 2.17 (October 21, 2026)
 - **New logo:** a silver pie cut like a pizza, one amber slice pulled out, hot rod red edges. On the
   start-up screen, the home-screen icon and GitHub (2.17.1).

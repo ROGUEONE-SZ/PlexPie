@@ -207,6 +207,18 @@
         <div class="group" data-guide="apple"></div>
       </section>
 
+      <section data-page="app-custom" data-parent="config" data-title="Your web players">
+        <div class="page-intro">Add any music, radio or audiobook website as its own tile on the home screen, like Apple Music. Up to six.</div>
+        <input type="hidden" id="CUSTOM_PLAYERS">
+        <div class="group" id="customlist"></div>
+        <h3>Add a web player</h3>
+        <div class="group">
+          <div class="row"><div class="t"><b>Name</b><small>Shown on the tile</small></div><input id="cpname" type="text" maxlength="24" placeholder="TuneIn" data-noform></div>
+          <div class="row"><div class="t"><b>Web address</b><small>Starts with https://</small></div><input id="cpurl" type="text" inputmode="url" placeholder="https://tunein.com" autocapitalize="off" autocorrect="off" data-noform></div>
+          <div class="row"><div class="t"><small id="cperr"></small></div><button class="btn primary" id="cpadd" data-noform>Add</button></div></div>
+        <div class="note">Then tap Save. Sign in on the screen if the site needs it. Pause all, the track name and cover work on most sites. Some sites block sign-in from kiosk browsers or ask you to use their app.</div>
+      </section>
+
       <section data-page="app-youtube_music" data-parent="config" data-title="YouTube Music">
         <div class="group"><div class="row"><div class="t"><b>YouTube Music</b><small>The YouTube Music web player on the screen</small></div>
           <label class="sw"><input type="checkbox" id="ENABLE_YOUTUBE_MUSIC"><span></span></label></div>
@@ -315,6 +327,8 @@
               <option value="300">5 minutes</option><option value="900">15 minutes</option><option value="0">Never</option>
             </select></div>
           <div class="row"><div class="t"><b>Brightness</b></div><input id="SCREEN_BRIGHTNESS" type="range" min="10" max="100" step="5"></div>
+          <div class="row"><div class="t"><b>Clock</b><small>On the home screen. Automatic follows the Pi's region.</small></div>
+            <select id="CLOCK_FORMAT"><option value="auto">Automatic</option><option value="12">12-hour (3:45 PM)</option><option value="24">24-hour (15:45)</option></select></div>
           <div class="row"><div class="t"><b>Rotation</b><small>Automatic follows the Raspberry Pi desktop's setting. The Pi Touch Display 2 starts in portrait: pick Right or Left for landscape. Touch turns with it.</small></div>
             <select id="SCREEN_ROTATION"><option value="auto">Automatic</option><option value="normal">Normal</option><option value="right">Right (90°)</option>
               <option value="inverted">Upside down</option><option value="left">Left (270°)</option></select></div></div>
@@ -468,6 +482,7 @@ const I = {
   spotify: svg('<circle cx="12" cy="12" r="10"/><path d="M7 9.5c3.5-1 7-.6 10 1M7.5 13c3-.8 5.6-.4 8 .8M8 16.3c2.4-.6 4.4-.3 6 .6"/>'),
   bt: svg('<path d="m7 7 10 10-5 5V2l5 5L7 17"/>'),
   ma: svg('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3"/>'),
+  plus: svg('<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>'),
   ytm: svg('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><path d="M10.8 10.2v3.6l3-1.8z" fill="currentColor"/>'),
   radio: svg('<rect x="3" y="8" width="18" height="12" rx="2"/><path d="M7 8l9-5"/><circle cx="15.5" cy="14" r="2.5"/><path d="M6 12h4M6 15h4"/>'),
   caldera: svg('<rect x="3" y="7" width="7" height="12" rx="1.5"/><rect x="14" y="7" width="7" height="12" rx="1.5"/><circle cx="6.5" cy="14.5" r="1.8"/><circle cx="17.5" cy="14.5" r="1.8"/><path d="M8.5 4.5c2-1.3 5-1.3 7 0"/>'),
@@ -520,6 +535,7 @@ const GUIDES = [
   ["caldera", "Caldera Music", "Multi-room with other Caldera speakers", I.caldera, "#e8742c"],
   ["youtube_music", "YouTube Music", "The YouTube Music web player on the screen", I.ytm, "#ff0033"],
   ["bbc_sounds", "BBC Sounds", "BBC radio and podcasts on the screen", I.radio, "#ff4c00"],
+  ["custom", "Your web players", "Add any music website as a tile", I.plus, "#5e5ce6"],
   ["ha", "Home Assistant", "Controls, dashboard tile, launcher buttons", I.ha, "#18bcf2"],
   ["timer", "Workout timer", "Intervals, countdown, stopwatch", I.timer, "#ff9f0a"],
   ["eq", "Equalizer", "Presets and room correction", I.eq, "#ff375f"],
@@ -534,7 +550,7 @@ const FIELDS = ["ENABLE_APPLE_MUSIC_WEB", "ENABLE_AIRPLAY", "ENABLE_SPOTIFY", "E
   "SCREEN_OFF_AFTER_SECS", "SCREEN_BRIGHTNESS", "AUTO_SHOW", "SWIPE_HOME", "MQTT_HOST", "MQTT_PORT",
   "MQTT_USER", "MQTT_PASS", "SHORTCUTS", "MA_HOST", "MA_URL", "PHONE_ACCESS",
   "EQ_ENABLED", "EQ_PRESET", "EQ_BANDS", "EQ_CUSTOM_TEXT", "THEME_FROM_ART", "VISUALIZER", "NIGHT_DIM",
-  "NIGHT_START", "NIGHT_END", "NIGHT_BRIGHTNESS", "AUTO_BRIGHTNESS", "HA_URL", "HA_DASHBOARD", "SCREEN_SHARING", "HOME_BUTTON", "SCREEN_ROTATION", "BOOT_SPLASH"];
+  "NIGHT_START", "NIGHT_END", "NIGHT_BRIGHTNESS", "AUTO_BRIGHTNESS", "HA_URL", "HA_DASHBOARD", "SCREEN_SHARING", "HOME_BUTTON", "SCREEN_ROTATION", "BOOT_SPLASH", "CLOCK_FORMAT", "CUSTOM_PLAYERS"];
 const INSTALL_FLAG = {apple: null, airplay: "ENABLE_AIRPLAY", spotify: "ENABLE_SPOTIFY", bluetooth: "ENABLE_BLUETOOTH", ma: "ENABLE_MUSIC_ASSISTANT", caldera: "ENABLE_CALDERA"};
 let data = null, page = null, dirty = false;
 const wide = () => matchMedia("(min-width: 700px)").matches;
@@ -595,7 +611,9 @@ function renderNav() {
   }).join("")}</div>`).join("");
   document.querySelectorAll("#nav .navrow").forEach(r => r.classList.toggle("on", page && (page === r.dataset.go || pageParent(page) === r.dataset.go)));
   for (const grp of ["music", "home"])
-    $("applist-" + grp).innerHTML = APPS.filter(a => a[4] === grp).map(a => navRow("app-" + a[0], a[1], a[2], a[3], appState(a[0]))).join("");
+    $("applist-" + grp).innerHTML = APPS.filter(a => a[4] === grp).map(a => navRow("app-" + a[0], a[1], a[2], a[3], appState(a[0]))).join("")
+      + (grp === "music" ? navRow("app-custom", "Your web players", I.plus, "#5e5ce6",
+          (n => n ? `${n} added` : "Add any music website")(customList().length)) : "");
 }
 const pageEl = id => document.querySelector(`section[data-page="${id}"]`);
 const pageParent = id => (pageEl(id) || {}).dataset?.parent || null;
@@ -645,6 +663,7 @@ function render() {
     const el = $(k); if (!el) continue;
     if (el.type === "checkbox") el.checked = !!v[k]; else el.value = v[k] ?? "";
   }
+  renderCustom();
   for (const [id, flag] of Object.entries(INSTALL_FLAG)) {
     if (flag && data.installed[flag] === false) { const el = $(flag); if (el) { el.disabled = true; el.checked = false; } }
   }
@@ -736,7 +755,7 @@ async function load() {
   if (r.status === 403) { document.body.innerHTML = '<div id="login"><h1>Remote access is off</h1><div class="sub">Turn it on in Settings › Remote access on the player.</div></div>'; return; }
   data = await r.json(); render();
   const want = location.hash.slice(1);
-  if (want) go(want); else if (wide()) go("config");
+  if (want) go(want); else if (updateCount()) go("updates"); else if (wide()) go("config");
 }
 async function waitBack() {
   for (let i = 0; i < 30; i++) {
@@ -919,6 +938,35 @@ document.addEventListener("click", async e => {
     const j = await (await api("/api/peer/open", {node, to: "settings"})).json().catch(() => ({}));
     if (j.url) location.href = j.url; else toast(j.error || "Couldn't open it");
   }
+});
+
+// ---------------- your own web players ("Name|https://address||Name|https://address")
+function customList() {
+  const v = ($("CUSTOM_PLAYERS") || {}).value || "";
+  return v.split("||").map(x => { const i = x.indexOf("|"); return i > 0 ? {name: x.slice(0, i), url: x.slice(i + 1)} : null; }).filter(Boolean);
+}
+function setCustom(list) {
+  $("CUSTOM_PLAYERS").value = list.map(p => `${p.name}|${p.url}`).join("||");
+  renderCustom(); setDirty(true);
+}
+function renderCustom() {
+  const list = customList();
+  $("customlist").innerHTML = list.length ? list.map((p, i) => `<div class="row"><div class="t"><b>${esc(p.name)}</b><small>${esc(p.url)}</small></div>
+      <button class="btn danger" data-cpdel="${i}">Remove</button></div>`).join("")
+    : `<div class="row"><div class="t"><small>None yet. Ideas: TuneIn, SoundCloud, Bandcamp, Audible, Pandora, your local radio station.</small></div></div>`;
+  $("cpadd").disabled = list.length >= 6;
+}
+$("cpadd").onclick = () => {
+  const name = $("cpname").value.trim().replace(/\|/g, ""), url = $("cpurl").value.trim().replace(/\|/g, "");
+  let ok = false; try { ok = new URL(url).protocol === "https:"; } catch (e) {}
+  if (!name) { $("cperr").textContent = "Give it a name"; return; }
+  if (!ok) { $("cperr").textContent = "The address must start with https://"; return; }
+  $("cperr").textContent = ""; $("cpname").value = ""; $("cpurl").value = "";
+  setCustom([...customList(), {name, url}]);
+};
+document.addEventListener("click", e => {
+  const d = e.target.closest("[data-cpdel]"); if (!d) return;
+  const list = customList(); list.splice(+d.dataset.cpdel, 1); setCustom(list);
 });
 
 // ---------------- wi-fi

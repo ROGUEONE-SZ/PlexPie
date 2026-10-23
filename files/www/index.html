@@ -50,6 +50,15 @@
   .sleep svg { width: 21px; height: 21px; }
   .sleep.on { color: #b79cff; background: color-mix(in srgb, #b79cff 16%, transparent); }
   .gear svg { width: 22px; height: 22px; }
+  .gear { position: relative; }
+  .updot { position: absolute; top: 6px; right: 5px; width: 10px; height: 10px; border-radius: 50%; background: #ff453a;
+    box-shadow: 0 0 0 2px var(--bg); display: none; }
+  .gear.update .updot { display: block; }
+  .gear.update { color: var(--text); }
+  .net { display: inline-grid; place-items: center; color: var(--muted); width: 26px; height: 26px; }
+  .net svg { width: 22px; height: 22px; }
+  .net.offline { color: #ff453a; }
+  .net .dim { opacity: .28; }
 
 
   main { display: grid; grid-template-columns: repeat(var(--cols, 4), 1fr); grid-template-rows: repeat(var(--rows, 1), 1fr);
@@ -120,8 +129,9 @@
   <button class="sleep" id="sleep" aria-label="Sleep timer" title="Sleep timer: tap for 15, 30, 45, 60, 90 minutes, off">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <path d="M2 14h6l-6 6h6M12 4h5l-5 5h5M16 13h4l-4 4h4"/></svg><span id="sleepleft"></span></button>
+  <span class="net" id="net" title="Network"></span>
   <div class="clock" id="clock">--:--</div>
-  <button class="gear" id="gear" aria-label="Settings">
+  <button class="gear" id="gear" aria-label="Settings"><span class="updot" id="updot" title="An update is available"></span>
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
   </button>
@@ -255,6 +265,11 @@ function setTrack(text) {
   });
 }
 function render(s) {
+  ensureCustomTiles(s);
+  renderNet(s.net);
+  $("gear").classList.toggle("update", !!s.update_available);
+  $("gear").title = s.update_available ? "Settings · an update is available" : "Settings";
+  if ((s.clock || "auto") !== clockFmt) { clockFmt = s.clock || "auto"; clock(); }
   $("name").textContent = s.player_name || "PlexPie";
   const tiles = [...document.querySelectorAll(".tile")];
   let shown = 0;
@@ -349,13 +364,56 @@ document.getElementById("access").addEventListener("click", e => {
     body: JSON.stringify({id: el.dataset.id, allow: b.dataset.a})}).then(() => { el.dataset.id = ""; el.classList.add("hidden"); });
 });
 function poll() { fetch("/api/state").then(r => r.json()).then(s => { render(s); renderAccess(s.access_requests); }).catch(() => {}); }
+let clockFmt = "auto";
 function clock() {
-  const d = new Date();
-  $("clock").textContent = d.toLocaleTimeString([], {hour: "numeric", minute: "2-digit"});
+  const d = new Date(), o = {hour: "numeric", minute: "2-digit"};
+  if (clockFmt === "12") o.hour12 = true;
+  if (clockFmt === "24") { o.hour12 = false; o.hour = "2-digit"; }
+  $("clock").textContent = d.toLocaleTimeString([], o);
+}
+// Network: Wi-Fi bars, an Ethernet plug, or a red "offline" mark
+const NET = {
+  ethernet: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="11" rx="2"/><path d="M9 3v4M12 3v4M15 3v4M12 14v4M8 21h8M12 18v3"/></svg>',
+  offline: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 8.8a15 15 0 0 1 20 0M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0M3 3l18 18"/></svg>',
+};
+const wifiIcon = (bars) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+  <path class="${bars < 3 ? "dim" : ""}" d="M2 8.8a15 15 0 0 1 20 0"/><path class="${bars < 2 ? "dim" : ""}" d="M5 12.5a10 10 0 0 1 14 0"/>
+  <path class="${bars < 1 ? "dim" : ""}" d="M8.5 16a5 5 0 0 1 7 0"/><circle cx="12" cy="19.5" r="1.3" fill="currentColor" stroke="none"/></svg>`;
+let netKey = "";
+function renderNet(n) {
+  n = n || {};
+  const bars = n.signal == null ? 3 : n.signal >= 67 ? 3 : n.signal >= 40 ? 2 : n.signal >= 15 ? 1 : 0;
+  const key = n.type + bars;
+  if (key === netKey) return;
+  netKey = key;
+  const el = $("net");
+  el.className = "net" + (n.type === "offline" ? " offline" : "");
+  el.innerHTML = n.type === "wifi" ? wifiIcon(bars) : NET[n.type] || "";
+  el.title = n.type === "wifi" ? `Wi-Fi${n.signal != null ? " · " + n.signal + "%" : ""}` : n.type === "ethernet" ? "Ethernet" : n.type === "offline" ? "No network" : "";
+}
+// Your own web players get a tile with their first letter
+function ensureCustomTiles(s) {
+  const ha = document.querySelector('.tile[data-src="ha"]');
+  (s.custom_players || []).forEach((k, i) => {
+    if (document.querySelector(`.tile[data-src="${k}"]`)) return;
+    const name = (s.sources || {})[k] || "Web player";
+    const hues = [200, 280, 330, 20, 150, 50], c = `hsl(${hues[i % hues.length]} 80% 62%)`;
+    const t = document.createElement("button");
+    t.className = "tile"; t.dataset.src = k; t.style.setProperty("--c", c);
+    t.innerHTML = `<span class="eq"><i></i><i></i><i></i></span>
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/>
+      <text x="12" y="16.3" text-anchor="middle" font-size="12" font-weight="800" fill="currentColor" font-family="Inter, sans-serif"></text></svg>
+      <div><div class="label"></div><div class="sub">On this screen</div></div>`;
+    t.querySelector("text").textContent = name.trim().charAt(0).toUpperCase();
+    t.querySelector(".label").textContent = name;
+    SUBS[k] = "On this screen";
+    ha ? ha.before(t) : $("tiles").append(t);
+  });
 }
 
-document.querySelectorAll(".tile").forEach(t =>
-  t.addEventListener("click", () => post("/api/source", {source: t.dataset.src})));
+$("tiles").addEventListener("click", e => {
+  const t = e.target.closest(".tile"); if (t) post("/api/source", {source: t.dataset.src});
+});
 $("pause").onclick = () => post("/api/playpause");
 $("volup").onclick = () => post("/api/volume", {delta: 5});
 $("voldown").onclick = () => post("/api/volume", {delta: -5});

@@ -25,7 +25,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 
-VERSION = "2.17.1"
+VERSION = "2.18.0"
 CONF_PATH = os.environ.get("PLEXPIE_CONF", "/etc/plexpie/plexpie.conf")
 WWW = os.path.join(os.path.dirname(os.path.abspath(__file__)), "www")
 HTTP_PORT = int(os.environ.get("PLEXPIE_HTTP_PORT", "8080"))
@@ -70,7 +70,7 @@ EDITABLE = {
     "SWIPE_HOME": "bool", "MA_HOST": "str", "MA_URL": "str",
     "MQTT_HOST": "str", "MQTT_PORT": "int", "MQTT_USER": "str", "MQTT_PASS": "secret",
     "PHONE_ACCESS": "bool", "PHONE_PIN": "str", "SCREEN_SHARING": "bool", "HOME_BUTTON": "str",
-    "SCREEN_ROTATION": "str", "BOOT_SPLASH": "bool",
+    "SCREEN_ROTATION": "str", "BOOT_SPLASH": "bool", "CLOCK_FORMAT": "str", "CUSTOM_PLAYERS": "str",
 }
 
 
@@ -154,7 +154,40 @@ WEB_PLAYERS = {"spotify_web": (("spotify.com",), ()),
                "youtube_music": (("music.youtube.com", "accounts.google.com", "accounts.youtube.com"), ("https://music.youtube.com", "https://www.youtube.com",
                                                           "https://accounts.google.com", "https://www.google.com")),
                "bbc_sounds": (("bbc.co.uk", "bbc.com"), ("https://www.bbc.co.uk", "https://account.bbc.com",
-                                                        "https://session.bbc.co.uk"))}     # pages that may need the keyboard
+                                                        "https://session.bbc.co.uk"))}
+
+
+def parse_custom_players(text):
+    """Your own web players: "Name|https://address||Name|https://address" -> [(key, name, url, host)]."""
+    out, seen = [], set()
+    for item in (text or "").split("||"):
+        name, _, url = item.partition("|")
+        name, url = name.strip()[:24], url.strip()
+        try:
+            u = urllib.parse.urlparse(url)
+        except ValueError:
+            continue
+        if not name or u.scheme != "https" or not u.hostname:
+            continue
+        host = u.hostname.lower()
+        host = host[4:] if host.startswith("www.") else host
+        key = "web_" + (re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_") or "player")
+        while key in seen:
+            key += "_"
+        seen.add(key)
+        out.append((key, name, url, host))
+        if len(out) >= 6:
+            break
+    return out
+
+
+CUSTOM = parse_custom_players(cfg("CUSTOM_PLAYERS"))
+for _key, _name, _url, _host in CUSTOM:
+    if any(_host == h or _host.endswith("." + h) for hs, _ in WEB_PLAYERS.values() for h in hs):
+        continue                                   # a site PlexPie already has a tile for
+    SOURCES[_key] = {"name": _name, "url": _url, "custom": True}
+    WEB_PLAYERS[_key] = ((_host,), (f"https://{_host}", f"https://www.{_host}"))
+WEB_APPS = WEB_APPS + tuple(k for k in SOURCES if k.startswith("web_"))     # pages that may need the keyboard
 SPOTIFY_API = "http://127.0.0.1:3678"
 
 NAME_TO_KEY = {v["name"]: k for k, v in SOURCES.items()}
@@ -240,6 +273,8 @@ class State:
         self.art = None
         self.art_type = "image/jpeg"
         self.art_ver = 0
+        self.net = {"type": "unknown"}  # ethernet / wifi (with signal %) / offline, for the home screen
+        self.update_avail = False
         self.plex_art = None            # Plexamp's current cover (fetched from your Plex server)
         self.plex_art_key = None
         self.screen_on = True
@@ -334,6 +369,10 @@ def state_json():
                             format_raw=dict(ST.ap_format)),
             "art_ver": ST.art_ver,
             "art": now_art(ns),
+            "net": dict(ST.net),
+            "update_available": ST.update_avail,
+            "clock": (cfg("CLOCK_FORMAT") or "auto").lower(),
+            "custom_players": [k for k in SOURCES if k.startswith("web_")],
             "screen_on": ST.screen_on,
             "brightness": ST.brightness,
             "volume": ST.volume,
@@ -868,7 +907,7 @@ def on_started(src):
             pause_source(other)
     # Show the app that just started playing (e.g. Plexamp started from the phone).
     auto = cfg("AUTO_SHOW_SOURCES", "plexamp airplay ma spotify bluetooth").replace(",", " ").split()
-    if auto and src in ("bluetooth", "caldera", "youtube_music", "bbc_sounds"):    # newer sources follow the on/off switch
+    if auto and (src in ("bluetooth", "caldera", "youtube_music", "bbc_sounds") or src.startswith("web_")):    # newer sources follow the on/off switch
         auto.append(src)
     if src == "airplay" and not cfg_yes("AUTO_SHOW_AIRPLAY"):
         auto = [a for a in auto if a != "airplay"]
@@ -2571,6 +2610,60 @@ def players_json():
     return out
 
 
+def net_status():
+    """How the player is connected right now, from the kernel (no root needed)."""
+    def has_ip(dev):                       # an IPv4 address on that interface (SIOCGIFADDR)
+        import fcntl
+        import struct
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+                fcntl.ioctl(s.fileno(), 0x8915, struct.pack("256s", dev[:15].encode()))
+            return True
+        except OSError:
+            return False
+    wifi = None
+    for dev in sorted(os.listdir("/sys/class/net")):
+        if dev == "lo" or dev.startswith(("docker", "veth", "br-", "virbr")):
+            continue
+        wireless = os.path.isdir(f"/sys/class/net/{dev}/wireless")
+        if (read_file(f"/sys/class/net/{dev}/operstate") or "").strip() not in ("up", "unknown") or not has_ip(dev):
+            continue
+        if not wireless:
+            return {"type": "ethernet", "dev": dev}
+        wifi = dev
+    if wifi:
+        sig = None
+        for line in (read_file("/proc/net/wireless") or "").splitlines():
+            if line.strip().startswith(wifi + ":"):
+                try:
+                    sig = max(0, min(100, round(float(line.split()[2].rstrip(".")) / 70 * 100)))
+                except (IndexError, ValueError):
+                    pass
+        return {"type": "wifi", "dev": wifi, "signal": sig}
+    return {"type": "offline"}
+
+
+def status_loop():
+    """Network and update status for the home screen."""
+    n = 0
+    while True:
+        try:
+            net = net_status()
+            upd = ST.update_avail
+            if n % 6 == 0:
+                u = update_info()
+                upd = bool(int((u.get("plexpie") or {}).get("behind") or 0) or int((u.get("os") or {}).get("count") or 0))
+            with ST.lock:
+                changed = net != ST.net or upd != ST.update_avail
+                ST.net, ST.update_avail = net, upd
+            if changed:
+                mark_changed()
+        except Exception as e:
+            log.warning("status: %s", e)
+        n += 1
+        time.sleep(10)
+
+
 def discovery_loop():
     while True:
         try:
@@ -2716,6 +2809,7 @@ SIGN_OUT_ORIGINS = {
     "youtube_music": list(WEB_PLAYERS["youtube_music"][1]),
     "bbc_sounds": list(WEB_PLAYERS["bbc_sounds"][1]),
 }
+SIGN_OUT_ORIGINS.update({k: list(v[1]) for k, v in WEB_PLAYERS.items() if k.startswith("web_")})
 
 
 def sign_out(src):
@@ -2753,7 +2847,8 @@ def accounts():
     if "spotify_web" in SOURCES:
         out.append({"id": "spotify_web", "name": "Spotify web player",
                     "status": "Sign in on the screen", "ok": None, "action": "Sign out"})
-    for key, label in (("youtube_music", "YouTube Music"), ("bbc_sounds", "BBC Sounds")):
+    for key, label in [("youtube_music", "YouTube Music"), ("bbc_sounds", "BBC Sounds")] + \
+            [(k, v["name"]) for k, v in SOURCES.items() if k.startswith("web_")]:
         if key in SOURCES:
             out.append({"id": key, "name": label, "status": "Sign in on the screen", "ok": None, "action": "Sign out"})
     if "ma" in SOURCES:
@@ -2932,6 +3027,8 @@ def settings_json(local, host=None, token=None):
     vals["HA_URL"] = vals.get("HA_URL") or HA_BASE
     vals["HOME_BUTTON"] = (vals.get("HOME_BUTTON") or "auto").lower()
     vals["SCREEN_ROTATION"] = (vals.get("SCREEN_ROTATION") or "auto").lower()
+    vals["CLOCK_FORMAT"] = (vals.get("CLOCK_FORMAT") or "auto").lower()
+    vals["CUSTOM_PLAYERS"] = "||".join(f"{n}|{u}" for _, n, u, _ in parse_custom_players(cfg("CUSTOM_PLAYERS")))
     vals["EQ_CUSTOM_TEXT"] = filters_to_apo(parse_compact(cfg("EQ_CUSTOM")))
     installed = {flag: subprocess.run(["systemctl", "cat", unit], capture_output=True).returncode == 0
                  for flag, unit in OPTIONAL_UNITS.items()}
@@ -2971,6 +3068,10 @@ def apply_settings(data, role="admin"):
             continue
         if k == "SCREEN_ROTATION" and str(v).lower() not in ("auto", "normal", "right", "inverted", "left"):
             continue
+        if k == "CLOCK_FORMAT" and str(v).lower() not in ("auto", "12", "24"):
+            continue
+        if k == "CUSTOM_PLAYERS":
+            v = "||".join(f"{n}|{u}" for _, n, u, _ in parse_custom_players(str(v)))
         if k == "EQ_CUSTOM_TEXT":
             clean["EQ_CUSTOM"] = to_compact(parse_apo(str(v)))
             continue
@@ -3727,7 +3828,7 @@ def main():
         spawn(airplay_reader)
     for fn in (fast_poller, slow_poller, focus_poller, gesture_reader, screen_loop, watchdog, update_checker,
                sleep_loop, eq_manager, dim_loop, theme_loop, knob_reader, screen_share_loop, home_button_loop,
-               rotation_sync, discovery_loop):
+               rotation_sync, discovery_loop, status_loop):
         spawn(fn)
     HA.start()
     while True:
