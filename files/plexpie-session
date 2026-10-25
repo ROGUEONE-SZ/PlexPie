@@ -6,8 +6,13 @@
 CONF=/etc/plexpie/plexpie.conf
 [ -r "$CONF" ] && . "$CONF"
 
+# Which browser runs the screen (written by the installer: Chromium on a Pi, Google Chrome on a PC)
+BROWSER=chromium; BROWSER_PROFILE=".config/plexpie-chromium"
+[ -r /etc/plexpie/platform ] && . /etc/plexpie/platform
+command -v "$BROWSER" >/dev/null || BROWSER=$(command -v chromium || command -v chromium-browser || command -v google-chrome-stable || echo chromium)
+
 export DISPLAY="${DISPLAY:-:0}"
-PROFILE="$HOME/.config/plexpie-chromium"
+PROFILE="$HOME/$BROWSER_PROFILE"
 LAUNCHER="http://127.0.0.1:8080/"
 SCALE="${CHROMIUM_SCALE:-1}"
 
@@ -96,8 +101,8 @@ PY
   SIZE=$(xrandr 2>/dev/null | sed -n 's/.*current \([0-9]*\) x \([0-9]*\).*/\1,\2/p' | head -1)
   WINDOW_ARGS=()
   [ -n "$SIZE" ] && WINDOW_ARGS=(--window-position=0,0 "--window-size=$SIZE")
-  log "starting chromium (screen ${SIZE:-unknown})"
-  chromium \
+  log "starting $BROWSER (screen ${SIZE:-unknown})"
+  "$BROWSER" \
     --kiosk \
     --user-data-dir="$PROFILE" \
     --remote-debugging-address=127.0.0.1 \
@@ -116,6 +121,6 @@ PY
     --check-for-update-interval=31536000 \
     "${WINDOW_ARGS[@]}" \
     "$LAUNCHER"
-  log "chromium exited ($?), restarting in 2s"
+  log "$BROWSER exited ($?), restarting in 2s"
   sleep 2
 done

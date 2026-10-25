@@ -1,6 +1,6 @@
 #!/bin/bash
-# PlexPie installer: turns the Pi into a one-screen music endpoint
-# (Plexamp, Apple Music, AirPlay 2, Music Assistant, Home Assistant control).
+# PlexPie installer: turns a Raspberry Pi (or, in beta, an Intel/AMD PC or another ARM board running
+# Debian, Ubuntu, Armbian or Raspberry Pi OS) into a one-screen music appliance.
 # Safe to re-run after editing plexpie.conf.
 #
 # Usage: sudo bash ~/plexpie/install.sh [--skip-airplay-build] [--no-restart-ui]
@@ -33,6 +33,7 @@ note() { echo "    note: $*"; }
 yes_() { case "${1,,}" in yes|true|1|on) return 0 ;; *) return 1 ;; esac; }
 
 echo "PlexPie install started $(date)"
+QUICK="${PLEXPIE_QUICK:-}"                      # quick setup: no questions here, the screen's wizard does the rest
 
 if [ ! -f "$REPO/plexpie.conf" ]; then
   echo "No plexpie.conf yet: starting the setup wizard."
@@ -54,6 +55,18 @@ PLAYER_NAME="${PLAYER_NAME:-PlexPie}"
 AIRPLAY_NAME="${AIRPLAY_NAME:-$PLAYER_NAME}"
 DAC_MATCH="${DAC_MATCH:-alsa_output.usb-.*}"
 PLEXAMP_VERSION="${PLEXAMP_VERSION:-4.12.4}"
+
+# What machine is this? The Raspberry Pi is the main, fully tested platform; Intel/AMD PCs are beta,
+# other ARM boards community supported. Pi-only parts (boot files, GPIO knob and button) are skipped elsewhere.
+IS_PI=no
+tr -d '\0' </proc/device-tree/model 2>/dev/null | grep -qi "raspberry pi" && IS_PI=yes
+ARCH=$(dpkg --print-architecture)             # arm64, amd64, armhf
+DISTRO=$( . /etc/os-release 2>/dev/null; echo "${ID:-debian}" )
+if [ "$IS_PI" = yes ]; then PLATFORM=pi; elif [ "$ARCH" = amd64 ]; then PLATFORM=pc; else PLATFORM=arm; fi
+BOOTCFG=""
+if [ "$IS_PI" = yes ]; then
+  BOOTCFG=$( [ -f /boot/firmware/config.txt ] && echo /boot/firmware/config.txt || echo /boot/config.txt )
+fi
 
 as_user() {
   sudo -u "$U" HOME="$UHOME" XDG_RUNTIME_DIR="/run/user/$AUID" \
@@ -92,6 +105,12 @@ build() {       # name dir configure-args...
     return 1
   fi
 }
+
+case "$PLATFORM" in
+  pi)  ok "Raspberry Pi, $DISTRO ($ARCH)" ;;
+  pc)  note "Intel/AMD PC, $DISTRO: PC support is in beta. Please report how it went (GitHub › Issues › Hardware report)." ;;
+  arm) note "ARM board, $DISTRO ($ARCH): community supported. Please report how it went (GitHub › Issues › Hardware report)." ;;
+esac
 
 # ---------------------------------------------------------------- 1. backup
 step "Backing up the current setup"
@@ -133,13 +152,41 @@ PKGS=(pipewire pipewire-pulse pipewire-alsa wireplumber pipewire-bin python3 pyt
       x11-xserver-utils xinput x11vnc alsa-utils avahi-daemon avahi-utils nodejs fonts-dejavu-core python3-numpy python3-pil)
 # Bluetooth receiver: BlueZ, PipeWire's Bluetooth plugin, and D-Bus bindings for the pairing helper
 yes_ "${ENABLE_BLUETOOTH:-yes}" && PKGS+=(bluez libspa-0.2-bluetooth python3-dbus python3-gi rfkill)
-# Chromium is "chromium" on Trixie and "chromium-browser" on older Raspberry Pi OS;
-# Widevine (needed by the Apple Music web player) comes from Raspberry Pi's repository.
-for alts in "chromium chromium-browser" "libwidevinecdm0" "unclutter-xfixes" "plymouth"; do
+# The browser that runs the screen. Raspberry Pi: Chromium plus Widevine from Raspberry Pi's repository
+# (Apple Music, TIDAL and Spotify's web player need Widevine). Intel/AMD PCs: Google Chrome, which has
+# Widevine built in. Other boards: Debian's Chromium (web players that need Widevine won't play there).
+BROWSER=""; BROWSER_PROFILE=".config/plexpie-chromium"
+if [ "$PLATFORM" = pc ]; then
+  if ! dpkg -s google-chrome-stable >/dev/null 2>&1; then
+    install -d -m 755 /etc/apt/keyrings
+    command -v gpg >/dev/null || apt-get install -y -q gpg
+    if curl -fsSL https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor --yes -o /etc/apt/keyrings/google-chrome.gpg; then
+      echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/google-chrome.gpg] https://dl.google.com/linux/chrome/deb/ stable main" \
+        > /etc/apt/sources.list.d/google-chrome.list
+      apt-get update -q
+    fi
+  fi
+  apt-cache show google-chrome-stable >/dev/null 2>&1 && { PKGS+=(google-chrome-stable); BROWSER=google-chrome-stable; }
+fi
+for alts in "libwidevinecdm0" "unclutter-xfixes" "plymouth" "gpg"; do
   # shellcheck disable=SC2086
   p=$(pick_pkg $alts)
   [ -n "$p" ] && PKGS+=("$p")
 done
+if [ -z "$BROWSER" ]; then
+  # Ubuntu's "chromium-browser" is only a placeholder for the snap version, which PlexPie can't drive well
+  if [ "$DISTRO" = ubuntu ] && ! apt-cache show chromium 2>/dev/null | grep -q '^Version: 1[0-9][0-9]'; then
+    note "On Ubuntu for ARM only the snap version of Chromium exists; using it (web players may not sign in)."
+    command -v snap >/dev/null && snap install chromium >/dev/null 2>&1 || true
+    BROWSER=/snap/bin/chromium; BROWSER_PROFILE="snap/chromium/common/plexpie-chromium"
+  else
+    for alts in "chromium chromium-browser"; do
+      # shellcheck disable=SC2086
+      p=$(pick_pkg $alts)
+      [ -n "$p" ] && { PKGS+=("$p"); BROWSER=$p; }
+    done
+  fi
+fi
 # Every player is installed, so the Settings page can switch them on and off instantly.
 PKGS+=(squeezelite libvorbis0a libogg0)
 # Optional speakers for other systems, only when chosen (they take space on small cards)
@@ -157,10 +204,14 @@ if yes_ "${ENABLE_AIRPLAY:-yes}" && [ "$SKIP_AIRPLAY_BUILD" = no ]; then
   done
 fi
 apt-get install -y -q --no-install-recommends "${PKGS[@]}"
-if ! dpkg -s libwidevinecdm0 >/dev/null 2>&1 && yes_ "${ENABLE_APPLE_MUSIC_WEB:-yes}"; then
+if [ "$BROWSER" != google-chrome-stable ] && ! dpkg -s libwidevinecdm0 >/dev/null 2>&1 && yes_ "${ENABLE_APPLE_MUSIC_WEB:-yes}"; then
   note "Widevine isn't available on this OS, so the Apple Music web player won't play."
   note "Use Raspberry Pi OS (64-bit) for it, or turn ENABLE_APPLE_MUSIC_WEB off."
 fi
+# Remember the machine and browser for the screen session, the player and Settings
+install -d -m 755 /etc/plexpie
+printf 'PLATFORM="%s"\nDISTRO="%s"\nARCH="%s"\nBROWSER="%s"\nBROWSER_PROFILE="%s"\n' \
+  "$PLATFORM" "$DISTRO" "$ARCH" "${BROWSER:-chromium}" "$BROWSER_PROFILE" > /etc/plexpie/platform
 # Debian's own Squeezelite service would run a second player; ours replaces it.
 systemctl disable --now squeezelite >/dev/null 2>&1 || true
 ok "packages installed"
@@ -217,6 +268,8 @@ systemctl enable plexamp >/dev/null 2>&1
 PLEX_TOKEN="$UHOME/.local/share/Plexamp/Settings/%40Plexamp%3Auser%3Atoken"
 if [ -s "$PLEX_TOKEN" ]; then
   ok "Plexamp is installed and signed in"
+elif [ -n "$QUICK" ]; then
+  ok "Plexamp installed: link it to your Plex account in the setup wizard on the screen"
 elif [ -t 0 ]; then
   systemctl stop plexamp 2>/dev/null || true
   echo
@@ -269,11 +322,13 @@ fi
 # ----------------------------------------------------------- 5b. spotify
 step "Spotify Connect receiver"
 if [ ! -x /usr/local/bin/go-librespot ] || [ -n "${UPDATE_SPOTIFY:-}" ]; then
-  url=$(curl -fsSL https://api.github.com/repos/devgianlu/go-librespot/releases/latest | python3 -c '
-import json, sys
+  url=$(curl -fsSL https://api.github.com/repos/devgianlu/go-librespot/releases/latest | ARCH="$ARCH" python3 -c '
+import json, os, sys
+WANT = {"arm64": ("arm64", "aarch64"), "amd64": ("x86_64", "amd64"), "armhf": ("armv7", "armhf", "arm_v7")}.get(
+    os.environ.get("ARCH"), ("arm64", "aarch64"))
 assets = json.load(sys.stdin).get("assets", [])
 pick = [a["browser_download_url"] for a in assets
-        if "linux" in a["name"].lower() and ("arm64" in a["name"] or "aarch64" in a["name"])]
+        if "linux" in a["name"].lower() and any(k in a["name"].lower() for k in WANT)]
 print(pick[0] if pick else "")' || true)
   if [ -n "$url" ]; then
     tmp=$(mktemp -d)
@@ -287,7 +342,7 @@ print(pick[0] if pick else "")' || true)
     if [ -n "$bin" ]; then install -m 755 "$bin" /usr/local/bin/go-librespot; ok "go-librespot installed"; fi
     rm -rf "$tmp"
   else
-    note "Couldn't find a go-librespot download for this Pi; Spotify Connect stays off."
+    note "Couldn't find a go-librespot download for this machine ($ARCH); Spotify Connect stays off."
   fi
 fi
 if [ -x /usr/local/bin/go-librespot ]; then
@@ -345,7 +400,7 @@ if yes_ "${ENABLE_CALDERA:-no}"; then
     install -d -o "$U" -g "$U" "$UHOME/.config/plexpie"
     if [ -f "$LINKED" ]; then
       ok "Caldera Music is signed in"
-    elif [ -t 0 ]; then
+    elif [ -t 0 ] && [ -z "$QUICK" ]; then
       echo
       echo "    Caldera Music needs to be linked to your Plex account once."
       echo "    Follow the steps it shows (usually a code to enter at plex.tv/link)."
@@ -411,16 +466,17 @@ done
 
 # Optional power button between pins 5 and 6 (GPIO3 and ground): press to shut down, press to start.
 # The Pi already starts from that button; the overlay adds the shut-down half.
-BOOTCFG=$( [ -f /boot/firmware/config.txt ] && echo /boot/firmware/config.txt || echo /boot/config.txt )
-if [ "${POWER_BUTTON:-no}" = yes ]; then
+if [ -z "$BOOTCFG" ]; then
+  : # not a Raspberry Pi: no GPIO power button or knob
+elif [ "${POWER_BUTTON:-no}" = yes ]; then
   grep -q '^dtoverlay=gpio-shutdown' "$BOOTCFG" || { echo 'dtoverlay=gpio-shutdown' >> "$BOOTCFG"; note "power button enabled (active after a reboot)"; }
 else
   sed -i '/^dtoverlay=gpio-shutdown$/d' "$BOOTCFG" 2>/dev/null || true
 fi
 
 # Optional rotary knob: A on pin 11 (GPIO17), B on pin 13 (GPIO27), push on pin 15 (GPIO22), ground on pin 9 or 14.
-sed -i -e '/^dtoverlay=rotary-encoder,/d' -e '/^dtoverlay=gpio-key,.*PLAYPAUSE/d' "$BOOTCFG" 2>/dev/null || true
-if [ "${KNOB:-no}" = yes ]; then
+[ -n "$BOOTCFG" ] && sed -i -e '/^dtoverlay=rotary-encoder,/d' -e '/^dtoverlay=gpio-key,.*PLAYPAUSE/d' "$BOOTCFG" 2>/dev/null || true
+if [ -n "$BOOTCFG" ] && [ "${KNOB:-no}" = yes ]; then
   {
     echo "dtoverlay=rotary-encoder,pin_a=${KNOB_PIN_A:-17},pin_b=${KNOB_PIN_B:-27},relative_axis=1,steps-per-period=${KNOB_STEPS:-2}"
     echo "dtoverlay=gpio-key,gpio=${KNOB_PIN_PUSH:-22},keycode=164,label=\"PLAYPAUSE\",gpio_pull=up"
@@ -464,7 +520,7 @@ step "Touchscreen session"
 # Raspberry Pi OS Lite has no X display config: on a Pi 4/5, X can pick the 3D chip (which has no
 # screen) and show only a white or black screen. Point it at the display chip (the Desktop image
 # ships the same file).
-if [ ! -e /usr/share/X11/xorg.conf.d/99-vc4.conf ] && [ ! -e /etc/X11/xorg.conf.d/99-vc4.conf ]; then
+if [ "$IS_PI" = yes ] && [ ! -e /usr/share/X11/xorg.conf.d/99-vc4.conf ] && [ ! -e /etc/X11/xorg.conf.d/99-vc4.conf ]; then
   mkdir -p /etc/X11/xorg.conf.d
   cat > /etc/X11/xorg.conf.d/99-vc4.conf <<'XEOF'
 Section "OutputClass"
@@ -477,9 +533,19 @@ XEOF
   ok "display set to the Raspberry Pi's display chip"
 fi
 systemctl disable --now display-control.service >/dev/null 2>&1 || true
+# The desktop's login screen (lightdm on Raspberry Pi OS, gdm on Ubuntu, sddm…): PlexPie takes the screen
+# instead, and remembers which one it was for "Exit to the desktop" and for uninstalling.
+DM=$(basename "$(readlink -f /etc/systemd/system/display-manager.service 2>/dev/null)" .service 2>/dev/null || true)
+[ "$DM" = display-manager ] && DM=""
+[ -z "$DM" ] && [ -f /etc/plexpie/display-manager ] && DM=$(cat /etc/plexpie/display-manager)
+[ -z "$DM" ] && systemctl cat lightdm.service >/dev/null 2>&1 && DM=lightdm
 DESKTOP_WAS_RUNNING=no
-systemctl is-active --quiet lightdm.service 2>/dev/null && DESKTOP_WAS_RUNNING=yes
-systemctl disable lightdm.service >/dev/null 2>&1 || true
+if [ -n "$DM" ]; then
+  echo "$DM" > /etc/plexpie/display-manager
+  systemctl is-active --quiet "$DM.service" 2>/dev/null && DESKTOP_WAS_RUNNING=yes
+  systemctl disable "$DM.service" >/dev/null 2>&1 || true
+  grep -q "^$DM " "$BACKUP_DIR/state.txt" 2>/dev/null || echo "$DM enabled" >> "$BACKUP_DIR/state.txt"
+fi
 cat > "$UHOME/.xinitrc" <<'EOF'
 #!/bin/sh
 # PlexPie: the whole screen is run by /opt/plexpie/plexpie-session

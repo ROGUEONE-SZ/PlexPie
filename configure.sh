@@ -148,6 +148,8 @@ cat > "$CONF" <<EOF
 
 # Linux user that runs everything (autologin on the touchscreen)
 APPLIANCE_USER="$APPLIANCE_USER"
+# First-run wizard on the screen (yes after a quick install; it switches itself off when done)
+SETUP_WIZARD="${SETUP_WIZARD:-no}"
 
 # Name shown in Plexamp, AirPlay and Music Assistant
 PLAYER_NAME="$PLAYER_NAME"

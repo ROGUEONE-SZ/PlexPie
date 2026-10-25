@@ -120,6 +120,14 @@ Still in the terminal connected to the Pi, copy this whole line, paste it, and p
 curl -fsSL https://raw.githubusercontent.com/ROGUEONE-SZ/PlexPie/main/get.sh | bash
 ```
 
+It first asks how you want to set up:
+
+- **1) Quick setup (recommended):** press <kbd>Enter</kbd>. Everything installs with sensible defaults, then the
+  player restarts into a **setup wizard on the screen**: name, linking Plexamp (scan the QR code for
+  plex.tv/claim on your phone), which apps you want, Home Assistant, and your phone. You can skip the rest of
+  this step and the Plexamp step below; the wizard covers them.
+- **2) Answer the questions here**, as described below.
+
 A short setup wizard asks a few questions. Press <kbd>Enter</kbd> to accept the suggested answer
 shown in brackets, or type your own:
 

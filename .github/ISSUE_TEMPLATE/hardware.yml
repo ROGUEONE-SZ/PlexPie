@@ -1,0 +1,69 @@
+name: Hardware report
+description: Tried PlexPie on a PC, a laptop or a board other than a Raspberry Pi? Tell us how it went (good or bad).
+title: "Hardware report: "
+labels: ["hardware-report"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for testing! PC support is in beta and other ARM boards are community supported, so every report helps.
+        Reports that say "everything worked" are just as useful as problem reports.
+  - type: input
+    id: machine
+    attributes:
+      label: Machine
+      placeholder: "Intel NUC 8i5 / Lenovo ThinkPad T480 / Orange Pi 5 / Beelink S12"
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: "Ubuntu 24.04 / Debian 13 / Armbian 25.x"
+    validations:
+      required: true
+  - type: input
+    id: screen
+    attributes:
+      label: Screen and sound
+      placeholder: "Laptop screen + headphones / 10-inch HDMI touchscreen + SMSL USB DAC"
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How did you install?
+      options:
+        - Quick setup (finished on the screen)
+        - Answered the questions in the terminal
+    validations:
+      required: true
+  - type: checkboxes
+    id: worked
+    attributes:
+      label: What worked? (tick everything that did)
+      options:
+        - label: The install finished without errors
+        - label: The PlexPie start-up screen and home screen appeared
+        - label: Touch (or mouse) works in the right places
+        - label: Sound comes out
+        - label: Plexamp plays
+        - label: Apple Music / TIDAL / Spotify web player plays
+        - label: AirPlay
+        - label: Spotify Connect
+        - label: Bluetooth
+        - label: Screen brightness and sleep
+        - label: Home Assistant
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything that didn't work, or looked wrong?
+      placeholder: "The screen was upside down until I set Settings › Screen › Rotation; AirPlay worked but the cover didn't show."
+  - type: textarea
+    id: report
+    attributes:
+      label: Diagnostics report
+      description: |
+        From any computer: `curl -fsSL https://raw.githubusercontent.com/ROGUEONE-SZ/PlexPie/main/tools/diag.sh | ssh USER@ADDRESS bash`
+        It hides tokens and passwords.
+      render: text

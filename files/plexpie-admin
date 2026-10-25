@@ -41,6 +41,61 @@ wait_reader() {   # let the progress reader finish writing ($! may be unset: nev
 
 protect_active() { grep -Eq 'boot=overlay|overlayroot=tmpfs' /proc/cmdline; }
 
+# The desktop's login screen PlexPie replaced (lightdm on Raspberry Pi OS, gdm on Ubuntu, sddm…)
+DM=$(cat /etc/plexpie/display-manager 2>/dev/null || echo lightdm)
+
+# Kernel boot options: cmdline.txt on a Raspberry Pi, GRUB on a PC
+BOOTKIND=""; BOOTFILE=""
+for f in /boot/firmware/cmdline.txt /boot/cmdline.txt; do [ -f "$f" ] && { BOOTKIND=pi; BOOTFILE=$f; break; }; done
+[ -z "$BOOTKIND" ] && [ -f /etc/default/grub ] && { BOOTKIND=grub; BOOTFILE=/etc/default/grub; }
+boot_line_get() {
+  case "$BOOTKIND" in
+    pi) head -n1 "$BOOTFILE" ;;
+    grub) sed -n 's/^GRUB_CMDLINE_LINUX_DEFAULT=["'"'"']\{0,1\}\([^"'"'"']*\)["'"'"']\{0,1\}$/\1/p' "$BOOTFILE" | tail -1 ;;
+  esac
+}
+boot_line_set() {   # boot_line_set "new options": keeps a copy of the old file
+  cp -p "$BOOTFILE" "$BOOTFILE.plexpie-bak"
+  case "$BOOTKIND" in
+    pi) printf '%s\n' "$1" > "$BOOTFILE.plexpie-new" && mv "$BOOTFILE.plexpie-new" "$BOOTFILE" ;;
+    grub)
+      if grep -q '^GRUB_CMDLINE_LINUX_DEFAULT=' "$BOOTFILE"; then
+        sed -i "s|^GRUB_CMDLINE_LINUX_DEFAULT=.*|GRUB_CMDLINE_LINUX_DEFAULT=\"$1\"|" "$BOOTFILE"
+      else
+        echo "GRUB_CMDLINE_LINUX_DEFAULT=\"$1\"" >> "$BOOTFILE"
+      fi
+      grub_update ;;
+  esac
+}
+grub_update() { if command -v update-grub >/dev/null; then update-grub >/dev/null 2>&1; else grub-mkconfig -o /boot/grub/grub.cfg >/dev/null 2>&1; fi || true; }
+grub_set() {        # grub_set KEY VALUE: one GRUB setting, remembering the original
+  local k=$1 v=$2
+  grep -q "^$k=" "$STATE/grub-orig" 2>/dev/null || echo "$k=$(sed -n "s/^$k=//p" "$BOOTFILE" | tail -1)" >> "$STATE/grub-orig"
+  if grep -q "^$k=" "$BOOTFILE"; then sed -i "s|^$k=.*|$k=$v|" "$BOOTFILE"; else echo "$k=$v" >> "$BOOTFILE"; fi
+}
+grub_restore() {    # put back the GRUB settings PlexPie changed
+  [ -f "$STATE/grub-orig" ] || return 0
+  while IFS='=' read -r k v; do
+    [ -n "$k" ] || continue
+    if [ -n "$v" ]; then sed -i "s|^$k=.*|$k=$v|" "$BOOTFILE"; else sed -i "/^$k=/d" "$BOOTFILE"; fi
+  done < "$STATE/grub-orig"
+  rm -f "$STATE/grub-orig"
+}
+plymouth_theme() {  # make the PlexPie start-up screen the default (and rebuild the start-up files)
+  [ -d /usr/share/plymouth/themes/plexpie ] || return 0
+  local sum; sum=$(cat /usr/share/plymouth/themes/plexpie/* 2>/dev/null | md5sum | cut -c1-32)
+  [ "$(cat "$STATE/plymouth-theme.sum" 2>/dev/null)" = "$sum" ] && return 0
+  if command -v plymouth-set-default-theme >/dev/null; then
+    plymouth-set-default-theme -R plexpie >/dev/null 2>&1 || return 0
+  else                                        # Ubuntu picks the theme with update-alternatives
+    update-alternatives --install /usr/share/plymouth/themes/default.plymouth default.plymouth \
+      /usr/share/plymouth/themes/plexpie/plexpie.plymouth 200 >/dev/null 2>&1 &&
+    update-alternatives --set default.plymouth /usr/share/plymouth/themes/plexpie/plexpie.plymouth >/dev/null 2>&1 &&
+    update-initramfs -u >/dev/null 2>&1 || return 0
+  fi
+  echo "$sum" > "$STATE/plymouth-theme.sum"
+}
+
 case "${1:-}" in
   wifi-status)
     radio=$(nmcli -t -f WIFI g 2>/dev/null || echo unknown)
@@ -158,16 +213,38 @@ print(json.dumps(sorted(seen.values(), key=lambda n: -n["signal"])[:20]))' ;;
   apply-run)        # reinstall with the current plexpie.conf (after restoring a backup)
     systemctl is-active --quiet plexpie-update && { echo "an update is running, try again in a few minutes" >&2; exit 1; }
     systemctl reset-failed plexpie-update 2>/dev/null
-    systemd-run --quiet --unit=plexpie-update --collect /opt/plexpie/plexpie-admin apply-do ;;
+    label=$(printf '%s' "${2:-Applying restored settings}" | tr -cd 'A-Za-z0-9 ._-' | cut -c1-40)
+    systemd-run --quiet --unit=plexpie-update --collect /opt/plexpie/plexpie-admin apply-do "$label" ;;
   apply-do)
     exec >>"$LOG" 2>&1
-    echo "=== restore started $(date)"
+    label=${2:-Applying restored settings}
+    echo "=== $label started $(date)"
     date +%s > "$STATE/update-started"
-    json_status "Applying restored settings" true ',"percent":20'
-    bash "$REPO/install.sh" --no-restart-ui </dev/null || { json_status "Restore failed (see $LOG)" false; exit 1; }
-    json_status "Settings restored" false ',"percent":100'
-    pkill -u "$U" -f plexpie-chromium || true   # reload the screen with the restored settings
-    echo "=== restore finished $(date)" ;;
+    json_status "$label" true ',"percent":20'
+    bash "$REPO/install.sh" --no-restart-ui </dev/null || { json_status "$label failed (see $LOG)" false; exit 1; }
+    json_status "Done" false ',"percent":100'
+    pkill -u "$U" -f plexpie-chromium || true   # reload the screen with the new settings
+    echo "=== $label finished $(date)" ;;
+  plexamp-claim)    # plexamp-claim CODE NAME: link Plexamp to a Plex account (the setup wizard's claim step)
+    [[ "${2:-}" =~ ^claim-[A-Za-z0-9_-]{6,}$ ]] || { echo "bad claim code" >&2; exit 2; }
+    name=$(printf '%s' "${3:-PlexPie}" | tr -cd "A-Za-z0-9 ._'-" | cut -c1-40)
+    systemctl reset-failed plexpie-claim 2>/dev/null
+    systemd-run --quiet --unit=plexpie-claim --collect /opt/plexpie/plexpie-admin plexamp-claim-do "$2" "${name:-PlexPie}" ;;
+  plexamp-claim-do)
+    UHOME=$(getent passwd "$U" | cut -d: -f6)
+    TOKEN="$UHOME/.local/share/Plexamp/Settings/%40Plexamp%3Auser%3Atoken"
+    echo '{"state":"linking"}' > "$STATE/claim.json"
+    systemctl stop plexamp 2>/dev/null || true
+    # Plexamp asks for the claim code, then the player name, the same as in a terminal
+    ( printf '%s\n' "$2"; sleep 10; printf '%s\n' "$3"; sleep 200 ) | \
+      timeout 180 sudo -u "$U" HOME="$UHOME" node /opt/plexamp/js/index.js >/dev/null 2>&1 &
+    feeder=$!
+    for _ in $(seq 150); do [ -s "$TOKEN" ] && break; sleep 1; done
+    [ -s "$TOKEN" ] && sleep 15                  # let it save the player name too
+    kill "$feeder" 2>/dev/null; pkill -u "$U" -f '/opt/plexamp/js/index.js' 2>/dev/null; sleep 1
+    systemctl start plexamp
+    if [ -s "$TOKEN" ]; then echo '{"state":"linked"}' > "$STATE/claim.json"
+    else echo '{"state":"failed"}' > "$STATE/claim.json"; fi ;;
   protect-status)
     avail=false; command -v raspi-config >/dev/null && avail=true
     active=false; protect_active && active=true
@@ -204,7 +281,7 @@ PY
     ;;
   exit-screen)      # exit-screen desktop|console: leave the PlexPie screen until the next restart
     want=${2:-desktop}
-    systemctl cat lightdm.service >/dev/null 2>&1 || want=console       # Raspberry Pi OS Lite: no desktop
+    systemctl cat "$DM.service" >/dev/null 2>&1 || want=console       # no desktop installed (e.g. Raspberry Pi OS Lite)
     install -d -m 755 /run/plexpie
     echo "$want" > /run/plexpie/paused          # in /run, so a restart always comes back to PlexPie
     systemd-run --quiet --collect --unit="plexpie-exit-$(date +%s)" /opt/plexpie/plexpie-admin exit-do "$want" ;;
@@ -219,41 +296,38 @@ PY
       [ "$(loginctl show-session "$s" -p TTY --value 2>/dev/null)" = tty1 ] && loginctl terminate-session "$s"
     done
     sleep 2
-    [ "$2" = desktop ] && systemctl start lightdm.service
+    [ "$2" = desktop ] && systemctl start "$DM.service"
     true ;;
   resume)           # back to the PlexPie screen (the "Back to PlexPie" icon, or typing: plexpie)
     rm -f /run/plexpie/paused
     systemd-run --quiet --collect --unit="plexpie-resume-$(date +%s)" /opt/plexpie/plexpie-admin resume-do ;;
   resume-do)
-    systemctl stop lightdm.service 2>/dev/null || true
+    systemctl stop "$DM.service" 2>/dev/null || true
     chvt 1 2>/dev/null || true
     for s in $(loginctl list-sessions --no-legend 2>/dev/null | awk '{print $1}'); do
       [ "$(loginctl show-session "$s" -p TTY --value 2>/dev/null)" = tty1 ] && loginctl terminate-session "$s"
     done
     systemctl restart getty@tty1.service ;;   # autologin starts the PlexPie screen again
-  boot-look)        # boot-look on|off: PlexPie start-up screen instead of Raspberry Pi boot text (next restart)
+  boot-look)        # boot-look on|off: PlexPie start-up screen instead of boot text (after a restart)
     want=${2:-on}
-    CMD=/boot/firmware/cmdline.txt; [ -f "$CMD" ] || CMD=/boot/cmdline.txt
     CFG=/boot/firmware/config.txt; [ -f "$CFG" ] || CFG=/boot/config.txt
     UHOME=$(getent passwd "$U" | cut -d: -f6)
     QUIET="quiet splash loglevel=3 logo.nologo vt.global_cursor_default=0 plymouth.ignore-serial-consoles"
-    [ -f "$CMD" ] || { echo "no cmdline.txt"; exit 0; }
-    line=$(head -n1 "$CMD")
-    # Remember what the card had before PlexPie touched it, so "off" puts exactly that back.
+    [ -n "$BOOTKIND" ] || { echo "no boot options file (cmdline.txt or GRUB) found"; exit 0; }
+    line=$(boot_line_get)
+    # Remember what the machine had before PlexPie touched it, so "off" puts exactly that back.
     [ -f "$STATE/cmdline-orig" ] || printf '%s\n' "$line" > "$STATE/cmdline-orig"
     orig=" $(cat "$STATE/cmdline-orig") "
     new=" $line "
     if [ "$want" = on ]; then
       for t in $QUIET; do [[ "$new" == *" $t "* ]] || new="$new$t "; done
       new=${new// console=tty1 / console=tty3 }          # boot messages to a hidden console
-      grep -q '^disable_splash=1' "$CFG" 2>/dev/null || echo 'disable_splash=1' >> "$CFG"   # no rainbow square
-      if [ -d /usr/share/plymouth/themes/plexpie ] && command -v plymouth-set-default-theme >/dev/null; then
-        # Rebuild the start-up files when the theme is new or its logo changed (it lives in the initramfs)
-        sum=$(cat /usr/share/plymouth/themes/plexpie/* 2>/dev/null | md5sum | cut -c1-32)
-        if [ "$(plymouth-set-default-theme 2>/dev/null)" != plexpie ] || [ "$(cat "$STATE/plymouth-theme.sum" 2>/dev/null)" != "$sum" ]; then
-          plymouth-set-default-theme -R plexpie >/dev/null 2>&1 && echo "$sum" > "$STATE/plymouth-theme.sum" || true
-        fi
+      if [ "$BOOTKIND" = pi ]; then
+        grep -q '^disable_splash=1' "$CFG" 2>/dev/null || echo 'disable_splash=1' >> "$CFG"   # no rainbow square
+      else
+        grub_set GRUB_TIMEOUT_STYLE hidden; grub_set GRUB_TIMEOUT 0      # straight to PlexPie (hold Shift for the menu)
       fi
+      plymouth_theme
       mkdir -p /etc/systemd/system/getty@tty1.service.d
       printf '[Service]\nExecStart=\nExecStart=-/sbin/agetty --autologin %s --noclear --noissue --nonewline --skip-login %%I $TERM\n' "$U" \
         > /etc/systemd/system/getty@tty1.service.d/zz-plexpie-quiet.conf
@@ -261,16 +335,14 @@ PY
     else
       for t in $QUIET; do [[ "$orig" == *" $t "* ]] || new=${new// $t / }; done
       [[ "$orig" == *" console=tty1 "* ]] && new=${new// console=tty3 / console=tty1 }
-      sed -i '/^disable_splash=1$/d' "$CFG" 2>/dev/null || true
+      if [ "$BOOTKIND" = pi ]; then sed -i '/^disable_splash=1$/d' "$CFG" 2>/dev/null || true; else grub_restore; fi
       rm -f /etc/systemd/system/getty@tty1.service.d/zz-plexpie-quiet.conf
       [ -n "$UHOME" ] && rm -f "$UHOME/.hushlogin"
     fi
     systemctl daemon-reload
     new=$(echo $new)                                     # tidy spaces
-    if [ -n "$new" ] && [ "$new" != "$line" ]; then
-      cp -p "$CMD" "$CMD.plexpie-bak"
-      printf '%s\n' "$new" > "$CMD.plexpie-new" && mv "$CMD.plexpie-new" "$CMD"
-    fi
+    if [ "$new" != "$line" ]; then boot_line_set "$new"
+    elif [ "$BOOTKIND" = grub ]; then grub_update; fi
     echo "$want" > "$STATE/boot-look"
     echo "boot look: $want (after a restart)" ;;
   boot-look-bg)     # same, in the background (rebuilding the start-up files takes a minute)
@@ -278,17 +350,16 @@ PY
   console-rotation) # console-rotation 0|90|180|270: turn the text console like the screen (after a restart)
     deg=${2:-0}
     case "$deg" in 0|90|180|270) ;; *) echo "bad rotation" >&2; exit 2 ;; esac
-    CMD=/boot/firmware/cmdline.txt; [ -f "$CMD" ] || CMD=/boot/cmdline.txt
-    [ -f "$CMD" ] || { echo "no cmdline.txt"; exit 0; }
-    line=$(head -n1 "$CMD")
+    [ -n "$BOOTKIND" ] || { echo "no boot options file"; exit 0; }
+    line=$(boot_line_get)
     if grep -q 'video=[^ ]*rotate=' <<<"$line"; then
-      echo "kept: rotate= set by hand in cmdline.txt"; exit 0
+      echo "kept: rotate= set by hand in the boot options"; exit 0
     fi
     new=$(sed -E 's/[[:space:]]*fbcon=rotate:[0-3]//g' <<<"$line")
     [ "$deg" != 0 ] && new="$new fbcon=rotate:$((deg / 90))"
-    if [ -n "$new" ] && [ "$new" != "$line" ]; then
-      cp -p "$CMD" "$CMD.plexpie-bak"
-      printf '%s\n' "$new" > "$CMD.plexpie-new" && mv "$CMD.plexpie-new" "$CMD"
+    new=$(echo $new)
+    if [ "$new" != "$line" ]; then
+      boot_line_set "$new"
       echo "changed (after a restart)"
     fi ;;
   update-status)

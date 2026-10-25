@@ -3,9 +3,11 @@
 <p align="center"><b>A Raspberry Pi music appliance: one touchscreen for all your music (your own server, streaming services, your phone and your multi-room system), controlled from Home Assistant.</b></p>
 
 <p align="center">
-  <a href="#install"><img src="https://img.shields.io/badge/version-2.20-0a84ff" alt="Version 2.20"></a>
+  <a href="#install"><img src="https://img.shields.io/badge/version-2.21-0a84ff" alt="Version 2.21"></a>
   <a href="LICENSE.md"><img src="https://img.shields.io/badge/license-source--available%20(PolyForm%20NC)-8e8e93" alt="License: source-available, PolyForm Noncommercial"></a>
   <img src="https://img.shields.io/badge/Raspberry%20Pi-4%20%7C%205-c51a4a?logo=raspberrypi&logoColor=white" alt="Raspberry Pi 4 or 5">
+  <img src="https://img.shields.io/badge/PC%20(Intel%2FAMD)-beta-f5a524" alt="Intel/AMD PCs: beta">
+  <a href="https://github.com/ROGUEONE-SZ/PlexPie/actions/workflows/install-test.yml"><img src="https://github.com/ROGUEONE-SZ/PlexPie/actions/workflows/install-test.yml/badge.svg" alt="Install test"></a>
   <img src="https://img.shields.io/badge/Raspberry%20Pi%20OS-64--bit%20Lite%20or%20Desktop-c51a4a" alt="Raspberry Pi OS 64-bit">
   <img src="https://img.shields.io/badge/Home%20Assistant-MQTT-41bdf5?logo=homeassistant&logoColor=white" alt="Home Assistant via MQTT">
   <a href="https://github.com/ROGUEONE-SZ/PlexPie/stargazers"><img src="https://img.shields.io/github/stars/ROGUEONE-SZ/PlexPie?style=flat&color=f5a524" alt="GitHub stars"></a>
@@ -148,7 +150,17 @@ What that means for you:
 
 ## What you need
 
-- **Raspberry Pi 4 or 5** with **Raspberry Pi OS 64-bit** (Bookworm or Trixie, Lite or Desktop).
+- **A computer for the player:**
+
+  | Hardware | System | Status |
+  |---|---|---|
+  | **Raspberry Pi 4 or 5** | Raspberry Pi OS 64-bit (Bookworm or Trixie, Lite or Desktop) | Fully supported and tested |
+  | **Intel/AMD PCs:** mini PCs (NUC, Beelink…), old laptops, desktops | Debian 12/13 or Ubuntu 24.04+ | **Beta**: installs and starts in automated tests; real-hardware reports welcome |
+  | **Other ARM boards:** Orange Pi, Rock Pi, Radxa, Odroid… | Debian, Ubuntu or Armbian (64-bit) | Community supported |
+
+  On PCs, PlexPie uses Google Chrome for the screen (its DRM support lets Apple Music, TIDAL and the
+  Spotify web player play). The Raspberry Pi-only extras (power button and knob on the GPIO pins) are
+  skipped elsewhere. Tried it on other hardware? Please open a **[Hardware report](https://github.com/ROGUEONE-SZ/PlexPie/issues/new?template=hardware.yml)**, good or bad.
 - **A touchscreen or a monitor**, any size or shape (tested on the official 7" display and a 34" ultrawide over HDMI): the launcher picks its grid for the screen (one row on wide screens, a 2–3 row grid of near-square tiles on square or portrait screens) and scales up on big displays.
 - **Audio output:** a USB DAC, which is picked automatically, or HDMI / the headphone jack.
 - **Accounts:**
@@ -157,31 +169,30 @@ What that means for you:
   - **Spotify Premium**, only for Spotify Connect
   - optional: **Home Assistant** with an MQTT broker (e.g. the Mosquitto add-on), and a **Music Assistant** server
 
-> PlexPie takes over the Pi's screen: the desktop is replaced by the music launcher.
-> The installer backs up what it changes, and `rollback.sh` puts it back.
+> PlexPie takes over the machine's screen: the desktop is replaced by the music launcher (Settings ›
+> System › Exit to the desktop gets it back for a while). Use a machine dedicated to music, not one that
+> runs your other services. The installer backs up what it changes, and `rollback.sh` puts it back.
 
 ## Install
 
-The [step-by-step guide](docs/INSTALL.md) walks through everything from an empty Pi. The short version, on the Pi, logged in as your normal user (not root):
+The [step-by-step guide](docs/INSTALL.md) walks through everything from an empty Pi. The short version, on the
+player (Pi or PC), logged in as your normal user (not root):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ROGUEONE-SZ/PlexPie/main/get.sh | bash
 ```
 
-This downloads PlexPie to `~/plexpie`, then runs a short setup wizard that asks for:
+It asks one thing:
 
-- a player name
-- which sources you want
-- your Home Assistant / MQTT details (optional)
-- how long until the screen sleeps
+1. **Quick setup (recommended):** installs everything with sensible defaults (about 15 minutes, mostly building
+   AirPlay 2), then restarts into a **setup wizard on the screen**: player name, linking Plexamp (with a QR code
+   for [plex.tv/claim](https://plex.tv/claim)), which apps you want, Home Assistant, and your phone. You can also
+   finish it from your phone at `http://<address>:8080/welcome`.
+2. **Answer the questions in the terminal**, the classic way: name, sources, Home Assistant, screen sleep, and
+   linking Plexamp with a claim code during the install.
 
-After that it installs everything. The first install takes about 15 minutes, mostly building AirPlay 2.
-
-Partway through, it asks you to link Plexamp to your Plex account. Open
-[plex.tv/claim](https://plex.tv/claim) on any device, copy the code, and paste it in.
-
-When it finishes, the touchscreen restarts into the launcher. Sign in to Apple Music and
-Music Assistant on the screen the first time you open them.
+Either way, sign in to Apple Music and the other web players on the screen the first time you open them.
+The wizard can be run again any time from Settings › System › Setup wizard.
 
 <details>
 <summary>Prefer to do it by hand?</summary>

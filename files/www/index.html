@@ -337,7 +337,11 @@ function setTrack(text) {
     }
   });
 }
+let wizardOpened = false;
 function render(s) {
+  if (s.setup_pending && !wizardOpened && /^(127\.|localhost)/.test(location.hostname)) {   // first run: the wizard
+    wizardOpened = true; post("/api/source", {source: "settings"});
+  }
   ensureCustomTiles(s);
   const order = s.tile_order || [];
   document.querySelectorAll(".tile").forEach((t, i) => {

@@ -142,6 +142,19 @@ rotated, set Settings › Screen › Rotation (above). The log shows what the to
 
 ---
 
+### On a PC or another board (beta)
+
+- **Which browser?** PCs use Google Chrome (installed from Google's repository) so Apple Music, TIDAL and the
+  Spotify web player can play. Other ARM boards use Debian's Chromium, where those web players may not play.
+- **Black screen after install:** restart once. On a desktop system, the installer replaces the login screen
+  (gdm, lightdm, sddm) with PlexPie; Settings › System › Exit to the desktop brings it back for a while.
+- **No sound:** a USB DAC is picked automatically. Without one, the system's default output plays (often HDMI);
+  check `wpctl status` on the player and pick another with `wpctl set-default <number>`.
+- **Boot menu disappeared:** with the PlexPie start-up screen on, the GRUB menu is hidden; hold **Shift** (or
+  press **Esc**) while starting to see it, or turn off Settings › System › PlexPie start-up screen.
+- Please open a [Hardware report](https://github.com/ROGUEONE-SZ/PlexPie/issues/new?template=hardware.yml)
+  either way, so the beta can become supported.
+
 ### Jellyfin, UPnP/DLNA, Roon or Snapcast
 
 - **Jellyfin tile doesn't show:** it needs your server's address (Settings › Configuration › Jellyfin).

@@ -1,0 +1,85 @@
+# Installs PlexPie on fresh Debian and Ubuntu systems (Intel/AMD and ARM) and checks that it starts.
+# It can't test a real screen, touch or sound, but it catches installer problems on every system
+# before anyone downloads a release. Screenshots of the screen's pages are kept with each run.
+name: Install test
+
+on:
+  push:
+    branches: [main]
+    paths: ["install.sh", "configure.sh", "get.sh", "files/**", ".github/workflows/install-test.yml"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  install:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {name: "Debian 13 (Intel/AMD) + AirPlay build", image: "debian:13", runner: "ubuntu-24.04", airplay: "yes"}
+          - {name: "Debian 12 (Intel/AMD)", image: "debian:12", runner: "ubuntu-24.04", airplay: "no"}
+          - {name: "Ubuntu 24.04 (Intel/AMD)", image: "ubuntu:24.04", runner: "ubuntu-24.04", airplay: "no"}
+          - {name: "Debian 13 (ARM, like Raspberry Pi OS)", image: "debian:13", runner: "ubuntu-24.04-arm", airplay: "no"}
+          - {name: "Ubuntu 24.04 (ARM)", image: "ubuntu:24.04", runner: "ubuntu-24.04-arm", airplay: "no"}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start a fresh system (with systemd, like a real machine)
+        run: |
+          cat > Dockerfile.test <<DOCKER
+          FROM ${{ matrix.image }}
+          ENV container=docker DEBIAN_FRONTEND=noninteractive
+          RUN apt-get update && apt-get install -y systemd systemd-sysv dbus sudo curl git ca-certificates python3 procps iproute2 \
+           && useradd -m -s /bin/bash -G sudo,audio,video tester \
+           && echo 'tester ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/tester
+          STOPSIGNAL SIGRTMIN+3
+          CMD ["/sbin/init"]
+          DOCKER
+          docker build -q -t plexpie-test -f Dockerfile.test .
+          docker run -d --name pp --privileged --cgroupns=host -v /sys/fs/cgroup:/sys/fs/cgroup:rw -v "$PWD":/src:ro plexpie-test
+          sleep 5
+
+      - name: Quick setup (no questions), like the one-line installer
+        run: |
+          docker exec pp bash -c 'cp -r /src /home/tester/plexpie && chown -R tester: /home/tester/plexpie'
+          docker exec -u tester -w /home/tester/plexpie pp bash -c 'bash configure.sh --defaults && sed -i "s/^SETUP_WIZARD=.*/SETUP_WIZARD=\"yes\"/" plexpie.conf'
+
+      - name: Install
+        run: |
+          EXTRA=""; [ "${{ matrix.airplay }}" = yes ] || EXTRA="--skip-airplay-build"
+          docker exec -w /home/tester/plexpie -e SUDO_USER=tester -e PLEXPIE_QUICK=1 pp bash install.sh --no-restart-ui $EXTRA
+
+      - name: Check that PlexPie runs
+        run: |
+          docker exec pp bash -c '
+            for i in $(seq 60); do curl -fs http://127.0.0.1:8080/api/state >/dev/null && break; sleep 2; done
+            set -e
+            systemctl is-active plexpie
+            curl -fs http://127.0.0.1:8080/api/state | python3 -c "import json,sys; s=json.load(sys.stdin); print(\"version\", s[\"version\"], \"sources\", sorted(s[\"sources\"])); assert s[\"setup_pending\"] is True"
+            for p in / /settings /welcome /remote /guide /api/settings /api/setup; do
+              code=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:8080$p"); echo "$p $code"; [ "$code" = 200 ]
+            done
+            cat /etc/plexpie/platform'
+
+      - name: Screenshots of the screen's pages
+        if: always()
+        run: |
+          docker exec -u tester pp bash -c '
+            . /etc/plexpie/platform 2>/dev/null; B=${BROWSER:-chromium}; mkdir -p /tmp/shots
+            for p in home: settings:settings welcome:welcome guide:guide; do
+              n=${p%%:*}; u=${p#*:}
+              timeout 60 "$B" --headless=new --no-sandbox --disable-gpu --hide-scrollbars --window-size=800,480 \
+                --virtual-time-budget=4000 --screenshot=/tmp/shots/$n.png "http://127.0.0.1:8080/$u" >/dev/null 2>&1 || true
+            done; ls -la /tmp/shots' || true
+          mkdir -p out && docker cp pp:/tmp/shots out/ || true
+          docker cp pp:/var/log/plexpie-install.log out/ || true
+          docker exec pp journalctl -u plexpie -n 200 --no-pager > out/plexpie.log 2>&1 || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ${{ matrix.image }}-${{ matrix.runner }}
+          path: out/

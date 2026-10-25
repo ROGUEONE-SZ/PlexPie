@@ -25,7 +25,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 
-VERSION = "2.20.0"
+VERSION = "2.21.0"
 CONF_PATH = os.environ.get("PLEXPIE_CONF", "/etc/plexpie/plexpie.conf")
 WWW = os.path.join(os.path.dirname(os.path.abspath(__file__)), "www")
 HTTP_PORT = int(os.environ.get("PLEXPIE_HTTP_PORT", "8080"))
@@ -216,6 +216,8 @@ WEB_APPS = WEB_APPS + tuple(k for k in SOURCES if k.startswith("web_"))     # pa
 SPOTIFY_API = "http://127.0.0.1:3678"
 
 NAME_TO_KEY = {v["name"]: k for k, v in SOURCES.items()}
+if cfg_yes("SETUP_WIZARD", "no") and not os.path.exists(os.path.join(SETTINGS_DIR, "setup-done")):
+    SOURCES["settings"]["url"] = f"http://127.0.0.1:{HTTP_PORT}/welcome"     # first run: the setup wizard
 # Home Assistant buttons on the launcher ("Gym lights, Fan"): each is a switch in Home Assistant
 SHORTCUTS = {}
 for _n in cfg("SHORTCUTS").split(","):
@@ -233,8 +235,8 @@ def source_for_url(url):
         return None
     host = (u.hostname or "").lower()
     if u.netloc == f"127.0.0.1:{HTTP_PORT}":
-        if u.path.startswith("/guide"):
-            return "settings"                    # the setup guides open inside the Settings tab
+        if u.path.startswith(("/guide", "/welcome")):
+            return "settings"                    # the setup guides and the wizard open inside the Settings tab
         for key in ("airplay", "spotify", "settings", "timer", "alert", "bluetooth", "caldera", "dlna", "roon",
                     "snapcast"):
             if u.path.startswith("/" + key):
@@ -400,6 +402,7 @@ def state_json():
             "clock": (cfg("CLOCK_FORMAT") or "auto").lower(),
             "custom_players": [k for k in SOURCES if k.startswith("web_")],
             "tile_order": [k for k in cfg("TILE_ORDER").replace(" ", "").split(",") if k],
+            "setup_pending": setup_pending(),
             "screen_on": ST.screen_on,
             "brightness": ST.brightness,
             "volume": ST.volume,
@@ -1394,6 +1397,88 @@ def backup_json():
             "settings": {k: cfg(k) for k in keys if cfg(k) != "" or k in C}}
 
 
+def conf_update(updates):
+    """Change settings in plexpie.conf in place (comments kept); the installer reads this file."""
+    path = os.path.join(REPO_DIR.strip(), "plexpie.conf")
+    lines = (read_file(path, "") or "").splitlines()
+    for k, v in updates.items():
+        v = str(v).replace('"', "").replace("\n", " ")
+        new = f'{k}="{v}"'
+        for i, line in enumerate(lines):
+            if re.match(rf"^{k}=", line):
+                lines[i] = new
+                break
+        else:
+            lines.append(new)
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
+        f.write("\n".join(lines) + "\n")
+    os.chmod(tmp, 0o600)
+    os.replace(tmp, path)
+
+
+# ------------------------------------------------------------ first-run setup wizard
+SETUP_DONE = os.path.join(SETTINGS_DIR, "setup-done")
+SETUP_FLAGS = ("ENABLE_APPLE_MUSIC_WEB", "ENABLE_TIDAL", "ENABLE_QOBUZ", "ENABLE_YOUTUBE_MUSIC", "ENABLE_BBC_SOUNDS",
+               "ENABLE_JELLYFIN", "ENABLE_AIRPLAY", "ENABLE_SPOTIFY", "ENABLE_BLUETOOTH", "ENABLE_DLNA",
+               "ENABLE_MUSIC_ASSISTANT", "ENABLE_ROON", "ENABLE_SNAPCAST", "ENABLE_HA_DASHBOARD", "ENABLE_TIMER")
+
+
+def setup_pending():
+    return cfg_yes("SETUP_WIZARD", "no") and not os.path.exists(SETUP_DONE)
+
+
+def plexamp_linked():
+    return os.path.exists(os.path.expanduser("~/.local/share/Plexamp/Settings/%40Plexamp%3Auser%3Atoken"))
+
+
+def setup_json():
+    claim = _read_json(os.path.join(UPD_DIR, "claim.json"))
+    run_state = update_info().get("run", {})
+    return {"name": PLAYER_NAME, "plexamp_linked": plexamp_linked(), "claim": claim.get("state", ""),
+            "platform": PLATFORM, "pending": setup_pending(),
+            "values": {k: cfg_yes(k, OPTIONAL_DEFAULTS.get(k, "no" if k not in (
+                "ENABLE_APPLE_MUSIC_WEB", "ENABLE_AIRPLAY", "ENABLE_BLUETOOTH", "ENABLE_HA_DASHBOARD",
+                "ENABLE_TIMER") else "yes")) for k in SETUP_FLAGS},
+            "jellyfin_url": cfg("JELLYFIN_URL"), "snapcast_host": cfg("SNAPCAST_HOST"),
+            "mqtt": {"host": cfg("MQTT_HOST"), "port": cfg("MQTT_PORT") or "1883", "user": cfg("MQTT_USER"),
+                     "pass_set": bool(cfg("MQTT_PASS"))},
+            "running": bool(run_state.get("running")), "step": run_state.get("step", ""),
+            "percent": run_state.get("percent", 0)}
+
+
+def setup_finish(data):
+    """Save everything the wizard asked, then let the installer set it up (installs what's newly chosen)."""
+    up = {}
+    name = re.sub(r"[^A-Za-z0-9 ._'-]", "", str(data.get("name") or ""))[:40].strip()
+    if name:
+        up["PLAYER_NAME"] = up["AIRPLAY_NAME"] = name
+    for k, v in (data.get("flags") or {}).items():
+        if k in SETUP_FLAGS:
+            up[k] = "yes" if v in (True, "yes", 1, "on") else "no"
+    if "jellyfin_url" in data:
+        up["JELLYFIN_URL"] = re.sub(r"[^A-Za-z0-9.:/_-]", "", str(data["jellyfin_url"]))[:120]
+    if "snapcast_host" in data:
+        up["SNAPCAST_HOST"] = re.sub(r"[^A-Za-z0-9.:_-]", "", str(data["snapcast_host"]))[:80]
+    mq = data.get("mqtt") or {}
+    if mq.get("host") is not None:
+        up["MQTT_HOST"] = re.sub(r"[^A-Za-z0-9.:_-]", "", str(mq.get("host", "")))[:80]
+        up["MQTT_PORT"] = str(int(mq.get("port") or 1883))
+        up["MQTT_USER"] = str(mq.get("user", "")).replace('"', "")[:60]
+        if mq.get("pass"):
+            up["MQTT_PASS"] = str(mq["pass"]).replace('"', "")[:120]
+    up["SETUP_WIZARD"] = "no"
+    conf_update(up)
+    save_overrides({k: v for k, v in up.items() if k in EDITABLE})
+    try:
+        os.makedirs(SETTINGS_DIR, exist_ok=True)
+        open(SETUP_DONE, "w").close()
+    except OSError:
+        pass
+    log.info("setup wizard finished (%s), setting things up", ", ".join(k for k in up if k != "MQTT_PASS"))
+    return admin("apply-run", "Finishing setup", timeout=20)
+
+
 def restore_backup(data):
     if not isinstance(data, dict) or data.get("plexpie_backup") != 1 or not isinstance(data.get("settings"), dict):
         return False, "This isn't a PlexPie backup file."
@@ -2305,7 +2390,7 @@ def rotation_sync():
 def restart_screen():
     """Start the overlay and Chromium again, so they pick up a new rotation and screen size."""
     run(["pkill", "-f", "plexpie-overlay.py"])
-    run(["pkill", "-x", "chromium"])
+    run(["pkill", "-f", "user-data-dir=.*plexpie-chromium"])     # Chromium or Google Chrome
 
 
 def gesture_reader():
@@ -3238,6 +3323,15 @@ def home_tiles():
     return [{"key": k, "name": SOURCES[k]["name"]} for k in want + [k for k in default if k not in want]]
 
 
+PLATFORM = load_conf("/etc/plexpie/platform").get("PLATFORM", "pi") if os.path.exists("/etc/plexpie/platform") else "pi"
+
+
+def desktop_available():
+    """Is there a desktop to exit to (lightdm on Raspberry Pi OS, gdm on Ubuntu…)?"""
+    dm = (read_file("/etc/plexpie/display-manager") or "lightdm").strip() or "lightdm"
+    return subprocess.run(["systemctl", "cat", dm + ".service"], capture_output=True).returncode == 0
+
+
 def settings_json(local, host=None, token=None):
     role = "admin" if local else (role_of(token) or "full")
     vals = {}
@@ -3294,7 +3388,7 @@ def settings_json(local, host=None, token=None):
             "caldera": {"linked": os.path.exists(CALDERA_LINKED), "running": bool(caldera_pids()),
                         "remote": bool(CALDERA.base), "device": (read_file(CALDERA_DEVICE_FILE) or "").strip()},
             "paused": os.path.exists(PAUSED_FLAG),
-            "desktop": subprocess.run(["systemctl", "cat", "lightdm.service"], capture_output=True).returncode == 0, "sources": sorted(SOURCES),
+            "desktop": desktop_available(), "platform": PLATFORM, "sources": sorted(SOURCES),
             "phone_url": f"http://{host}/settings" if host else (f"http://{addr}:{HTTP_PORT}/settings" if addr else ""),
             "tiles": home_tiles(),
             "local": local, "role": role, "admin_exists": has_admin(),
@@ -3386,7 +3480,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
     REMOTE_CONTROLS = ("/api/state", "/api/art", "/api/players", "/api/peer", "/api/peer/open", "/api/handoff",
                        "/api/source", "/api/volume", "/api/playpause", "/api/pause_all", "/api/sleep")
     REMOTE_AUTH = ("/api/settings", "/api/account", "/api/system", "/api/backup", "/api/restore", "/api/bluetooth",
-                   "/api/devices", "/guide", "/guide.pdf", "/api/access", "/api/peers")
+                   "/api/devices", "/guide", "/guide.pdf", "/api/access", "/api/peers", "/welcome", "/api/setup")
 
     def _role(self):
         if self._local():
@@ -3468,6 +3562,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 return self._cookie_redirect(token, path)
         if path == "/remote":
             return self._file("remote.html")
+        if path == "/welcome":
+            return self._file("welcome.html")
+        if path == "/api/setup":
+            return self._send(200, json.dumps(setup_json()).encode())
         if path == "/remote.webmanifest":
             return self._send(200, json.dumps({
                 "name": f"PlexPie remote", "short_name": "PlexPie", "start_url": "/remote", "scope": "/",
@@ -3615,6 +3713,24 @@ class Handler(http.server.BaseHTTPRequestHandler):
             if LOGIN_FAILS["n"] >= 5:
                 LOGIN_FAILS.update(n=0, until=time.time() + 60)
             return self._send(403, b'{"error":"wrong PIN"}')
+        if path == "/api/setup":
+            what = data.get("action")
+            if what == "claim":
+                code = str(data.get("code", "")).strip()
+                if not re.fullmatch(r"claim-[A-Za-z0-9_-]{6,}", code):
+                    return self._send(400, b'{"error":"That doesn\'t look like a claim code. It starts with claim-"}')
+                name = re.sub(r"[^A-Za-z0-9 ._'-]", "", str(data.get("name") or PLAYER_NAME))[:40] or PLAYER_NAME
+                ok, out = admin("plexamp-claim", code, name, timeout=20)
+                return self._send(200 if ok else 500, json.dumps({"ok": ok}).encode())
+            if what == "finish":
+                ok, out = setup_finish(data)
+                return self._send(200 if ok else 500, json.dumps({"ok": ok, "error": out.strip()[-200:]}).encode())
+            if what == "skip":
+                conf_update({"SETUP_WIZARD": "no"})
+                open(SETUP_DONE, "w").close()
+                spawn(lambda: (time.sleep(0.5), os._exit(0)))
+                return self._send(200, b'{"ok":true}')
+            return self._send(400, b'{"error":"unknown action"}')
         if path == "/api/access/request":
             if not cfg_yes("PHONE_ACCESS"):
                 return self._send(403, b'{"error":"remote access is off"}')

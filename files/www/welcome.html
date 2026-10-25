@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Set up PlexPie</title>
+<link rel="apple-touch-icon" href="/icon.png">
+<meta name="theme-color" content="#0b0b0f">
+<style>
+  :root { --bg: #0b0b0f; --panel: #1c1c1f; --panel2: #2a2a2e; --line: #2c2c30; --text: #f4f4f7; --muted: #8e8e93;
+    --accent: #0a84ff; --ok: #30d158; --bad: #ff453a; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); min-height: 100%;
+    font-family: "Inter", "Noto Sans", "DejaVu Sans", system-ui, -apple-system, sans-serif; }
+  * { scrollbar-width: none; } ::-webkit-scrollbar { display: none; }
+  button, input { font: inherit; }
+  .hidden { display: none !important; }
+  main { max-width: 760px; margin: 0 auto; padding: calc(16px + env(safe-area-inset-top)) 18px 110px; }
+  header { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
+  header img { width: 40px; height: 40px; }
+  header h1 { flex: 1; margin: 0; font-size: 24px; font-weight: 800; }
+  .dots { display: flex; gap: 6px; }
+  .dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--panel2); }
+  .dots i.on { background: var(--accent); }
+  h2 { font-size: 26px; margin: 18px 0 6px; }
+  p.lead { color: var(--muted); margin: 0 0 16px; line-height: 1.45; font-size: 16px; }
+  h3 { font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 18px 4px 7px; font-weight: 600; }
+  .group { background: var(--panel); border-radius: 14px; overflow: hidden; }
+  .row { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--line); min-height: 54px; }
+  .row:first-child { border-top: 0; }
+  .row .t { flex: 1; min-width: 0; }
+  .row .t b { display: block; font-size: 16px; font-weight: 600; }
+  .row .t small { color: var(--muted); font-size: 13px; line-height: 1.35; display: block; margin-top: 2px; }
+  input[type=text], input[type=password], input[type=number] { background: var(--panel2); border: 1px solid var(--line); color: var(--text);
+    border-radius: 10px; padding: 10px 12px; font-size: 16px; width: 260px; max-width: 55vw; }
+  input.big { width: 100%; max-width: none; font-size: 22px; padding: 14px; }
+  .sw { position: relative; width: 52px; height: 32px; flex: none; }
+  .sw input { opacity: 0; width: 0; height: 0; position: absolute; }
+  .sw span { position: absolute; inset: 0; border-radius: 99px; background: #39393d; transition: .2s; }
+  .sw span::after { content: ""; position: absolute; width: 28px; height: 28px; left: 2px; top: 2px; border-radius: 50%; background: #fff; transition: .2s; }
+  .sw input:checked + span { background: var(--ok); }
+  .sw input:checked + span::after { transform: translateX(20px); }
+  .btn { border: 0; border-radius: 12px; padding: 12px 18px; font-size: 16px; font-weight: 700; background: var(--panel2); color: var(--text); }
+  .btn.primary { background: var(--accent); color: #fff; }
+  .btn:disabled { opacity: .45; }
+  .bar { position: fixed; left: 0; right: 0; bottom: 0; display: flex; gap: 10px; justify-content: space-between; align-items: center;
+    padding: 12px 18px calc(12px + env(safe-area-inset-bottom)); background: linear-gradient(transparent, var(--bg) 30%); }
+  .bar .ghost { background: transparent; color: var(--muted); }
+  .qr { display: flex; gap: 16px; align-items: center; background: var(--panel); border-radius: 14px; padding: 14px; }
+  .qr .code { background: #fff; padding: 8px; border-radius: 10px; width: 132px; height: 132px; flex: none; }
+  .qr .code svg { width: 100%; height: 100%; display: block; }
+  .qr ol { margin: 0; padding-left: 20px; line-height: 1.5; color: var(--muted); }
+  .qr ol b { color: var(--text); }
+  .status { margin-top: 12px; font-size: 15px; min-height: 22px; }
+  .status.ok { color: var(--ok); } .status.bad { color: var(--bad); }
+  .prog { height: 10px; border-radius: 99px; background: var(--panel2); overflow: hidden; margin: 18px 0 8px; }
+  .prog b { display: block; height: 100%; width: 5%; background: var(--accent); transition: width .6s; }
+  .pin { font-size: 30px; font-weight: 800; letter-spacing: .15em; }
+  .note { color: var(--muted); font-size: 13px; margin: 8px 4px; line-height: 1.4; }
+</style>
+</head>
+<body>
+<main>
+  <header><img src="/icon.png" alt=""><h1>PlexPie</h1><div class="dots" id="dots"></div></header>
+
+  <!-- 1: welcome and name -->
+  <section data-step="0">
+    <h2>Welcome!</h2>
+    <p class="lead">Let's set up your player. It takes about five minutes, and you can change everything later in Settings.</p>
+    <div class="group"><div class="row"><div class="t"><b>Player name</b><small>Shown in Plexamp, AirPlay, Spotify and Home Assistant</small></div></div>
+      <div class="row"><input id="name" class="big" type="text" maxlength="40" placeholder="Living Room"></div></div>
+    <p class="note" id="platformnote"></p>
+  </section>
+
+  <!-- 2: Plexamp -->
+  <section data-step="1" class="hidden">
+    <h2>Link Plexamp</h2>
+    <p class="lead">Plexamp plays your Plex library. Link it to your Plex account once (skip this if you don't use Plex).</p>
+    <div id="plexdone" class="group hidden"><div class="row"><div class="t"><b>✓ Plexamp is linked</b><small>Nothing to do here.</small></div></div></div>
+    <div id="plexsteps">
+      <div class="qr"><div class="code" id="claimqr"></div><div><ol>
+        <li>On your phone, scan the code or open <b>plex.tv/claim</b> and sign in.</li>
+        <li>Copy the whole code, starting with <b>claim-</b>. It works for 4 minutes.</li>
+        <li>Type or paste it below and tap <b>Link</b>.</li></ol></div></div>
+      <h3>Claim code</h3>
+      <div class="group"><div class="row"><input id="claim" type="text" class="big" placeholder="claim-xxxxxxxxxxxxxxxxxxxx" autocapitalize="off" autocorrect="off">
+        <button class="btn primary" id="claimbtn">Link</button></div></div>
+      <div class="status" id="claimstatus"></div>
+    </div>
+  </section>
+
+  <!-- 3: apps -->
+  <section data-step="2" class="hidden">
+    <h2>Choose your music</h2>
+    <p class="lead">Switch on what you use. Anything that needs extra software is installed when you finish.</p>
+    <div id="apps"></div>
+    <div id="jellyrow" class="group hidden" style="margin-top:8px"><div class="row"><div class="t"><b>Jellyfin server address</b><small>e.g. 192.168.1.20 or 192.168.1.20:8096</small></div>
+      <input id="jellyurl" type="text" placeholder="192.168.1.20" autocapitalize="off" autocorrect="off"></div></div>
+    <div id="snaprow" class="group hidden" style="margin-top:8px"><div class="row"><div class="t"><b>Snapcast server address</b><small>Empty finds it on the network</small></div>
+      <input id="snaphost" type="text" placeholder="192.168.1.20" autocapitalize="off" autocorrect="off"></div></div>
+    <p class="note">Caldera Music needs a one-time sign-in from a computer; see Setup guides › Caldera Music after setup.</p>
+  </section>
+
+  <!-- 4: Home Assistant -->
+  <section data-step="3" class="hidden">
+    <h2>Home Assistant</h2>
+    <p class="lead">Optional: control the player from Home Assistant over MQTT. Skip this if you don't use Home Assistant.</p>
+    <div class="group">
+      <div class="row"><div class="t"><b>Broker</b><small>Your Home Assistant address, e.g. homeassistant.local</small></div><input id="mqhost" type="text" autocapitalize="off" autocorrect="off"></div>
+      <div class="row"><div class="t"><b>Port</b></div><input id="mqport" type="number" placeholder="1883"></div>
+      <div class="row"><div class="t"><b>Username</b></div><input id="mquser" type="text" autocapitalize="off" autocorrect="off"></div>
+      <div class="row"><div class="t"><b>Password</b><small id="mqnote"></small></div><input id="mqpass" type="password" autocomplete="new-password"></div>
+    </div>
+  </section>
+
+  <!-- 5: phone -->
+  <section data-step="4" class="hidden">
+    <h2>Your phone</h2>
+    <p class="lead">Change settings and control the music from your phone, tablet or computer on the same Wi-Fi.</p>
+    <div class="qr"><div class="code" id="phoneqr"></div><div><ol>
+      <li>Scan the code with your phone's camera, or open <b id="phoneurl"></b>.</li>
+      <li>Enter this PIN once: <span class="pin" id="pin"></span></li>
+      <li>Tip: in Settings › Remote access, make your phone the <b>admin device</b>.</li></ol></div></div>
+  </section>
+
+  <!-- 6: finishing -->
+  <section data-step="5" class="hidden">
+    <h2 id="fintitle">Setting things up…</h2>
+    <p class="lead" id="finlead">Installing what you chose and applying your settings. This can take a few minutes; the screen may blink once.</p>
+    <div class="prog"><b id="progbar"></b></div>
+    <div class="note" id="progstep"></div>
+  </section>
+</main>
+<div class="bar">
+  <button class="btn ghost" id="back">Back</button>
+  <div style="display:flex;gap:10px"><button class="btn ghost" id="skip">Skip</button><button class="btn primary" id="next">Next</button></div>
+</div>
+<script src="/qrcode.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const api = (path, body) => fetch(path, body === undefined ? {} : {method: "POST",
+  headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
+const qrSvg = t => { if (typeof qrcode === "undefined" || !t) return ""; const q = qrcode(0, "M"); q.addData(t); q.make();
+  return q.createSvgTag({cellSize: 4, margin: 0, scalable: true}); };
+const GROUPS = [
+  ["On this screen", [["ENABLE_APPLE_MUSIC_WEB", "Apple Music", "Web player, sign in on the screen"], ["ENABLE_TIDAL", "TIDAL", "Web player"],
+    ["ENABLE_QOBUZ", "Qobuz", "Web player, hi-res"], ["ENABLE_YOUTUBE_MUSIC", "YouTube Music", "Web player"],
+    ["ENABLE_BBC_SOUNDS", "BBC Sounds", "Radio and podcasts"], ["ENABLE_JELLYFIN", "Jellyfin", "Your Jellyfin server"]]],
+  ["From your phone", [["ENABLE_AIRPLAY", "AirPlay", "iPhone, iPad, Mac"], ["ENABLE_SPOTIFY", "Spotify Connect", "Spotify Premium"],
+    ["ENABLE_BLUETOOTH", "Bluetooth", "Any phone or computer"], ["ENABLE_DLNA", "UPnP / DLNA", "BubbleUPnP, mconnect, NAS apps"]]],
+  ["Multi-room and other systems", [["ENABLE_MUSIC_ASSISTANT", "Music Assistant", "Needs a Music Assistant server"],
+    ["ENABLE_ROON", "Roon", "Needs a Roon subscription"], ["ENABLE_SNAPCAST", "Snapcast", "Needs a Snapcast server"]]],
+  ["Home", [["ENABLE_HA_DASHBOARD", "Home Assistant tile", "A dashboard on the screen"], ["ENABLE_TIMER", "Workout timer", "Intervals and countdown"]]],
+];
+const STEPS = 6;
+let step = 0, S = null, settings = null, claimTimer = null;
+
+function showStep(n) {
+  step = n;
+  document.querySelectorAll("section[data-step]").forEach(s => s.classList.toggle("hidden", +s.dataset.step !== n));
+  $("dots").innerHTML = Array.from({length: STEPS - 1}, (_, i) => `<i class="${i <= n ? "on" : ""}"></i>`).join("");
+  $("back").style.visibility = n > 0 && n < 5 ? "visible" : "hidden";
+  $("skip").classList.toggle("hidden", !(n === 1 || n === 3) || (n === 1 && S.plexamp_linked));
+  $("next").classList.toggle("hidden", n === 5);
+  $("next").textContent = n === 4 ? "Finish" : "Next";
+  document.querySelector(".bar").classList.toggle("hidden", n === 5);
+  scrollTo(0, 0);
+}
+function renderApps() {
+  $("apps").innerHTML = GROUPS.map(([title, items]) => `<h3>${title}</h3><div class="group">` + items.map(([k, n, sub]) =>
+    `<div class="row"><div class="t"><b>${n}</b><small>${sub}</small></div><label class="sw"><input type="checkbox" data-flag="${k}" ${S.values[k] ? "checked" : ""}><span></span></label></div>`).join("") + "</div>").join("");
+  const sync = () => {
+    $("jellyrow").classList.toggle("hidden", !document.querySelector('[data-flag="ENABLE_JELLYFIN"]').checked);
+    $("snaprow").classList.toggle("hidden", !document.querySelector('[data-flag="ENABLE_SNAPCAST"]').checked);
+  };
+  $("apps").addEventListener("change", sync); sync();
+}
+async function load() {
+  S = await (await api("/api/setup")).json();
+  try { settings = await (await api("/api/settings")).json(); } catch (e) { settings = {values: {}}; }
+  $("name").value = S.name && S.name !== "PlexPie" ? S.name : "";
+  $("name").placeholder = S.name || "Living Room";
+  $("platformnote").textContent = S.platform === "pc" ? "Running on a PC: PC support is in beta. If something doesn't work, please report it on GitHub (Issues › Hardware report)."
+    : S.platform === "arm" ? "Running on an ARM board: community supported. Please report how it goes on GitHub (Issues › Hardware report)." : "";
+  $("plexdone").classList.toggle("hidden", !S.plexamp_linked);
+  $("plexsteps").classList.toggle("hidden", S.plexamp_linked);
+  $("claimqr").innerHTML = qrSvg("https://plex.tv/claim");
+  renderApps();
+  $("jellyurl").value = S.jellyfin_url || ""; $("snaphost").value = S.snapcast_host || "";
+  $("mqhost").value = S.mqtt.host || ""; $("mqport").value = S.mqtt.port || "1883"; $("mquser").value = S.mqtt.user || "";
+  $("mqnote").textContent = S.mqtt.pass_set ? "Saved · leave empty to keep it" : "";
+  const url = (settings.phone_url || "").replace(/\/settings$/, "/remote");
+  $("phoneurl").textContent = url || "(not connected to a network yet)";
+  $("phoneqr").innerHTML = qrSvg(url);
+  $("pin").textContent = (settings.values || {}).PHONE_PIN || "(shown on the player)";
+  showStep(0);
+}
+$("claimbtn").onclick = async () => {
+  const code = $("claim").value.trim();
+  $("claimstatus").className = "status"; $("claimstatus").textContent = "Linking… this takes up to a minute.";
+  $("claimbtn").disabled = true;
+  const r = await api("/api/setup", {action: "claim", code, name: $("name").value.trim() || S.name});
+  if (!r.ok) {
+    const j = await r.json().catch(() => ({}));
+    $("claimstatus").className = "status bad"; $("claimstatus").textContent = j.error || "Couldn't start linking."; $("claimbtn").disabled = false; return;
+  }
+  clearInterval(claimTimer);
+  claimTimer = setInterval(async () => {
+    const j = await (await api("/api/setup")).json().catch(() => ({}));
+    if (j.claim === "linked" || j.plexamp_linked) {
+      clearInterval(claimTimer); S.plexamp_linked = true;
+      $("claimstatus").className = "status ok"; $("claimstatus").textContent = "✓ Linked! Tap Next.";
+      $("skip").classList.add("hidden");
+    } else if (j.claim === "failed") {
+      clearInterval(claimTimer); $("claimbtn").disabled = false;
+      $("claimstatus").className = "status bad"; $("claimstatus").textContent = "That didn't work. Codes expire after 4 minutes: get a new one and try again.";
+    }
+  }, 2500);
+};
+$("back").onclick = () => showStep(Math.max(0, step - 1));
+$("skip").onclick = () => showStep(step + 1);
+$("next").onclick = async () => {
+  if (step < 4) return showStep(step + 1);
+  const flags = {};
+  document.querySelectorAll("[data-flag]").forEach(i => flags[i.dataset.flag] = i.checked);
+  const body = {action: "finish", name: $("name").value.trim(), flags,
+    jellyfin_url: $("jellyurl").value.trim(), snapcast_host: $("snaphost").value.trim(),
+    mqtt: {host: $("mqhost").value.trim(), port: $("mqport").value || "1883", user: $("mquser").value.trim(), pass: $("mqpass").value}};
+  showStep(5);
+  const r = await api("/api/setup", body).catch(() => null);
+  if (!r || !r.ok) { $("fintitle").textContent = "Couldn't start the setup"; $("finlead").textContent = "Try again from Settings › System › Setup wizard."; return; }
+  watch();
+};
+function watch() {
+  let seenRunning = false, fails = 0, idle = 0;
+  const tick = async () => {
+    try {
+      const j = await (await api("/api/setup")).json(); fails = 0;
+      if (j.running) { seenRunning = true; $("progbar").style.width = Math.max(5, j.percent || 20) + "%"; $("progstep").textContent = j.step || ""; }
+      else if (seenRunning || ++idle > 8) {
+        $("progbar").style.width = "100%"; $("fintitle").textContent = "All set 🎉";
+        $("finlead").textContent = "Your player is ready. Going to the home screen…";
+        setTimeout(() => fetch("/api/source", {method: "POST", headers: {"Content-Type": "application/json"}, body: '{"source":"home"}'})
+          .finally(() => { if (!/^(127\.|localhost)/.test(location.hostname)) location.href = "/remote"; }), 2500);
+        return;
+      }
+    } catch (e) { fails++; $("progstep").textContent = "Restarting…"; }      // the player restarts while it installs
+    setTimeout(tick, 3000);
+  };
+  tick();
+}
+load();
+</script>
+</body>
+</html>

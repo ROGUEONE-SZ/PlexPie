@@ -2,6 +2,19 @@
 
 Already running PlexPie? **Settings › Updates › PlexPie › Update** brings you to the latest version.
 
+## 2.21 (October 25, 2026)
+- **Runs on more than a Pi (beta):** Intel/AMD PCs (mini PCs, NUCs, old laptops) with Debian or Ubuntu, and
+  other 64-bit ARM boards (community supported). On PCs the screen uses Google Chrome, so Apple Music, TIDAL
+  and the Spotify web player play there too. The start-up screen, rotation and "Exit to the desktop" work
+  with a PC's boot menu (GRUB) and desktops like Ubuntu's.
+- **Quick setup:** the one-line installer can install with no questions and finish in a **setup wizard on
+  the screen** (or your phone): name, link Plexamp with a QR code, choose apps, Home Assistant, your phone.
+  The terminal questions are still there if you prefer them.
+- **Automated install tests** on Debian 12/13 and Ubuntu 24.04, Intel/AMD and ARM, on every change.
+- **Hardware report** form on GitHub for people trying PlexPie on other machines.
+
+Everything on the Raspberry Pi works as before.
+
 ## 2.20 (October 25, 2026)
 - **Jellyfin:** your Jellyfin server's music on the screen (enter its address).
 - **UPnP / DLNA speaker:** play from BubbleUPnP, mconnect, Jellyfin's DLNA plugin or NAS music apps

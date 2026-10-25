@@ -73,7 +73,7 @@ def rounded_rect(c, x0, y0, x1, y1, r, **kw):
 
 # ------------------------------------------------------------ typing target
 def chromium_window():
-    for wid in xdo("search", "--onlyvisible", "--class", "[Cc]hromium").split():
+    for wid in xdo("search", "--onlyvisible", "--class", "[Cc]hromium|[Gg]oogle-chrome").split():
         geo = xdo("getwindowgeometry", "--shell", wid)
         width = next((int(l.split("=")[1]) for l in geo.splitlines() if l.startswith("WIDTH=")), 0)
         if width >= sw * 0.9:
