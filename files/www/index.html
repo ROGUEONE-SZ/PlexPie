@@ -7,7 +7,7 @@
 <style>
   :root {
     --bg: #0b0b0f; --panel: #16161c; --line: #26262e; --text: #f4f4f7; --muted: #8e8e99;
-    --plexamp: #f5a524; --apple: #fa3c5a; --airplay: #3b8cf6; --ma: #19c2a8; --spotify: #1ed760; --timer: #ff5a4f; --bt: #7b8cff; --ha: #41bdf5; --caldera: #ff8a3d; --ytm: #ff3355; --bbc: #ff7a2e; --lamp: #ffd166;
+    --plexamp: #f5a524; --apple: #fa3c5a; --airplay: #3b8cf6; --ma: #19c2a8; --spotify: #1ed760; --timer: #ff5a4f; --bt: #7b8cff; --ha: #41bdf5; --caldera: #ff8a3d; --ytm: #ff3355; --bbc: #ff7a2e; --tidal: #33d6d6; --qobuz: #4a90e2; --lamp: #ffd166;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden;
@@ -192,6 +192,18 @@
       <rect x="3" y="8" width="18" height="12" rx="2"/><path d="M7 8l9-5"/><circle cx="15.5" cy="14" r="2.5"/><path d="M6 12h4M6 15h4"/></svg>
     <div><div class="label">BBC Sounds</div><div class="sub">Radio · podcasts</div></div>
   </button>
+  <button class="tile" data-src="tidal" style="--c: var(--tidal)">
+    <span class="eq"><i></i><i></i><i></i></span>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <path d="M2 12c2.5-5 5-5 7.5 0s5 5 7.5 0 3.5-3 5-1.5"/><path d="M2 17c2.5-3 5-3 7.5 0s5 3 7.5 0" opacity=".5"/></svg>
+    <div><div class="label">TIDAL</div><div class="sub">On this screen</div></div>
+  </button>
+  <button class="tile" data-src="qobuz" style="--c: var(--qobuz)">
+    <span class="eq"><i></i><i></i><i></i></span>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5"/><path d="M12 5.5a6.5 6.5 0 0 1 6.5 6.5" opacity=".6"/></svg>
+    <div><div class="label">Qobuz</div><div class="sub">Hi-res, on this screen</div></div>
+  </button>
   <button class="tile" data-src="ha" style="--c: var(--ha)">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <path d="M3 11.5L12 4l9 7.5"/><path d="M5.5 9.5V20h13V9.5"/><circle cx="12" cy="14" r="2"/><path d="M12 16v4M10.5 12.6L8.5 11M13.5 12.6l2-1.6"/></svg>
@@ -230,7 +242,8 @@ const post = (path, body) => fetch(path, {method: "POST", headers: {"Content-Typ
   body: JSON.stringify(body || {})}).then(r => r.json()).then(j => j.state && render(j.state)).catch(() => {});
 const SUBS = {plexamp: "Your library", apple: "On this screen", airplay: "iPhone, iPad, Mac",
               spotify: "Spotify Connect", ma: "Your speakers", timer: "Intervals · countdown", bluetooth: "Any device", ha: "Your dashboard",
-              caldera: "Multi-room", youtube_music: "On this screen", bbc_sounds: "Radio · podcasts"};
+              caldera: "Multi-room", youtube_music: "On this screen", bbc_sounds: "Radio · podcasts",
+              tidal: "On this screen", qobuz: "Hi-res, on this screen"};
 const ICON_PAUSE = '<rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/>';
 const ICON_PLAY = '<path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/>';
 const POWER = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v9"/><path d="M6.3 7.3a8 8 0 1 0 11.4 0"/></svg>';
@@ -266,6 +279,11 @@ function setTrack(text) {
 }
 function render(s) {
   ensureCustomTiles(s);
+  const order = s.tile_order || [];
+  document.querySelectorAll(".tile").forEach((t, i) => {
+    const at = order.indexOf(t.dataset.src);
+    t.style.order = at >= 0 ? at : 100 + i;
+  });
   renderNet(s.net);
   $("gear").classList.toggle("update", !!s.update_available);
   $("gear").title = s.update_available ? "Settings · an update is available" : "Settings";

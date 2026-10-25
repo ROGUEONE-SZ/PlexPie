@@ -207,6 +207,31 @@
         <div class="group" data-guide="apple"></div>
       </section>
 
+      <section data-page="app-tidal" data-parent="config" data-title="TIDAL">
+        <div class="group"><div class="row"><div class="t"><b>TIDAL</b><small>The TIDAL web player on the screen</small></div>
+          <label class="sw"><input type="checkbox" id="ENABLE_TIDAL"><span></span></label></div>
+          <div class="row"><div class="t"><b>TIDAL account</b><small>Sign in on the screen</small></div>
+            <button class="btn" data-signout="tidal">Sign out</button></div></div>
+        <div class="note">PlexPie never stores your TIDAL password. The web player plays through the shared sound output; the TIDAL app's "Connect" isn't available for players like this.</div>
+        <div class="group" data-guide="tidal"></div>
+      </section>
+
+      <section data-page="app-qobuz" data-parent="config" data-title="Qobuz">
+        <div class="group"><div class="row"><div class="t"><b>Qobuz</b><small>The Qobuz web player on the screen</small></div>
+          <label class="sw"><input type="checkbox" id="ENABLE_QOBUZ"><span></span></label></div>
+          <div class="row"><div class="t"><b>Qobuz account</b><small>Sign in on the screen</small></div>
+            <button class="btn" data-signout="qobuz">Sign out</button></div></div>
+        <div class="note">PlexPie never stores your Qobuz password. Qobuz Connect (playing from the Qobuz app on your phone) isn't available for players like this yet.</div>
+        <div class="group" data-guide="qobuz"></div>
+      </section>
+
+      <section data-page="screen-order" data-parent="screen" data-title="Home screen order">
+        <div class="page-intro">Move tiles up or down, then tap Save. The home screen shows them in this order.</div>
+        <input type="hidden" id="TILE_ORDER">
+        <div class="group" id="orderlist"></div>
+        <div class="row" style="padding:6px 0"><button class="btn" id="orderreset" data-noform>Back to the usual order</button></div>
+      </section>
+
       <section data-page="app-custom" data-parent="config" data-title="Your web players">
         <div class="page-intro">Add any music, radio or audiobook website as its own tile on the home screen, like Apple Music. Up to six.</div>
         <input type="hidden" id="CUSTOM_PLAYERS">
@@ -327,6 +352,7 @@
               <option value="300">5 minutes</option><option value="900">15 minutes</option><option value="0">Never</option>
             </select></div>
           <div class="row"><div class="t"><b>Brightness</b></div><input id="SCREEN_BRIGHTNESS" type="range" min="10" max="100" step="5"></div>
+          <div class="row link" data-go="screen-order"><div class="t"><b>Home screen order</b><small>Choose which tiles come first</small></div><span class="chev">›</span></div>
           <div class="row"><div class="t"><b>Clock</b><small>On the home screen. Automatic follows the Pi's region.</small></div>
             <select id="CLOCK_FORMAT"><option value="auto">Automatic</option><option value="12">12-hour (3:45 PM)</option><option value="24">24-hour (15:45)</option></select></div>
           <div class="row"><div class="t"><b>Rotation</b><small>Automatic follows the Raspberry Pi desktop's setting. The Pi Touch Display 2 starts in portrait: pick Right or Left for landscape. Touch turns with it.</small></div>
@@ -482,6 +508,9 @@ const I = {
   spotify: svg('<circle cx="12" cy="12" r="10"/><path d="M7 9.5c3.5-1 7-.6 10 1M7.5 13c3-.8 5.6-.4 8 .8M8 16.3c2.4-.6 4.4-.3 6 .6"/>'),
   bt: svg('<path d="m7 7 10 10-5 5V2l5 5L7 17"/>'),
   ma: svg('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3"/>'),
+  wave: svg('<path d="M2 12c2.5-5 5-5 7.5 0s5 5 7.5 0 3.5-3 5-1.5"/><path d="M2 17c2.5-3 5-3 7.5 0s5 3 7.5 0"/>'),
+  disc: svg('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5"/><path d="M12 5.5a6.5 6.5 0 0 1 6.5 6.5"/>'),
+  order: svg('<path d="M8 6h12M8 12h12M8 18h12M3 6h.01M3 12h.01M3 18h.01"/>'),
   plus: svg('<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>'),
   ytm: svg('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><path d="M10.8 10.2v3.6l3-1.8z" fill="currentColor"/>'),
   radio: svg('<rect x="3" y="8" width="18" height="12" rx="2"/><path d="M7 8l9-5"/><circle cx="15.5" cy="14" r="2.5"/><path d="M6 12h4M6 15h4"/>'),
@@ -521,6 +550,8 @@ const APPS = [
   ["caldera", "Caldera Music", I.caldera, "#e8742c", "music", "ENABLE_CALDERA"],
   ["youtube_music", "YouTube Music", I.ytm, "#ff0033", "music", "ENABLE_YOUTUBE_MUSIC"],
   ["bbc_sounds", "BBC Sounds", I.radio, "#ff4c00", "music", "ENABLE_BBC_SOUNDS"],
+  ["tidal", "TIDAL", I.wave, "#1fb5b5", "music", "ENABLE_TIDAL"],
+  ["qobuz", "Qobuz", I.disc, "#3b7dd8", "music", "ENABLE_QOBUZ"],
   ["ha", "Home Assistant", I.ha, "#18bcf2", "home", null],
   ["timer", "Workout timer", I.timer, "#ff9f0a", "home", "ENABLE_TIMER"],
 ];
@@ -535,6 +566,8 @@ const GUIDES = [
   ["caldera", "Caldera Music", "Multi-room with other Caldera speakers", I.caldera, "#e8742c"],
   ["youtube_music", "YouTube Music", "The YouTube Music web player on the screen", I.ytm, "#ff0033"],
   ["bbc_sounds", "BBC Sounds", "BBC radio and podcasts on the screen", I.radio, "#ff4c00"],
+  ["tidal", "TIDAL", "The TIDAL web player on the screen", I.wave, "#1fb5b5"],
+  ["qobuz", "Qobuz", "The Qobuz web player on the screen", I.disc, "#3b7dd8"],
   ["custom", "Your web players", "Add any music website as a tile", I.plus, "#5e5ce6"],
   ["ha", "Home Assistant", "Controls, dashboard tile, launcher buttons", I.ha, "#18bcf2"],
   ["timer", "Workout timer", "Intervals, countdown, stopwatch", I.timer, "#ff9f0a"],
@@ -545,12 +578,12 @@ const GUIDES = [
   ["backup", "Backup and restore", "Keep your settings safe", I.backup, "#ff9f0a"],
   ["help", "Troubleshooting", "Quick fixes for common problems", I.update, "#8e8e93"],
 ];
-const FIELDS = ["ENABLE_APPLE_MUSIC_WEB", "ENABLE_AIRPLAY", "ENABLE_SPOTIFY", "ENABLE_SPOTIFY_WEB", "ENABLE_MUSIC_ASSISTANT", "ENABLE_CALDERA", "ENABLE_YOUTUBE_MUSIC", "ENABLE_BBC_SOUNDS",
+const FIELDS = ["ENABLE_APPLE_MUSIC_WEB", "ENABLE_AIRPLAY", "ENABLE_SPOTIFY", "ENABLE_SPOTIFY_WEB", "ENABLE_MUSIC_ASSISTANT", "ENABLE_CALDERA", "ENABLE_YOUTUBE_MUSIC", "ENABLE_BBC_SOUNDS", "ENABLE_TIDAL", "ENABLE_QOBUZ",
   "ENABLE_BLUETOOTH", "ENABLE_TIMER", "ENABLE_HA_DASHBOARD",
   "SCREEN_OFF_AFTER_SECS", "SCREEN_BRIGHTNESS", "AUTO_SHOW", "SWIPE_HOME", "MQTT_HOST", "MQTT_PORT",
   "MQTT_USER", "MQTT_PASS", "SHORTCUTS", "MA_HOST", "MA_URL", "PHONE_ACCESS",
   "EQ_ENABLED", "EQ_PRESET", "EQ_BANDS", "EQ_CUSTOM_TEXT", "THEME_FROM_ART", "VISUALIZER", "NIGHT_DIM",
-  "NIGHT_START", "NIGHT_END", "NIGHT_BRIGHTNESS", "AUTO_BRIGHTNESS", "HA_URL", "HA_DASHBOARD", "SCREEN_SHARING", "HOME_BUTTON", "SCREEN_ROTATION", "BOOT_SPLASH", "CLOCK_FORMAT", "CUSTOM_PLAYERS"];
+  "NIGHT_START", "NIGHT_END", "NIGHT_BRIGHTNESS", "AUTO_BRIGHTNESS", "HA_URL", "HA_DASHBOARD", "SCREEN_SHARING", "HOME_BUTTON", "SCREEN_ROTATION", "BOOT_SPLASH", "CLOCK_FORMAT", "CUSTOM_PLAYERS", "TILE_ORDER"];
 const INSTALL_FLAG = {apple: null, airplay: "ENABLE_AIRPLAY", spotify: "ENABLE_SPOTIFY", bluetooth: "ENABLE_BLUETOOTH", ma: "ENABLE_MUSIC_ASSISTANT", caldera: "ENABLE_CALDERA"};
 let data = null, page = null, dirty = false;
 const wide = () => matchMedia("(min-width: 700px)").matches;
@@ -589,7 +622,7 @@ function appState(id) {
   const ac = acct(id);
   if (id === "plexamp") return (data.address_change || {}).new ? "Address changed: open to fix" : (ac.status || "On");
   if (id === "apple") return ac.ok ? "On · signed in" : ac.ok === false ? "On · not signed in" : "On";
-  if (id === "youtube_music" || id === "bbc_sounds") return "On · sign in on the screen";
+  if (["youtube_music", "bbc_sounds", "tidal", "qobuz"].includes(id)) return "On · sign in on the screen";
   if (id === "bluetooth") { const b = data.bluetooth || {}; return b.connected ? `On · ${b.connected}` : "On"; }
   if (id === "ma") return ac.ok ? "On · server reachable" : "On · server not reachable";
   if (id === "caldera") { const c = data.caldera || {};
@@ -664,6 +697,7 @@ function render() {
     if (el.type === "checkbox") el.checked = !!v[k]; else el.value = v[k] ?? "";
   }
   renderCustom();
+  tileOrder = (data.tiles || []).slice(); renderOrder();
   for (const [id, flag] of Object.entries(INSTALL_FLAG)) {
     if (flag && data.installed[flag] === false) { const el = $(flag); if (el) { el.disabled = true; el.checked = false; } }
   }
@@ -939,6 +973,21 @@ document.addEventListener("click", async e => {
     if (j.url) location.href = j.url; else toast(j.error || "Couldn't open it");
   }
 });
+
+// ---------------- home screen order
+let tileOrder = [];
+function renderOrder() {
+  $("orderlist").innerHTML = tileOrder.map((t, i) => `<div class="row"><div class="t"><b>${esc(t.name)}</b></div>
+    <button class="btn" data-mv="${i}" data-dir="-1" ${i ? "" : "disabled"} aria-label="Move up">↑</button>
+    <button class="btn" data-mv="${i}" data-dir="1" ${i < tileOrder.length - 1 ? "" : "disabled"} aria-label="Move down">↓</button></div>`).join("");
+}
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-mv]"); if (!b) return;
+  const i = +b.dataset.mv, j = i + +b.dataset.dir;
+  [tileOrder[i], tileOrder[j]] = [tileOrder[j], tileOrder[i]];
+  $("TILE_ORDER").value = tileOrder.map(t => t.key).join(","); renderOrder(); setDirty(true);
+});
+$("orderreset").onclick = () => { $("TILE_ORDER").value = ""; setDirty(true); toast("Usual order after Save"); };
 
 // ---------------- your own web players ("Name|https://address||Name|https://address")
 function customList() {

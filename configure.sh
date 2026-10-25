@@ -99,6 +99,8 @@ dim "Caldera Music (Plex Labs) plays in sync with other Caldera speakers and sho
 yesno ENABLE_CALDERA "Add Caldera Music (multi-room with other Caldera speakers)?" "${ENABLE_CALDERA:-no}"
 yesno ENABLE_YOUTUBE_MUSIC "Add the YouTube Music web player on the screen?" "${ENABLE_YOUTUBE_MUSIC:-no}"
 yesno ENABLE_BBC_SOUNDS "Add BBC Sounds (BBC radio and podcasts) on the screen?" "${ENABLE_BBC_SOUNDS:-no}"
+yesno ENABLE_TIDAL "Add the TIDAL web player on the screen?" "${ENABLE_TIDAL:-no}"
+yesno ENABLE_QOBUZ "Add the Qobuz web player on the screen?" "${ENABLE_QOBUZ:-no}"
 
 # --------------------------------------------------------- home assistant
 echo
@@ -146,6 +148,8 @@ ENABLE_CALDERA="$ENABLE_CALDERA"
 # Web players on the screen, like Apple Music (sign in on the screen)
 ENABLE_YOUTUBE_MUSIC="${ENABLE_YOUTUBE_MUSIC:-no}"
 ENABLE_BBC_SOUNDS="${ENABLE_BBC_SOUNDS:-no}"
+ENABLE_TIDAL="${ENABLE_TIDAL:-no}"
+ENABLE_QOBUZ="${ENABLE_QOBUZ:-no}"
 # Where Caldera plays: auto = shared with the other sources, caldera = Caldera's own pick (often the DAC alone)
 CALDERA_DEVICE="${CALDERA_DEVICE:-auto}"
 # A push button between pins 5 and 6 (GPIO3 and ground) shuts the Pi down and starts it again

@@ -198,6 +198,26 @@
     <div class="tip">Live radio plays in most countries; many shows and podcasts are only available in the UK.</div>
   </section>
 
+  <section class="g" id="tidal" data-group="2" data-sub="The TIDAL web player on the screen">
+    <h2>TIDAL</h2>
+    <p class="sub">TIDAL's web player on the screen.</p>
+    <ol>
+      <li>Settings › Configuration › <b>TIDAL</b>: switch it on and tap <span class="k">Save</span>.</li>
+      <li>On the home screen, tap <span class="k">TIDAL</span> and sign in with your TIDAL account.</li>
+    </ol>
+    <div class="tip">TIDAL Connect (picking this player in the TIDAL app on your phone) is only licensed to hardware makers, so it isn't available here. To play from your phone, use AirPlay or Bluetooth.</div>
+  </section>
+
+  <section class="g" id="qobuz" data-group="2" data-sub="The Qobuz web player on the screen">
+    <h2>Qobuz</h2>
+    <p class="sub">Qobuz's web player on the screen, including hi-res albums.</p>
+    <ol>
+      <li>Settings › Configuration › <b>Qobuz</b>: switch it on and tap <span class="k">Save</span>.</li>
+      <li>On the home screen, tap <span class="k">Qobuz</span> and sign in with your Qobuz account.</li>
+    </ol>
+    <div class="tip">Qobuz Connect (playing from the Qobuz app on your phone) isn't open to projects like this yet. To play from your phone, use AirPlay or Bluetooth.</div>
+  </section>
+
   <section class="g" id="custom" data-group="2" data-sub="Add any music website as a tile">
     <h2>Your own web players</h2>
     <p class="sub">Any music, radio or audiobook website can get its own tile, like Apple Music.</p>
@@ -407,6 +427,7 @@
       <tr><td>Home Assistant shows "unavailable"</td><td>Wait two minutes; check the green dot in Configuration › Home Assistant.</td></tr>
       <tr><td>Receiver or smart plug stops responding</td><td>Give it a fixed address in the router; unplug the receiver for a minute.</td></tr>
       <tr><td>Songs skip or stutter</td><td>Remove old players with the same name on plex.tv (Account › Authorized Devices) and pick the player again in Plexamp. Then check power (official supply) and Wi-Fi; the report's playback health section shows both.</td></tr>
+      <tr><td>Tiles in the wrong order</td><td>Settings › Screen › <b>Home screen order</b>: move them up or down, then Save.</td></tr>
       <tr><td>Screen in portrait (or upside down), but you want landscape</td><td>Settings › Screen › <b>Rotation</b>: Right or Left. Automatic follows the Raspberry Pi desktop's setting. Touch turns with it.</td></tr>
       <tr><td>Screen black</td><td>Tap it (asleep). Still black: unplug for 10 seconds.</td></tr>
       <tr><td>Caldera isn't in Plexamp's speaker list</td><td>Settings › Configuration › Caldera Music: check it's on and signed in. Not signed in: run the installer again from a computer (<code>ssh -t</code>). Caldera needs a 64-bit Raspberry Pi OS on a Pi 4 or 5.</td></tr>

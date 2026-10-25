@@ -2,6 +2,13 @@
 
 Already running PlexPie? **Settings › Updates › PlexPie › Update** brings you to the latest version.
 
+## 2.19 (October 25, 2026)
+- **TIDAL and Qobuz** web players on the screen (optional, Settings › Configuration).
+- **Home screen order:** move tiles up or down in Settings › Screen › Home screen order.
+
+TIDAL Connect and Qobuz Connect aren't included: both are only licensed to hardware makers, and the
+unofficial versions rely on files copied from commercial devices.
+
 ## 2.18 (October 23, 2026)
 - **Your own web players:** add any music, radio or audiobook website as a tile on the home screen
   (Settings › Configuration › Your web players, up to six).

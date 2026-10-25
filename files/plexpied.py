@@ -25,7 +25,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 
-VERSION = "2.18.0"
+VERSION = "2.19.0"
 CONF_PATH = os.environ.get("PLEXPIE_CONF", "/etc/plexpie/plexpie.conf")
 WWW = os.path.join(os.path.dirname(os.path.abspath(__file__)), "www")
 HTTP_PORT = int(os.environ.get("PLEXPIE_HTTP_PORT", "8080"))
@@ -62,7 +62,8 @@ SETTINGS_ENV = os.path.join(SETTINGS_DIR, "settings.env")      # read by the sys
 # What the Settings page may change, and how
 EDITABLE = {
     "ENABLE_APPLE_MUSIC_WEB": "bool", "ENABLE_AIRPLAY": "bool", "ENABLE_SPOTIFY": "bool",
-    "ENABLE_SPOTIFY_WEB": "bool", "ENABLE_MUSIC_ASSISTANT": "bool", "ENABLE_CALDERA": "bool", "ENABLE_YOUTUBE_MUSIC": "bool", "ENABLE_BBC_SOUNDS": "bool", "ENABLE_TIMER": "bool", "SHORTCUTS": "str",
+    "ENABLE_SPOTIFY_WEB": "bool", "ENABLE_MUSIC_ASSISTANT": "bool", "ENABLE_CALDERA": "bool", "ENABLE_YOUTUBE_MUSIC": "bool", "ENABLE_BBC_SOUNDS": "bool",
+    "ENABLE_TIDAL": "bool", "ENABLE_QOBUZ": "bool", "TILE_ORDER": "str", "ENABLE_TIMER": "bool", "SHORTCUTS": "str",
     "VISUALIZER": "str", "THEME_FROM_ART": "bool", "NIGHT_DIM": "bool", "NIGHT_START": "str", "NIGHT_END": "str",
     "NIGHT_BRIGHTNESS": "int", "AUTO_BRIGHTNESS": "bool", "ENABLE_HA_DASHBOARD": "bool", "HA_URL": "str", "HA_DASHBOARD": "str",
     "ENABLE_BLUETOOTH": "bool", "EQ_ENABLED": "bool", "EQ_PRESET": "str", "EQ_BANDS": "str", "EQ_CUSTOM": "str",
@@ -132,6 +133,8 @@ SOURCES = {
     "caldera": {"name": "Caldera", "url": f"http://127.0.0.1:{HTTP_PORT}/caldera"},
     "youtube_music": {"name": "YouTube Music", "url": "https://music.youtube.com/"},
     "bbc_sounds": {"name": "BBC Sounds", "url": "https://www.bbc.co.uk/sounds"},
+    "tidal": {"name": "TIDAL", "url": "https://listen.tidal.com/"},
+    "qobuz": {"name": "Qobuz", "url": "https://play.qobuz.com/"},
     "timer": {"name": "Timer", "url": f"http://127.0.0.1:{HTTP_PORT}/timer"},
     "alert": {"name": "Alert", "url": f"http://127.0.0.1:{HTTP_PORT}/alert", "hidden": True},
     "settings": {"name": "Settings", "url": f"http://127.0.0.1:{HTTP_PORT}/settings", "hidden": True},
@@ -143,18 +146,21 @@ for key, flag, default in (("airplay", "ENABLE_AIRPLAY", "yes"), ("ma", "ENABLE_
                            ("apple", "ENABLE_APPLE_MUSIC_WEB", "yes"), ("spotify", "ENABLE_SPOTIFY", "no"),
                            ("spotify_web", "ENABLE_SPOTIFY_WEB", "no"), ("timer", "ENABLE_TIMER", "yes"),
                            ("bluetooth", "ENABLE_BLUETOOTH", "yes"), ("caldera", "ENABLE_CALDERA", "no"),
-                           ("youtube_music", "ENABLE_YOUTUBE_MUSIC", "no"), ("bbc_sounds", "ENABLE_BBC_SOUNDS", "no")):
+                           ("youtube_music", "ENABLE_YOUTUBE_MUSIC", "no"), ("bbc_sounds", "ENABLE_BBC_SOUNDS", "no"),
+                           ("tidal", "ENABLE_TIDAL", "no"), ("qobuz", "ENABLE_QOBUZ", "no")):
     if not cfg_yes(flag, default):
         SOURCES.pop(key)
 if "spotify" not in SOURCES:
     SOURCES.pop("spotify_web", None)
-WEB_APPS = ("plexamp", "apple", "ma", "spotify_web", "settings", "ha", "youtube_music", "bbc_sounds")
+WEB_APPS = ("plexamp", "apple", "ma", "spotify_web", "settings", "ha", "youtube_music", "bbc_sounds", "tidal", "qobuz")
 # Web players that play on the screen: (source, host suffixes, sign-in origins to clear on sign-out)
 WEB_PLAYERS = {"spotify_web": (("spotify.com",), ()),
                "youtube_music": (("music.youtube.com", "accounts.google.com", "accounts.youtube.com"), ("https://music.youtube.com", "https://www.youtube.com",
                                                           "https://accounts.google.com", "https://www.google.com")),
                "bbc_sounds": (("bbc.co.uk", "bbc.com"), ("https://www.bbc.co.uk", "https://account.bbc.com",
-                                                        "https://session.bbc.co.uk"))}
+                                                        "https://session.bbc.co.uk")),
+               "tidal": (("tidal.com",), ("https://listen.tidal.com", "https://login.tidal.com", "https://tidal.com")),
+               "qobuz": (("qobuz.com",), ("https://play.qobuz.com", "https://www.qobuz.com"))}
 
 
 def parse_custom_players(text):
@@ -373,6 +379,7 @@ def state_json():
             "update_available": ST.update_avail,
             "clock": (cfg("CLOCK_FORMAT") or "auto").lower(),
             "custom_players": [k for k in SOURCES if k.startswith("web_")],
+            "tile_order": [k for k in cfg("TILE_ORDER").replace(" ", "").split(",") if k],
             "screen_on": ST.screen_on,
             "brightness": ST.brightness,
             "volume": ST.volume,
@@ -907,7 +914,7 @@ def on_started(src):
             pause_source(other)
     # Show the app that just started playing (e.g. Plexamp started from the phone).
     auto = cfg("AUTO_SHOW_SOURCES", "plexamp airplay ma spotify bluetooth").replace(",", " ").split()
-    if auto and (src in ("bluetooth", "caldera", "youtube_music", "bbc_sounds") or src.startswith("web_")):    # newer sources follow the on/off switch
+    if auto and (src in ("bluetooth", "caldera", "youtube_music", "bbc_sounds", "tidal", "qobuz") or src.startswith("web_")):    # newer sources follow the on/off switch
         auto.append(src)
     if src == "airplay" and not cfg_yes("AUTO_SHOW_AIRPLAY"):
         auto = [a for a in auto if a != "airplay"]
@@ -2808,6 +2815,8 @@ SIGN_OUT_ORIGINS = {
                     "https://accounts.spotify.com"],
     "youtube_music": list(WEB_PLAYERS["youtube_music"][1]),
     "bbc_sounds": list(WEB_PLAYERS["bbc_sounds"][1]),
+    "tidal": list(WEB_PLAYERS["tidal"][1]),
+    "qobuz": list(WEB_PLAYERS["qobuz"][1]),
 }
 SIGN_OUT_ORIGINS.update({k: list(v[1]) for k, v in WEB_PLAYERS.items() if k.startswith("web_")})
 
@@ -2847,7 +2856,8 @@ def accounts():
     if "spotify_web" in SOURCES:
         out.append({"id": "spotify_web", "name": "Spotify web player",
                     "status": "Sign in on the screen", "ok": None, "action": "Sign out"})
-    for key, label in [("youtube_music", "YouTube Music"), ("bbc_sounds", "BBC Sounds")] + \
+    for key, label in [("youtube_music", "YouTube Music"), ("bbc_sounds", "BBC Sounds"), ("tidal", "TIDAL"),
+                       ("qobuz", "Qobuz")] + \
             [(k, v["name"]) for k, v in SOURCES.items() if k.startswith("web_")]:
         if key in SOURCES:
             out.append({"id": key, "name": label, "status": "Sign in on the screen", "ok": None, "action": "Sign out"})
@@ -3000,6 +3010,20 @@ def reset_plexamp_screen():
     log.info("reset the Plexamp screen")
 
 
+HOME_ORDER = ("plexamp", "apple", "airplay", "spotify", "bluetooth", "ma", "caldera", "youtube_music", "bbc_sounds",
+              "tidal", "qobuz")
+
+
+def home_tiles():
+    """The home-screen tiles, in the order they show (TILE_ORDER first, then the usual order)."""
+    keys = [k for k, v in SOURCES.items() if not v.get("hidden") and k not in ("home", "settings", "alert")]
+    default = [k for k in HOME_ORDER if k in keys] + [k for k in keys if k.startswith("web_")] + \
+              [k for k in ("ha", "timer") if k in keys] + [k for k in keys if k not in HOME_ORDER
+                                                          and not k.startswith("web_") and k not in ("ha", "timer")]
+    want = [k for k in cfg("TILE_ORDER").replace(" ", "").split(",") if k in keys]
+    return [{"key": k, "name": SOURCES[k]["name"]} for k in want + [k for k in default if k not in want]]
+
+
 def settings_json(local, host=None, token=None):
     role = "admin" if local else (role_of(token) or "full")
     vals = {}
@@ -3011,7 +3035,8 @@ def settings_json(local, host=None, token=None):
             vals[k] = cfg_yes(k, {"ENABLE_SPOTIFY": "no", "ENABLE_SPOTIFY_WEB": "no", "EQ_ENABLED": "no",
                                   "NIGHT_DIM": "no", "AUTO_BRIGHTNESS": "no",
                                   "PHONE_ACCESS": "yes", "SCREEN_SHARING": "no", "ENABLE_CALDERA": "no",
-                                  "ENABLE_YOUTUBE_MUSIC": "no", "ENABLE_BBC_SOUNDS": "no"}.get(k, "yes"))
+                                  "ENABLE_YOUTUBE_MUSIC": "no", "ENABLE_BBC_SOUNDS": "no", "ENABLE_TIDAL": "no",
+                                  "ENABLE_QOBUZ": "no"}.get(k, "yes"))
         else:
             vals[k] = cfg(k)
     vals["MA_HOST"] = vals.get("MA_HOST") or cfg("HA_HOST")
@@ -3053,6 +3078,7 @@ def settings_json(local, host=None, token=None):
             "paused": os.path.exists(PAUSED_FLAG),
             "desktop": subprocess.run(["systemctl", "cat", "lightdm.service"], capture_output=True).returncode == 0, "sources": sorted(SOURCES),
             "phone_url": f"http://{host}/settings" if host else (f"http://{addr}:{HTTP_PORT}/settings" if addr else ""),
+            "tiles": home_tiles(),
             "local": local, "role": role, "admin_exists": has_admin(),
             "access_requests": access_requests() if role == "admin" else [],
             "peers": peers_json() if rank(role) >= rank("full") else []}
@@ -3070,6 +3096,8 @@ def apply_settings(data, role="admin"):
             continue
         if k == "CLOCK_FORMAT" and str(v).lower() not in ("auto", "12", "24"):
             continue
+        if k == "TILE_ORDER":
+            v = ",".join(x for x in re.findall(r"[a-z0-9_]+", str(v).lower()))[:400]
         if k == "CUSTOM_PLAYERS":
             v = "||".join(f"{n}|{u}" for _, n, u, _ in parse_custom_players(str(v)))
         if k == "EQ_CUSTOM_TEXT":
