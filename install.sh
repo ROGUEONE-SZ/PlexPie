@@ -312,7 +312,11 @@ if yes_ "${ENABLE_AIRPLAY:-yes}"; then
     ok "shairport-sync $tag"
   fi
   systemctl daemon-reload
-  systemctl enable --now nqptp >/dev/null 2>&1
+  if [ -x /usr/local/bin/shairport-sync ] && systemctl cat nqptp >/dev/null 2>&1; then
+    systemctl enable --now nqptp >/dev/null 2>&1
+  else
+    note "AirPlay isn't built on this machine yet; run the installer without --skip-airplay-build to add it."
+  fi
   systemctl disable --now shairport-sync >/dev/null 2>&1 || true
   render "$REPO/files/shairport-sync.conf" > /etc/plexpie/shairport-sync.conf
   chmod 644 /etc/plexpie/shairport-sync.conf
@@ -631,14 +635,15 @@ fi
 
 [ -f /opt/plexamp/js/index.js ] && systemctl restart plexamp
 systemctl restart plexpie
-yes_ "${ENABLE_AIRPLAY:-yes}" && systemctl restart plexpie-airplay
-yes_ "${ENABLE_MUSIC_ASSISTANT:-yes}" && systemctl restart plexpie-squeezelite
-yes_ "${ENABLE_CALDERA:-no}" && systemctl restart plexpie-caldera
+restart_opt() { systemctl restart "$@" 2>/dev/null || note "$1 didn't start; see: journalctl -u $1"; }
+yes_ "${ENABLE_AIRPLAY:-yes}" && [ -x /usr/local/bin/shairport-sync ] && restart_opt plexpie-airplay
+yes_ "${ENABLE_MUSIC_ASSISTANT:-yes}" && restart_opt plexpie-squeezelite
+yes_ "${ENABLE_CALDERA:-no}" && restart_opt plexpie-caldera
 for pair in DLNA:dlna ROON:roon SNAPCAST:snapcast; do
-  v="ENABLE_${pair%%:*}"; yes_ "${!v:-no}" && systemctl restart "plexpie-${pair##*:}"
+  v="ENABLE_${pair%%:*}"; yes_ "${!v:-no}" && restart_opt "plexpie-${pair##*:}"
 done
-yes_ "${ENABLE_SPOTIFY:-no}" && [ -x /usr/local/bin/go-librespot ] && systemctl restart plexpie-spotify
-yes_ "${ENABLE_BLUETOOTH:-yes}" && systemctl is-enabled --quiet plexpie-bluetooth 2>/dev/null && systemctl restart bluetooth plexpie-bluetooth
+yes_ "${ENABLE_SPOTIFY:-no}" && [ -x /usr/local/bin/go-librespot ] && restart_opt plexpie-spotify
+yes_ "${ENABLE_BLUETOOTH:-yes}" && systemctl is-enabled --quiet plexpie-bluetooth 2>/dev/null && restart_opt bluetooth plexpie-bluetooth
 
 if [ "$RESTART_UI" = yes ]; then
   # End the current screen session; autologin starts the new one.
@@ -652,11 +657,11 @@ fi
 sleep 4
 step "Status"
 apt-get clean >/dev/null 2>&1 || true              # downloaded package files aren't needed any more
-echo "    free space on the memory card: $(df -Ph / | awk 'NR==2{print $4}')"
+echo "    free disk space: $(df -Ph / | awk 'NR==2{print $4}')"
 for unit in plexamp plexpie plexpie-airplay plexpie-squeezelite plexpie-spotify plexpie-caldera nqptp; do
   printf '    %-22s %s\n' "$unit" "$(systemctl is-active "$unit" 2>/dev/null || true)"
 done
-if curl -fs --max-time 3 http://127.0.0.1:8080/api/state >/dev/null; then ok "launcher answering on the Pi"; fi
+if curl -fs --max-time 3 http://127.0.0.1:8080/api/state >/dev/null; then ok "launcher answering on port 8080"; fi
 
 echo
 echo "PlexPie is installed."
