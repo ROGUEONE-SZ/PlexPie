@@ -136,6 +136,13 @@ else
   HA_HOST="${HA_HOST:-}"
 fi
 
+# ------------------------------------------------------------ away from home
+echo
+bold "Away from home (optional)"
+dim "Tailscale lets your own phone reach this player from anywhere, with no ports opened on"
+dim "your router. Free for personal use; you sign in on the screen or your phone afterwards."
+yesno ENABLE_TAILSCALE "Control this player from anywhere with Tailscale?" "${ENABLE_TAILSCALE:-no}"
+
 # ------------------------------------------------------------------ screen
 echo
 bold "Screen"
@@ -212,6 +219,8 @@ HA_DASHBOARD="${HA_DASHBOARD:-}"
 ENABLE_TIMER="${ENABLE_TIMER:-yes}"
 # Remote access: Settings from any phone, tablet or computer at http://<pi>:8080/settings (PIN shown on the player)
 PHONE_ACCESS="${PHONE_ACCESS:-yes}"
+# Away from home: Tailscale (only your own devices can reach the player; sign in from Settings -> Remote access)
+ENABLE_TAILSCALE="${ENABLE_TAILSCALE:-no}"
 
 # Music Assistant server (Squeezelite connects here) and its web interface
 MA_HOST="$MA_HOST"

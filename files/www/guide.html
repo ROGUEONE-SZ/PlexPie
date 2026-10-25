@@ -435,6 +435,27 @@
     <div class="tip">Lost the admin phone? The player's own screen can always approve devices and change levels. Tap <span class="k">New PIN</span> there to sign every device out.</div>
   </section>
 
+  <!-- ===================================================================== tailscale -->
+  <section class="g" id="tailscale" data-group="3" data-sub="Control the player from anywhere with Tailscale">
+    <h2>Away from home (Tailscale)</h2>
+    <p class="sub">Use your remote control and Settings from anywhere: at work, on mobile data, on holiday. Tailscale connects your own devices to each other privately. It's free for personal use.</p>
+    <ol>
+      <li>Settings › <b>Remote access</b> › turn on <span class="k">Control from anywhere</span> and tap <span class="k">Save</span>. The player installs Tailscale (a minute or two).</li>
+      <li>A sign-in code appears. Scan it with your phone and sign in to Tailscale (or create an account with Google, Apple, Microsoft or GitHub), then tap <b>Connect</b>. The line turns green: <b>Connected</b>.</li>
+      <li>On your phone, install the <b>Tailscale</b> app from the App Store or Google Play and sign in with the same account.</li>
+      <li>Back on the player, scan the second code (<b>Your remote control, from anywhere</b>), or open the <b>Address away from home</b> it shows. Enter the PIN once.</li>
+      <li>On an iPhone: Share › <b>Add to Home Screen</b>. That icon works at home and away, as long as the Tailscale app is on.</li>
+    </ol>
+    <div class="tip"><b>What it doesn't do:</b> nothing is opened on your router and the player isn't on the public internet. Only devices signed in to your Tailscale account can reach it, and they still need the PIN or your admin's approval, exactly like at home.</div>
+    <h3>Good to know</h3>
+    <ul>
+      <li><b>Several players:</b> turn it on for each player you want to reach away from home. The remote control's <span class="k">Settings ›</span> button only opens players that have it.</li>
+      <li><b>Already use Tailscale?</b> If it was set up on this machine before PlexPie, PlexPie shows its address and leaves its settings alone. If your Tailscale reaches your whole home network (a subnet router), you don't need it on the player at all: just open the player's normal address.</li>
+      <li><b>Turn it off</b> to disconnect (it stays signed in), or tap <span class="k">Sign out</span> to remove the player from your Tailscale account.</li>
+      <li>Your Tailscale sign-in is kept by Tailscale itself, not by PlexPie, and isn't in your PlexPie backup.</li>
+    </ul>
+  </section>
+
   <!-- ===================================================================== backup -->
   <section class="g" id="backup" data-group="3" data-sub="Keep your settings safe">
     <h2>Backup and restore</h2>

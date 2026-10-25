@@ -3,7 +3,7 @@
 <p align="center"><b>A Raspberry Pi music appliance: one touchscreen for all your music (your own server, streaming services, your phone and your multi-room system), controlled from Home Assistant.</b></p>
 
 <p align="center">
-  <a href="#install"><img src="https://img.shields.io/badge/version-2.21-0a84ff" alt="Version 2.21"></a>
+  <a href="#install"><img src="https://img.shields.io/badge/version-2.22-0a84ff" alt="Version 2.22"></a>
   <a href="LICENSE.md"><img src="https://img.shields.io/badge/license-source--available%20(PolyForm%20NC)-8e8e93" alt="License: source-available, PolyForm Noncommercial"></a>
   <img src="https://img.shields.io/badge/Raspberry%20Pi-4%20%7C%205-c51a4a?logo=raspberrypi&logoColor=white" alt="Raspberry Pi 4 or 5">
   <img src="https://img.shields.io/badge/PC%20(Intel%2FAMD)-beta-f5a524" alt="Intel/AMD PCs: beta">

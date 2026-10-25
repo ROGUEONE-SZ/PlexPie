@@ -68,6 +68,8 @@ HA_DASHBOARD=""
 ENABLE_TIMER="yes"
 # Remote access: Settings from any phone, tablet or computer at http://<pi>:8080/settings (PIN shown on the player)
 PHONE_ACCESS="yes"
+# Away from home: Tailscale (only your own devices can reach the player; sign in from Settings -> Remote access)
+ENABLE_TAILSCALE="no"
 
 # Music Assistant server (Squeezelite connects here) and its web interface
 MA_HOST=""

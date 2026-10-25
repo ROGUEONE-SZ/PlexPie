@@ -23,10 +23,10 @@ jobs:
       matrix:
         include:
           - {name: "Debian 13 (Intel/AMD) + AirPlay build", slug: debian13-amd64, image: "debian:13", runner: "ubuntu-24.04", airplay: "yes"}
-          - {name: "Debian 12 (Intel/AMD)", slug: debian12-amd64, image: "debian:12", runner: "ubuntu-24.04", airplay: "no"}
+          - {name: "Debian 12 (Intel/AMD) + Tailscale", slug: debian12-amd64, image: "debian:12", runner: "ubuntu-24.04", airplay: "no", tailscale: "yes"}
           - {name: "Ubuntu 24.04 (Intel/AMD)", slug: ubuntu2404-amd64, image: "ubuntu:24.04", runner: "ubuntu-24.04", airplay: "no"}
           - {name: "Debian 13 (ARM, like Raspberry Pi OS)", slug: debian13-arm64, image: "debian:13", runner: "ubuntu-24.04-arm", airplay: "no"}
-          - {name: "Ubuntu 24.04 (ARM)", slug: ubuntu2404-arm64, image: "ubuntu:24.04", runner: "ubuntu-24.04-arm", airplay: "no"}
+          - {name: "Ubuntu 24.04 (ARM) + Tailscale", slug: ubuntu2404-arm64, image: "ubuntu:24.04", runner: "ubuntu-24.04-arm", airplay: "no", tailscale: "yes"}
     steps:
       - uses: actions/checkout@v4
 
@@ -49,6 +49,9 @@ jobs:
         run: |
           docker exec pp bash -c 'cp -r /src /home/tester/plexpie && chown -R tester: /home/tester/plexpie'
           docker exec -u tester -w /home/tester/plexpie pp bash -c 'bash configure.sh --defaults && sed -i "s/^SETUP_WIZARD=.*/SETUP_WIZARD=\"yes\"/" plexpie.conf'
+          if [ "${{ matrix.tailscale }}" = yes ]; then
+            docker exec -u tester -w /home/tester/plexpie pp sed -i 's/^ENABLE_TAILSCALE=.*/ENABLE_TAILSCALE="yes"/' plexpie.conf
+          fi
 
       - name: Install
         run: |
@@ -66,6 +69,21 @@ jobs:
               code=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:8080$p"); echo "$p $code"; [ "$code" = 200 ]
             done
             cat /etc/plexpie/platform'
+
+      - name: Check Tailscale (installed, owned by PlexPie, sign-in link offered)
+        if: matrix.tailscale == 'yes'
+        run: |
+          docker exec pp bash -c '
+            set -e
+            command -v tailscale; systemctl is-active tailscaled; test -f /var/lib/plexpie/tailscale-owned
+            for i in $(seq 45); do
+              j=$(curl -fs http://127.0.0.1:8080/api/tailscale || echo "{}")
+              echo "$j" | python3 -c "import json,sys; s=json.load(sys.stdin); sys.exit(0 if s.get(\"auth_url\") else 1)" && break
+              sleep 2
+            done
+            # print the state, never the sign-in link itself
+            echo "$j" | python3 -c "import json,sys; s=json.load(sys.stdin); a=s.pop(\"auth_url\",\"\"); print(s); print(\"sign-in link offered:\", bool(a)); assert a and s[\"installed\"] and s[\"owned\"]"
+            tailscale logout >/dev/null 2>&1 || true'
 
       - name: Screenshots of the screen's pages
         if: always()

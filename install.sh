@@ -519,6 +519,20 @@ for d in /sys/class/backlight/*; do
 done
 ok "PlexPie files in /opt/plexpie, settings in /etc/plexpie/plexpie.conf"
 
+# ------------------------------------------------------------- Tailscale
+# Optional remote access from anywhere. Only installs it here; signing in happens on the screen or phone
+# (Settings > Remote access). A Tailscale you set up yourself earlier is left exactly as it is.
+if yes_ "${ENABLE_TAILSCALE:-no}"; then
+  step "Tailscale (away from home)"
+  if command -v tailscale >/dev/null && [ ! -f /var/lib/plexpie/tailscale-owned ]; then
+    ok "Tailscale was already set up on this machine; PlexPie leaves it as it is"
+  elif /opt/plexpie/plexpie-admin tailscale-install-do; then
+    ok "Tailscale installed: sign in from Settings > Remote access"
+  else
+    note "Couldn't install Tailscale (see /var/log/plexpie-update.log); everything else works without it."
+  fi
+fi
+
 # ------------------------------------------------------------ 7. session
 step "Touchscreen session"
 # Raspberry Pi OS Lite has no X display config: on a Pi 4/5, X can pick the 3D chip (which has no

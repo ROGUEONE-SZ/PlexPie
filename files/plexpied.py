@@ -12,6 +12,7 @@ Runs as the appliance user (system service plexpie.service). It:
 """
 import glob
 import http.server
+import ipaddress
 import json
 import logging
 import os
@@ -25,7 +26,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 
-VERSION = "2.21.0"
+VERSION = "2.22.0"
 CONF_PATH = os.environ.get("PLEXPIE_CONF", "/etc/plexpie/plexpie.conf")
 WWW = os.path.join(os.path.dirname(os.path.abspath(__file__)), "www")
 HTTP_PORT = int(os.environ.get("PLEXPIE_HTTP_PORT", "8080"))
@@ -72,7 +73,7 @@ EDITABLE = {
     "SCREEN_OFF_AFTER_SECS": "int", "SCREEN_BRIGHTNESS": "int", "AUTO_SHOW_SOURCES": "str",
     "SWIPE_HOME": "bool", "MA_HOST": "str", "MA_URL": "str",
     "MQTT_HOST": "str", "MQTT_PORT": "int", "MQTT_USER": "str", "MQTT_PASS": "secret",
-    "PHONE_ACCESS": "bool", "PHONE_PIN": "str", "SCREEN_SHARING": "bool", "HOME_BUTTON": "str",
+    "PHONE_ACCESS": "bool", "PHONE_PIN": "str", "ENABLE_TAILSCALE": "bool", "SCREEN_SHARING": "bool", "HOME_BUTTON": "str",
     "SCREEN_ROTATION": "str", "BOOT_SPLASH": "bool", "CLOCK_FORMAT": "str", "CUSTOM_PLAYERS": "str",
 }
 
@@ -1421,7 +1422,8 @@ def conf_update(updates):
 SETUP_DONE = os.path.join(SETTINGS_DIR, "setup-done")
 SETUP_FLAGS = ("ENABLE_APPLE_MUSIC_WEB", "ENABLE_TIDAL", "ENABLE_QOBUZ", "ENABLE_YOUTUBE_MUSIC", "ENABLE_BBC_SOUNDS",
                "ENABLE_JELLYFIN", "ENABLE_AIRPLAY", "ENABLE_SPOTIFY", "ENABLE_BLUETOOTH", "ENABLE_DLNA",
-               "ENABLE_MUSIC_ASSISTANT", "ENABLE_ROON", "ENABLE_SNAPCAST", "ENABLE_HA_DASHBOARD", "ENABLE_TIMER")
+               "ENABLE_MUSIC_ASSISTANT", "ENABLE_ROON", "ENABLE_SNAPCAST", "ENABLE_HA_DASHBOARD", "ENABLE_TIMER",
+               "ENABLE_TAILSCALE")
 
 
 def setup_pending():
@@ -2908,7 +2910,7 @@ def net_status():
             return False
     wifi = None
     for dev in sorted(os.listdir("/sys/class/net")):
-        if dev == "lo" or dev.startswith(("docker", "veth", "br-", "virbr")):
+        if dev == "lo" or dev.startswith(("docker", "veth", "br-", "virbr", "tailscale", "tun", "wg", "zt")):
             continue
         wireless = os.path.isdir(f"/sys/class/net/{dev}/wireless")
         if (read_file(f"/sys/class/net/{dev}/operstate") or "").strip() not in ("up", "unknown") or not has_ip(dev):
@@ -3068,9 +3070,68 @@ def update_checker():
         time.sleep(12 * 3600)
 
 
+def is_tailscale_ip(a):
+    try:
+        return ipaddress.ip_address(a.split("%")[0].replace("::ffff:", "")) in TS_NET
+    except ValueError:
+        return False
+
+
 def lan_address():
     out = run(["hostname", "-I"]).split()
-    return next((a for a in out if "." in a), "")
+    return next((a for a in out if "." in a and not is_tailscale_ip(a)), "")
+
+
+# ---------------------------------------------------------------- Tailscale
+# Optional: reach this player from anywhere, from the owner's own devices (their tailnet) only.
+# Visitors over Tailscale are ordinary remote devices: same PIN, roles and admin approval as on Wi-Fi.
+TS_NET = ipaddress.ip_network("100.64.0.0/10")
+TS = {"t": 0, "s": {}}
+
+
+def ts_status(force=False):
+    if not force and time.time() - TS["t"] < 4:
+        return TS["s"]
+    ok, out = admin("tailscale-status", timeout=8)
+    try:
+        st = json.loads(out) if ok else {}
+    except ValueError:
+        st = {}
+    TS.update(t=time.time(), s=st if isinstance(st, dict) else {})
+    return TS["s"]
+
+
+def ts_host(st=None):
+    st = st if st is not None else TS["s"]
+    return (st.get("dns") or st.get("ip") or "") if st.get("state") == "Running" else ""
+
+
+def ts_json(role):
+    st = dict(ts_status())
+    if role != "admin":
+        st.pop("auth_url", None)
+    host = ts_host(st)
+    st.update(enabled=cfg_yes("ENABLE_TAILSCALE", "no"), port=HTTP_PORT,
+              url=f"http://{host}:{HTTP_PORT}/remote" if host else "",
+              settings_url=f"http://{host}:{HTTP_PORT}/settings" if host else "")
+    return st
+
+
+def ts_reconcile(want=None, changed=False, name=None):
+    """Make Tailscale match the setting. At start-up only finishes what was chosen; after a change, acts."""
+    want = cfg_yes("ENABLE_TAILSCALE", "no") if want is None else want
+    st = ts_status(force=True)
+    if not st.get("installed"):
+        if want and changed and not st.get("installing"):
+            admin("tailscale-install", name or PLAYER_NAME, timeout=15)
+        return
+    if not st.get("owned"):
+        return                              # set up by the owner before PlexPie: leave it alone
+    state = st.get("state")
+    if want and (changed or state in ("NeedsLogin", "NoState", "Stopped")):
+        admin("tailscale-up", name or PLAYER_NAME, timeout=15)
+    elif not want and state == "Running":
+        admin("tailscale-down", timeout=15)
 
 
 def browser_call(method, params):
@@ -3345,7 +3406,7 @@ def settings_json(local, host=None, token=None):
                                   "PHONE_ACCESS": "yes", "SCREEN_SHARING": "no", "ENABLE_CALDERA": "no",
                                   "ENABLE_YOUTUBE_MUSIC": "no", "ENABLE_BBC_SOUNDS": "no", "ENABLE_TIDAL": "no",
                                   "ENABLE_QOBUZ": "no", "ENABLE_JELLYFIN": "no", "ENABLE_DLNA": "no",
-                                  "ENABLE_ROON": "no", "ENABLE_SNAPCAST": "no"}.get(k, "yes"))
+                                  "ENABLE_ROON": "no", "ENABLE_SNAPCAST": "no", "ENABLE_TAILSCALE": "no"}.get(k, "yes"))
         else:
             vals[k] = cfg(k)
     vals["MA_HOST"] = vals.get("MA_HOST") or cfg("HA_HOST")
@@ -3399,7 +3460,7 @@ def settings_json(local, host=None, token=None):
 def apply_settings(data, role="admin"):
     clean = {}
     for k, v in data.items():
-        if k in ("PHONE_PIN", "PHONE_ACCESS") and role != "admin":
+        if k in ("PHONE_PIN", "PHONE_ACCESS", "ENABLE_TAILSCALE") and role != "admin":
             continue                       # only the player's screen and the admin device change these
         if k == "AUTO_SHOW":
             clean["AUTO_SHOW_SOURCES"] = "plexamp airplay ma spotify bluetooth" if v else ""
@@ -3446,6 +3507,9 @@ def apply_settings(data, role="admin"):
             sudo("/usr/bin/systemctl", "restart", "plexpie-squeezelite")
         if rotation_changed:
             restart_screen()
+        if "ENABLE_TAILSCALE" in clean or ("PLAYER_NAME" in clean and TS["s"].get("state") == "Running"):
+            ts_reconcile(want=(clean.get("ENABLE_TAILSCALE") or ("yes" if cfg_yes("ENABLE_TAILSCALE", "no") else "no")) == "yes",
+                         changed=True, name=clean.get("PLAYER_NAME") or PLAYER_NAME)
         os._exit(0)
     spawn(restart)
     return clean
@@ -3480,7 +3544,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
     REMOTE_CONTROLS = ("/api/state", "/api/art", "/api/players", "/api/peer", "/api/peer/open", "/api/handoff",
                        "/api/source", "/api/volume", "/api/playpause", "/api/pause_all", "/api/sleep")
     REMOTE_AUTH = ("/api/settings", "/api/account", "/api/system", "/api/backup", "/api/restore", "/api/bluetooth",
-                   "/api/devices", "/guide", "/guide.pdf", "/api/access", "/api/peers", "/welcome", "/api/setup")
+                   "/api/devices", "/guide", "/guide.pdf", "/api/access", "/api/peers", "/welcome", "/api/setup", "/api/tailscale")
 
     def _role(self):
         if self._local():
@@ -3595,6 +3659,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return self._send(200, json.dumps(access_requests() if self._role() == "admin" else []).encode())
         if path == "/api/players":
             return self._send(200, json.dumps({"players": players_json(), "role": self._role()}).encode())
+        if path == "/api/tailscale":
+            return self._send(200, json.dumps(ts_json(self._role())).encode())
         if path == "/api/peers":
             return self._send(200, json.dumps(peers_json()).encode())
         if path in ("/", "/index.html"):
@@ -3753,7 +3819,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             if data.get("to") == "settings" and rank(tk_role) < rank("full"):
                 return self._send(403, b'{"error":"not allowed"}')
             via = (SESSIONS.get(self._token() or "") or {}).get("name", PLAYER_NAME).replace("PlexPie · ", "")
-            return self._send(200, json.dumps({"ticket": make_ticket(tk_role, via)}).encode())
+            return self._send(200, json.dumps({"ticket": make_ticket(tk_role, via), "ts": ts_host(ts_status())}).encode())
         if path == "/api/peers":
             if self._role() != "admin":
                 return self._send(403, b'{"error":"only the admin device can link players"}')
@@ -3784,8 +3850,29 @@ class Handler(http.server.BaseHTTPRequestHandler):
             st, j = peer_call(p, "/api/handoff", {"to": to, "role": want}, timeout=4)
             if st != 200 or not j.get("ticket"):
                 return self._send(502, json.dumps({"error": j.get("error") or "Couldn't reach it"}).encode())
+            host = p["address"]
+            if is_tailscale_ip(self.client_address[0]):      # away from home: only a Tailscale address works
+                if not j.get("ts"):
+                    return self._send(502, json.dumps({"error": f"Away from home, {p['name']} needs Tailscale too "
+                                                                "(Settings › Remote access on that player)"}).encode())
+                host = j["ts"]
             return self._send(200, json.dumps(
-                {"url": f"http://{p['address']}:{p.get('port', HTTP_PORT)}/{to}?ticket={j['ticket']}"}).encode())
+                {"url": f"http://{host}:{p.get('port', HTTP_PORT)}/{to}?ticket={j['ticket']}"}).encode())
+        if path == "/api/tailscale":
+            if self._role() != "admin":
+                return self._send(403, b'{"error":"only the admin device can change Tailscale"}')
+            what = data.get("action")
+            st = ts_status(force=True)
+            if what == "install" and not st.get("installed"):
+                ok, _ = admin("tailscale-install", PLAYER_NAME, timeout=15)
+            elif what == "signin" and st.get("owned"):
+                ok, _ = admin("tailscale-up", PLAYER_NAME, timeout=15)
+            elif what == "signout" and st.get("owned"):
+                ok, _ = admin("tailscale-logout", timeout=15)
+            else:
+                return self._send(400, b'{"error":"not possible right now"}')
+            TS["t"] = 0
+            return self._send(200 if ok else 500, json.dumps({"ok": ok}).encode())
         if path == "/api/settings":
             saved = apply_settings(data, self._role() or "full")
             return self._send(200, json.dumps({"ok": True, "saved": sorted(saved)}).encode())
@@ -4178,6 +4265,7 @@ def main():
     log.info("PlexPie %s starting, sources: %s", VERSION, ", ".join(SOURCES))
     ensure_pin()
     spawn(lambda: (time.sleep(20), check_address_change()))
+    spawn(lambda: (time.sleep(15), ts_reconcile()))
     bind = "0.0.0.0" if cfg_yes("PHONE_ACCESS") else "127.0.0.1"
     server = Server((bind, HTTP_PORT), Handler)
     tabs = BROWSER.tabs() or []                 # after a settings restart, keep what is on screen

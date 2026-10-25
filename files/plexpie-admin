@@ -362,6 +362,83 @@ PY
       boot_line_set "$new"
       echo "changed (after a restart)"
     fi ;;
+  # ---- Tailscale: reach this player from anywhere, from the user's own devices only.
+  # PlexPie never turns on Tailscale SSH, subnet routes, exit nodes, Funnel or "tailscale serve"
+  # (serve would make every visitor look like the screen itself, which needs no PIN).
+  # A Tailscale that was set up before PlexPie installed it is left alone: status only.
+  tailscale-status)
+    installed=false; command -v tailscale >/dev/null && installed=true
+    owned=false; [ -f "$STATE/tailscale-owned" ] && owned=true
+    installing=false; [ -f "$STATE/tailscale-installing" ] && systemctl is-active --quiet plexpie-tailscale && installing=true
+    err=$(cat "$STATE/tailscale-error" 2>/dev/null | tr -cd 'A-Za-z0-9 .,:/()_-' | cut -c1-120)
+    st='{}'; $installed && st=$(timeout 5 tailscale status --json 2>/dev/null || echo '{}')
+    TS_INSTALLED=$installed TS_OWNED=$owned TS_INSTALLING=$installing TS_ERR=$err python3 -c '
+import json, os, sys
+try:
+    s = json.loads(sys.stdin.read() or "{}")
+except ValueError:
+    s = {}
+me = s.get("Self") or {}
+ips = [a for a in me.get("TailscaleIPs") or [] if "." in a]
+url = s.get("AuthURL") or ""
+print(json.dumps({"installed": os.environ["TS_INSTALLED"] == "true", "owned": os.environ["TS_OWNED"] == "true",
+                  "installing": os.environ["TS_INSTALLING"] == "true", "error": os.environ.get("TS_ERR", ""),
+                  "state": s.get("BackendState") or ("" if os.environ["TS_INSTALLED"] == "true" else "NotInstalled"),
+                  "auth_url": url if url.startswith("https://login.tailscale.com/") else "",
+                  "dns": (me.get("DNSName") or "").rstrip("."), "ip": ips[0] if ips else ""}))' <<<"$st" ;;
+  tailscale-install)   # install from Tailscale's own repository, then sign-in starts (in the background)
+    systemctl is-active --quiet plexpie-tailscale && exit 0
+    systemctl reset-failed plexpie-tailscale 2>/dev/null
+    systemd-run --quiet --unit=plexpie-tailscale --collect /opt/plexpie/plexpie-admin tailscale-install-do "${2:-}" ;;
+  tailscale-install-do)  # tailscale-install-do [NAME]: NAME given = start sign-in afterwards
+    rm -f "$STATE/tailscale-error"
+    if ! command -v tailscale >/dev/null; then
+      touch "$STATE/tailscale-installing"; trap 'rm -f "$STATE/tailscale-installing"' EXIT
+      . /etc/os-release 2>/dev/null
+      case "${ID:-}" in
+        ubuntu) dist="ubuntu/${VERSION_CODENAME:-}" ;;
+        raspbian) dist="raspbian/${VERSION_CODENAME:-}" ;;
+        *) dist="debian/${VERSION_CODENAME:-}" ;;
+      esac
+      base="https://pkgs.tailscale.com/stable/$dist"
+      if ! { mkdir -p -m 0755 /usr/share/keyrings &&
+             curl -fsSL "$base.noarmor.gpg" -o /usr/share/keyrings/tailscale-archive-keyring.gpg &&
+             curl -fsSL "$base.tailscale-keyring.list" -o /etc/apt/sources.list.d/tailscale.list &&
+             apt-get update -q >>"$LOG" 2>&1 && DEBIAN_FRONTEND=noninteractive apt-get install -y -q tailscale >>"$LOG" 2>&1; }; then
+        rm -f /etc/apt/sources.list.d/tailscale.list
+        echo "Couldn't install Tailscale for ${PRETTY_NAME:-this system} (see $LOG)" > "$STATE/tailscale-error"
+        exit 1
+      fi
+      touch "$STATE/tailscale-owned"
+      rm -f "$STATE/tailscale-installing"
+    fi
+    [ -f "$STATE/tailscale-owned" ] || exit 0
+    systemctl enable --now tailscaled >/dev/null 2>&1
+    [ -n "${2:-}" ] && exec "$0" tailscale-up-do "$2"
+    exit 0 ;;
+  tailscale-up)        # tailscale-up NAME: connect; shows a sign-in link the first time
+    [ -f "$STATE/tailscale-owned" ] || { echo "Tailscale is managed outside PlexPie" >&2; exit 1; }
+    systemctl is-active --quiet plexpie-tailscale && exit 0
+    systemctl reset-failed plexpie-tailscale 2>/dev/null
+    systemd-run --quiet --unit=plexpie-tailscale --collect /opt/plexpie/plexpie-admin tailscale-up-do "${2:-plexpie}" ;;
+  tailscale-up-do)
+    [ -f "$STATE/tailscale-owned" ] || exit 1
+    name=$(printf '%s' "${2:-plexpie}" | tr 'A-Z' 'a-z' | tr -c 'a-z0-9\n' '-' | sed 's/--*/-/g; s/^-//; s/-$//' | cut -c1-40)
+    systemctl enable --now tailscaled >/dev/null 2>&1
+    rm -f "$STATE/tailscale-error"
+    # Waits until someone signs in from the link (the Settings page shows it), at most 15 minutes.
+    timeout 900 tailscale up --reset --hostname="${name:-plexpie}" --accept-dns=false --accept-routes=false >/dev/null 2>&1
+    rc=$?
+    [ $rc = 0 ] || [ $rc = 124 ] || echo "Tailscale couldn't connect (code $rc)" > "$STATE/tailscale-error"
+    exit 0 ;;
+  tailscale-down)      # stay signed in, just disconnect
+    [ -f "$STATE/tailscale-owned" ] || exit 1
+    systemctl stop plexpie-tailscale 2>/dev/null
+    tailscale down 2>/dev/null; exit 0 ;;
+  tailscale-logout)    # sign out: this player leaves your Tailscale network
+    [ -f "$STATE/tailscale-owned" ] || exit 1
+    systemctl stop plexpie-tailscale 2>/dev/null
+    tailscale logout 2>/dev/null; exit 0 ;;
   update-status)
     # A restart or power cut in the middle of an update leaves "running" behind: clear it.
     if grep -q '"running":true' "$STATE/update-run.json" 2>/dev/null && ! systemctl is-active --quiet plexpie-update; then
@@ -370,6 +447,6 @@ PY
     cat "$STATE/plexpie.json" 2>/dev/null || echo '{}'
     cat "$STATE/os.json" 2>/dev/null || echo '{}'
     cat "$STATE/update-run.json" 2>/dev/null || echo '{}' ;;
-  *) echo "usage: plexpie-admin wifi-status|wifi-on|wifi-off|wifi-scan|wifi-connect SSID|check-plexpie|check-os|update-check|update-run plexpie/os/all|update-status|apply-run|protect-status|protect-on|protect-off" >&2
+  *) echo "usage: plexpie-admin wifi-status|wifi-on|wifi-off|wifi-scan|wifi-connect SSID|check-plexpie|check-os|update-check|update-run plexpie/os/all|update-status|apply-run|protect-status|protect-on|protect-off|tailscale-status|tailscale-install|tailscale-up NAME|tailscale-down|tailscale-logout" >&2
      exit 2 ;;
 esac

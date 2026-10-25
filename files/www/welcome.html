@@ -121,6 +121,9 @@
       <li>Scan the code with your phone's camera, or open <b id="phoneurl"></b>.</li>
       <li>Enter this PIN once: <span class="pin" id="pin"></span></li>
       <li>Tip: in Settings › Remote access, make your phone the <b>admin device</b>.</li></ol></div></div>
+    <h3>Away from home</h3>
+    <div class="group"><div class="row"><div class="t"><b>Control from anywhere</b><small>With Tailscale, free for personal use. Only your own devices can reach the player; nothing is opened on your router. You sign in right after setup.</small></div>
+      <label class="sw"><input type="checkbox" data-flag="ENABLE_TAILSCALE" id="tsflag"><span></span></label></div></div>
   </section>
 
   <!-- 6: finishing -->
@@ -193,6 +196,7 @@ async function load() {
   $("phoneurl").textContent = url || "(not connected to a network yet)";
   $("phoneqr").innerHTML = qrSvg(url);
   $("pin").textContent = (settings.values || {}).PHONE_PIN || "(shown on the player)";
+  $("tsflag").checked = !!S.values.ENABLE_TAILSCALE;
   showStep(0);
 }
 $("claimbtn").onclick = async () => {
@@ -239,6 +243,11 @@ function watch() {
       if (j.running) { seenRunning = true; $("progbar").style.width = Math.max(5, j.percent || 20) + "%"; $("progstep").textContent = j.step || ""; }
       else if (seenRunning || ++idle > 8) {
         $("progbar").style.width = "100%"; $("fintitle").textContent = "All set 🎉";
+        if ($("tsflag").checked) {          // one more step: sign in to Tailscale
+          $("finlead").textContent = "Your player is ready. Last step: sign in to Tailscale…";
+          setTimeout(() => { location.href = "/settings#remote"; }, 2500);
+          return;
+        }
         $("finlead").textContent = "Your player is ready. Going to the home screen…";
         setTimeout(() => fetch("/api/source", {method: "POST", headers: {"Content-Type": "application/json"}, body: '{"source":"home"}'})
           .finally(() => { if (!/^(127\.|localhost)/.test(location.hostname)) location.href = "/remote"; }), 2500);

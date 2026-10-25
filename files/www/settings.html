@@ -466,6 +466,16 @@
             <b id="pinshow" style="font-size:20px;letter-spacing:.15em"></b>
             <button class="btn" id="newpin">New PIN</button></div></div>
         <div class="group local-only" id="remoteqr"></div>
+        <h3>Away from home</h3>
+        <div class="group">
+          <div class="row admin-only" id="tstoggle"><div class="t"><b>Control from anywhere</b><small>With Tailscale, free for personal use. Only your own devices can reach this player, and nothing is opened on your router.</small></div>
+            <label class="sw"><input type="checkbox" id="ENABLE_TAILSCALE"><span></span></label></div>
+          <div class="row" id="tsrow"><span class="dot" id="tsdot"></span><div class="t"><b>Tailscale</b><small id="tssub">Off</small></div>
+            <button class="btn hidden" id="tsbtn"></button></div>
+          <div class="row hidden" id="tsaddr"><div class="t"><b>Address away from home</b><code id="tsurl" style="display:block;margin:4px 0 2px;word-break:break-all;white-space:normal"></code><small>Open it on your phone with the Tailscale app on. It works at home too.</small></div></div></div>
+        <div class="group hidden" id="tsqr"></div>
+        <div class="note" id="tsnote"></div>
+        <div class="group" data-guide="tailscale"></div>
         <div id="reqwrap" class="hidden"><h3>Asking to connect</h3><div class="group" id="requests"></div></div>
         <div class="group">
           <div class="row link" data-href="/remote"><div class="t"><b>Remote control</b><small>Play, pause, volume and apps for this player and your other PlexPie players. On an iPhone: open it, then Share › Add to Home Screen.</small></div><span class="chev">›</span></div>
@@ -539,6 +549,7 @@ const I = {
   sun: svg('<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'),
   sound: svg('<path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/>'),
   wifi: svg('<path d="M2 8.8a15 15 0 0 1 20 0M5 12.6a10 10 0 0 1 14 0M8.5 16.4a5 5 0 0 1 7 0"/><circle cx="12" cy="20" r=".8" fill="currentColor"/>'),
+  globe: svg('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/>'),
   update: svg('<path d="M21 12a9 9 0 1 1-2.6-6.4L21 8"/><path d="M21 3v5h-5"/>'),
   devices: svg('<rect x="2" y="4" width="13" height="16" rx="2"/><rect x="16" y="9" width="6" height="11" rx="1.5"/><path d="M8 17h1"/>'),
   backup: svg('<rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9M10 13h4"/>'),
@@ -628,6 +639,7 @@ const GUIDES = [
   ["timer", "Workout timer", "Intervals, countdown, stopwatch", I.timer, "#ff9f0a", "home"],
   ["eq", "Equalizer", "Presets and room correction", I.eq, "#ff375f", "everyday"],
   ["remote", "Remote access", "Change settings from any device", I.devices, "#30d158", "everyday"],
+  ["tailscale", "Away from home", "Control the player from anywhere with Tailscale", I.globe, "#5e5ce6", "everyday"],
   ["screen", "Screen sharing", "See and use the screen from a Mac, iPad or iPhone", I.laptop, "#636366", "everyday"],
   ["desktop", "Desktop and command line", "Use the Pi as a computer, then come back", I.power, "#636366", "everyday"],
   ["backup", "Backup and restore", "Keep your settings safe", I.backup, "#ff9f0a", "everyday"],
@@ -639,7 +651,7 @@ const FIELDS = ["ENABLE_APPLE_MUSIC_WEB", "ENABLE_AIRPLAY", "ENABLE_SPOTIFY", "E
   "ENABLE_SNAPCAST", "SNAPCAST_HOST",
   "ENABLE_BLUETOOTH", "ENABLE_TIMER", "ENABLE_HA_DASHBOARD",
   "SCREEN_OFF_AFTER_SECS", "SCREEN_BRIGHTNESS", "AUTO_SHOW", "SWIPE_HOME", "MQTT_HOST", "MQTT_PORT",
-  "MQTT_USER", "MQTT_PASS", "SHORTCUTS", "MA_HOST", "MA_URL", "PHONE_ACCESS",
+  "MQTT_USER", "MQTT_PASS", "SHORTCUTS", "MA_HOST", "MA_URL", "PHONE_ACCESS", "ENABLE_TAILSCALE",
   "EQ_ENABLED", "EQ_PRESET", "EQ_BANDS", "EQ_CUSTOM_TEXT", "THEME_FROM_ART", "VISUALIZER", "NIGHT_DIM",
   "NIGHT_START", "NIGHT_END", "NIGHT_BRIGHTNESS", "AUTO_BRIGHTNESS", "HA_URL", "HA_DASHBOARD", "SCREEN_SHARING", "HOME_BUTTON", "SCREEN_ROTATION", "BOOT_SPLASH", "CLOCK_FORMAT", "CUSTOM_PLAYERS", "TILE_ORDER"];
 const INSTALL_FLAG = {apple: null, airplay: "ENABLE_AIRPLAY", spotify: "ENABLE_SPOTIFY", bluetooth: "ENABLE_BLUETOOTH", ma: "ENABLE_MUSIC_ASSISTANT", caldera: "ENABLE_CALDERA",
@@ -724,6 +736,7 @@ function go(id, push = true) {
   renderNav();
   if (id === "sound") requestAnimationFrame(() => setTimeout(drawEq, 30));
   if (id === "updates" || id === "remote") refreshQuick();
+  if (id === "remote") pollTs();
   if (push) history.replaceState(null, "", "#" + id);
 }
 $("back").onclick = () => {
@@ -1010,6 +1023,63 @@ setInterval(async () => {                  // the admin sees new requests withou
   if (!data || data.role !== "admin" || document.hidden) return;
   try { const w = await (await api("/api/whoami")).json(); renderRequests(w.access_requests); } catch (e) {}
 }, 4000);
+// ---------------- Tailscale (away from home)
+let ts = null;
+async function pollTs() {
+  try { const r = await api("/api/tailscale"); if (r.ok) { ts = await r.json(); renderTs(); } } catch (e) {}
+}
+setInterval(() => { if (data && page === "remote" && !document.hidden) pollTs(); }, 3000);
+function renderTs() {
+  if (!ts) return;
+  const admin = data.role === "admin", on = $("ENABLE_TAILSCALE").checked || ts.enabled, st = ts.state;
+  let dot = "", sub = "Off", btn = "", qr = "", note = "";
+  $("tstoggle").classList.toggle("hidden", !admin || (ts.installed && !ts.owned));
+  if (ts.installed && !ts.owned) {
+    dot = st === "Running" ? "ok" : "";
+    sub = st === "Running" ? `Connected · set up outside PlexPie` : "Set up outside PlexPie · not connected";
+    note = "Tailscale was already set up on this player before PlexPie, so PlexPie only shows its address and leaves its settings alone.";
+  } else if (!on) {
+    sub = ts.installed && st && st !== "NeedsLogin" && st !== "NoState" ? "Off · still signed in; turn on to reconnect" : "Off";
+  } else if (ts.installing) {
+    sub = "Installing Tailscale… (a minute or two)";
+  } else if (!ts.installed) {
+    dot = "no"; sub = ts.error || "Not installed yet"; btn = admin ? "Install" : "";
+  } else if (st === "Running") {
+    dot = "ok"; sub = "Connected"; btn = admin ? "Sign out" : "";
+  } else if (st === "NeedsLogin" || st === "NoState" || st === "Stopped" || st === "NeedsMachineAuth") {
+    dot = "no";
+    if (st === "NeedsMachineAuth") sub = "Waiting for approval in your Tailscale admin console";
+    else if (ts.auth_url) sub = "Sign in to add this player to your Tailscale account";
+    else { sub = ts.error || "Getting a sign-in link…"; btn = admin ? "Sign in" : ""; }
+    if (ts.auth_url && admin) {
+      if (data.local) qr = qrCard(ts.auth_url, "Sign in to Tailscale with your phone",
+        ["Scan the code with your phone's camera", "Sign in with your Tailscale account (or create one: Google, Apple, Microsoft or GitHub)",
+         "Tap <b>Connect</b>. This page turns green when it's done"]);
+      else btn = "Sign in";
+    }
+  } else {
+    sub = "Starting…";
+  }
+  $("tsdot").className = "dot " + dot; $("tssub").textContent = sub;
+  $("tsbtn").textContent = btn; $("tsbtn").classList.toggle("hidden", !btn); $("tsbtn").classList.toggle("danger", btn === "Sign out");
+  $("tsaddr").classList.toggle("hidden", !ts.url); $("tsurl").textContent = ts.url || "";
+  if (ts.url && data.local) qr = qrCard(ts.url, "Your remote control, from anywhere",
+    ["Install the <b>Tailscale</b> app on your phone and sign in with the same account", "Scan this code, then enter the PIN once",
+     "On an iPhone: Share › <b>Add to Home Screen</b>"]);
+  if (ts.url && !note) note = "Away from home you sign in once more with the PIN, because it's a different address. The PIN, roles and admin approval work the same as on your Wi-Fi.";
+  $("tsqr").innerHTML = qr; $("tsqr").classList.toggle("hidden", !qr);
+  $("tsnote").textContent = note; $("tsnote").classList.toggle("hidden", !note);
+}
+$("tsbtn").onclick = async () => {
+  const b = $("tsbtn").textContent;
+  if (b === "Sign in" && ts && ts.auth_url && !data.local) { window.open(ts.auth_url, "_blank"); return; }
+  if (b === "Sign out" && !confirm("Sign this player out of Tailscale? You won't reach it away from home until you sign in again.")) return;
+  const r = await api("/api/tailscale", {action: b === "Install" ? "install" : b === "Sign out" ? "signout" : "signin"});
+  toast(r.ok ? (b === "Install" ? "Installing Tailscale…" : b === "Sign out" ? "Signed out" : "Getting a sign-in link…") : "That didn't work");
+  setTimeout(pollTs, 1500);
+};
+$("ENABLE_TAILSCALE").addEventListener("change", renderTs);
+
 function renderPeers(list) {
   list = list || [];
   const admin = data.role === "admin";

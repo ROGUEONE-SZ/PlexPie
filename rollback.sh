@@ -17,6 +17,12 @@ echo "==> Putting back the Raspberry Pi start-up screen"
 rm -rf /usr/share/plymouth/themes/plexpie
 rm -f /etc/avahi/services/plexpie.service
 
+if [ -f /var/lib/plexpie/tailscale-owned ] && command -v tailscale >/dev/null; then
+  echo "==> Signing this player out of Tailscale (PlexPie installed it)"
+  tailscale logout 2>/dev/null; systemctl disable --now tailscaled 2>/dev/null
+  rm -f /var/lib/plexpie/tailscale-owned
+fi
+
 echo "==> Stopping PlexPie services"
 systemctl disable --now plexpie plexpie-airplay plexpie-squeezelite plexpie-caldera plexpie-dlna plexpie-roon plexpie-snapcast nqptp 2>/dev/null
 rm -f /etc/systemd/system/plexpie.service /etc/systemd/system/plexpie-airplay.service \
