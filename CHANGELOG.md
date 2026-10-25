@@ -12,6 +12,8 @@ Already running PlexPie? **Settings › Updates › PlexPie › Update** brings 
   The terminal questions are still there if you prefer them.
 - **Automated install tests** on Debian 12/13 and Ubuntu 24.04, Intel/AMD and ARM, on every change.
 - **Hardware report** form on GitHub for people trying PlexPie on other machines.
+- **Sturdier installer:** works on minimal Debian/Ubuntu installs, and one receiver that can't start
+  no longer stops the whole install.
 
 Everything on the Raspberry Pi works as before.
 
