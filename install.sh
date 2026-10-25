@@ -148,7 +148,7 @@ fi
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -q
 PKGS=(pipewire pipewire-pulse pipewire-alsa wireplumber pipewire-bin python3 python3-paho-mqtt
-      python3-websocket python3-tk python3-evdev xprintidle xdotool curl git avahi-daemon xserver-xorg xinit
+      python3-websocket python3-tk python3-evdev xprintidle xdotool curl git bzip2 ca-certificates avahi-daemon xserver-xorg xinit
       x11-xserver-utils xinput x11vnc alsa-utils avahi-daemon avahi-utils nodejs fonts-dejavu-core python3-numpy python3-pil)
 # Bluetooth receiver: BlueZ, PipeWire's Bluetooth plugin, and D-Bus bindings for the pairing helper
 yes_ "${ENABLE_BLUETOOTH:-yes}" && PKGS+=(bluez libspa-0.2-bluetooth python3-dbus python3-gi rfkill)
