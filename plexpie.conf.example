@@ -22,6 +22,15 @@ ENABLE_YOUTUBE_MUSIC="no"
 ENABLE_BBC_SOUNDS="no"
 ENABLE_TIDAL="no"
 ENABLE_QOBUZ="no"
+# Jellyfin: your server's music on the screen (address like 192.168.1.20 or 192.168.1.20:8096)
+ENABLE_JELLYFIN="no"
+JELLYFIN_URL=""
+# Speakers for other systems: UPnP/DLNA renderer, Roon Bridge (Roon Ready), Snapcast client
+ENABLE_DLNA="no"
+ENABLE_ROON="no"
+ENABLE_SNAPCAST="no"
+# Snapcast server address (empty = find it on the network)
+SNAPCAST_HOST=""
 # Where Caldera plays: auto = shared with the other sources, caldera = Caldera's own pick (often the DAC alone)
 CALDERA_DEVICE="auto"
 # A push button between pins 5 and 6 (GPIO3 and ground) shuts the Pi down and starts it again

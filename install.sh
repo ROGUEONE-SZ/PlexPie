@@ -142,6 +142,10 @@ for alts in "chromium chromium-browser" "libwidevinecdm0" "unclutter-xfixes" "pl
 done
 # Every player is installed, so the Settings page can switch them on and off instantly.
 PKGS+=(squeezelite libvorbis0a libogg0)
+# Optional speakers for other systems, only when chosen (they take space on small cards)
+yes_ "${ENABLE_DLNA:-no}" && PKGS+=(gmediarender gstreamer1.0-alsa gstreamer1.0-plugins-good gstreamer1.0-libav)
+yes_ "${ENABLE_SNAPCAST:-no}" && PKGS+=(snapclient)
+yes_ "${ENABLE_ROON:-no}" && PKGS+=(bzip2)
 if yes_ "${ENABLE_AIRPLAY:-yes}" && [ "$SKIP_AIRPLAY_BUILD" = no ]; then
   PKGS+=(build-essential git autoconf automake libtool pkg-config libpopt-dev libconfig-dev
          libasound2-dev libavahi-client-dev libssl-dev libsoxr-dev libsodium-dev libavutil-dev
@@ -293,6 +297,30 @@ if [ -x /usr/local/bin/go-librespot ]; then
   ok "Spotify device name: $PLAYER_NAME"
 fi
 
+# --------------------------------------------- Roon Bridge, UPnP/DLNA, Snapcast
+# Their own services would run a second copy with the wrong sound output: PlexPie runs them instead.
+for s in gmediarender snapclient; do systemctl disable --now "$s" >/dev/null 2>&1 || true; done
+[ -s /etc/plexpie/dlna-uuid ] || python3 -c "import uuid,socket;print(uuid.uuid5(uuid.NAMESPACE_DNS,'plexpie-'+socket.gethostname()))" > /etc/plexpie/dlna-uuid 2>/dev/null || true
+if yes_ "${ENABLE_ROON:-no}"; then
+  step "Roon Bridge"
+  if [ ! -x /opt/RoonBridge/start.sh ] || [ -n "${UPDATE_ROON:-}" ]; then
+    case "$(uname -m)" in aarch64) RARCH=linuxarmv8 ;; armv7l) RARCH=linuxarmv7hf ;; x86_64) RARCH=linuxx64 ;; *) RARCH= ;; esac
+    if [ -n "$RARCH" ]; then
+      tmp=$(mktemp -d)
+      if curl -fsSL "https://download.roonlabs.com/builds/RoonBridge_${RARCH}.tar.bz2" -o "$tmp/rb.tar.bz2" \
+         && tar -xjf "$tmp/rb.tar.bz2" -C "$tmp"; then
+        rm -rf /opt/RoonBridge && mv "$tmp/RoonBridge" /opt/RoonBridge && ok "Roon Bridge installed (from Roon Labs)"
+      else
+        note "Couldn't download Roon Bridge; it stays off. Run this installer again to retry."
+      fi
+      rm -rf "$tmp"
+    else
+      note "Roon Bridge isn't available for this system ($(uname -m))."
+    fi
+  fi
+  install -d -o "$U" -g "$U" "$UHOME/.local/share/roon"
+fi
+
 # ------------------------------------------------------------ Caldera Music
 # Optional. Caldera's own installer puts it in ~/caldera-music; PlexPie runs it as plexpie-caldera
 # on the shared sound output, so it doesn't take the DAC away from the other sources.
@@ -376,7 +404,8 @@ if [ -f /etc/plexpie/plexpie.conf ] && ! cmp -s "$REPO/plexpie.conf" /etc/plexpi
   cp -p /etc/plexpie/plexpie.conf /etc/plexpie/plexpie.conf.prev
 fi
 install -m 640 -o root -g "$U" "$REPO/plexpie.conf" /etc/plexpie/plexpie.conf
-for unit in plexpie plexpie-airplay plexpie-squeezelite plexpie-spotify plexpie-bluetooth plexpie-caldera; do
+for unit in plexpie plexpie-airplay plexpie-squeezelite plexpie-spotify plexpie-bluetooth plexpie-caldera \
+            plexpie-dlna plexpie-roon plexpie-snapcast; do
   render "$REPO/files/systemd/$unit.service" > "/etc/systemd/system/$unit.service"
 done
 
@@ -409,6 +438,9 @@ $U ALL=(root) NOPASSWD: /usr/bin/systemctl start plexpie-squeezelite, /usr/bin/s
 $U ALL=(root) NOPASSWD: /usr/bin/systemctl start plexpie-spotify, /usr/bin/systemctl stop plexpie-spotify, /usr/bin/systemctl restart plexpie-spotify
 $U ALL=(root) NOPASSWD: /usr/bin/systemctl start plexpie-bluetooth, /usr/bin/systemctl stop plexpie-bluetooth, /usr/bin/systemctl restart plexpie-bluetooth
 $U ALL=(root) NOPASSWD: /usr/bin/systemctl start plexpie-caldera, /usr/bin/systemctl stop plexpie-caldera, /usr/bin/systemctl restart plexpie-caldera
+$U ALL=(root) NOPASSWD: /usr/bin/systemctl start plexpie-dlna, /usr/bin/systemctl stop plexpie-dlna, /usr/bin/systemctl restart plexpie-dlna
+$U ALL=(root) NOPASSWD: /usr/bin/systemctl start plexpie-roon, /usr/bin/systemctl stop plexpie-roon, /usr/bin/systemctl restart plexpie-roon
+$U ALL=(root) NOPASSWD: /usr/bin/systemctl start plexpie-snapcast, /usr/bin/systemctl stop plexpie-snapcast, /usr/bin/systemctl restart plexpie-snapcast
 EOF
 chmod 440 /etc/sudoers.d/plexpie
 visudo -cf /etc/sudoers.d/plexpie >/dev/null
@@ -517,6 +549,7 @@ else systemctl disable --now plexpie-airplay >/dev/null 2>&1 || true; fi
 # Optional players are enabled at boot; the plexpie daemon stops the ones switched off in Settings.
 systemctl enable plexpie-squeezelite >/dev/null 2>&1
 systemctl enable plexpie-caldera >/dev/null 2>&1
+systemctl enable plexpie-dlna plexpie-roon plexpie-snapcast >/dev/null 2>&1
 [ -x /usr/local/bin/go-librespot ] && systemctl enable plexpie-spotify >/dev/null 2>&1
 if [ -x /usr/sbin/bluetoothd ] || [ -x /usr/libexec/bluetooth/bluetoothd ]; then
   # Show up as a speaker; reconnecting phones that were already paired needs no confirmation
@@ -535,6 +568,9 @@ systemctl restart plexpie
 yes_ "${ENABLE_AIRPLAY:-yes}" && systemctl restart plexpie-airplay
 yes_ "${ENABLE_MUSIC_ASSISTANT:-yes}" && systemctl restart plexpie-squeezelite
 yes_ "${ENABLE_CALDERA:-no}" && systemctl restart plexpie-caldera
+for pair in DLNA:dlna ROON:roon SNAPCAST:snapcast; do
+  v="ENABLE_${pair%%:*}"; yes_ "${!v:-no}" && systemctl restart "plexpie-${pair##*:}"
+done
 yes_ "${ENABLE_SPOTIFY:-no}" && [ -x /usr/local/bin/go-librespot ] && systemctl restart plexpie-spotify
 yes_ "${ENABLE_BLUETOOTH:-yes}" && systemctl is-enabled --quiet plexpie-bluetooth 2>/dev/null && systemctl restart bluetooth plexpie-bluetooth
 

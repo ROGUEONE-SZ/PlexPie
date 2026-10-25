@@ -25,7 +25,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 
-VERSION = "2.19.0"
+VERSION = "2.20.0"
 CONF_PATH = os.environ.get("PLEXPIE_CONF", "/etc/plexpie/plexpie.conf")
 WWW = os.path.join(os.path.dirname(os.path.abspath(__file__)), "www")
 HTTP_PORT = int(os.environ.get("PLEXPIE_HTTP_PORT", "8080"))
@@ -63,7 +63,9 @@ SETTINGS_ENV = os.path.join(SETTINGS_DIR, "settings.env")      # read by the sys
 EDITABLE = {
     "ENABLE_APPLE_MUSIC_WEB": "bool", "ENABLE_AIRPLAY": "bool", "ENABLE_SPOTIFY": "bool",
     "ENABLE_SPOTIFY_WEB": "bool", "ENABLE_MUSIC_ASSISTANT": "bool", "ENABLE_CALDERA": "bool", "ENABLE_YOUTUBE_MUSIC": "bool", "ENABLE_BBC_SOUNDS": "bool",
-    "ENABLE_TIDAL": "bool", "ENABLE_QOBUZ": "bool", "TILE_ORDER": "str", "ENABLE_TIMER": "bool", "SHORTCUTS": "str",
+    "ENABLE_TIDAL": "bool", "ENABLE_QOBUZ": "bool", "TILE_ORDER": "str",
+    "ENABLE_JELLYFIN": "bool", "JELLYFIN_URL": "str", "ENABLE_DLNA": "bool", "ENABLE_ROON": "bool",
+    "ENABLE_SNAPCAST": "bool", "SNAPCAST_HOST": "str", "ENABLE_TIMER": "bool", "SHORTCUTS": "str",
     "VISUALIZER": "str", "THEME_FROM_ART": "bool", "NIGHT_DIM": "bool", "NIGHT_START": "str", "NIGHT_END": "str",
     "NIGHT_BRIGHTNESS": "int", "AUTO_BRIGHTNESS": "bool", "ENABLE_HA_DASHBOARD": "bool", "HA_URL": "str", "HA_DASHBOARD": "str",
     "ENABLE_BLUETOOTH": "bool", "EQ_ENABLED": "bool", "EQ_PRESET": "str", "EQ_BANDS": "str", "EQ_CUSTOM": "str",
@@ -120,6 +122,11 @@ def cfg_int(key, default):
 PLAYER_NAME = cfg("PLAYER_NAME", socket.gethostname())
 HA_BASE = (cfg("HA_URL") or (f"http://{cfg('HA_HOST')}:8123" if cfg("HA_HOST") else "")).rstrip("/")
 MA_URL = cfg("MA_URL", "http://homeassistant.local:8095").rstrip("/")
+JELLYFIN_URL = cfg("JELLYFIN_URL").strip().rstrip("/")
+if JELLYFIN_URL and "://" not in JELLYFIN_URL:
+    JELLYFIN_URL = "http://" + JELLYFIN_URL
+if JELLYFIN_URL and not urllib.parse.urlparse(JELLYFIN_URL).port and urllib.parse.urlparse(JELLYFIN_URL).scheme == "http":
+    JELLYFIN_URL += ":8096"                       # Jellyfin's usual port
 
 SOURCES = {
     "home": {"name": "Home", "url": f"http://127.0.0.1:{HTTP_PORT}/"},
@@ -135,6 +142,10 @@ SOURCES = {
     "bbc_sounds": {"name": "BBC Sounds", "url": "https://www.bbc.co.uk/sounds"},
     "tidal": {"name": "TIDAL", "url": "https://listen.tidal.com/"},
     "qobuz": {"name": "Qobuz", "url": "https://play.qobuz.com/"},
+    "jellyfin": {"name": "Jellyfin", "url": (JELLYFIN_URL + "/web/") if JELLYFIN_URL else ""},
+    "dlna": {"name": "UPnP / DLNA", "url": f"http://127.0.0.1:{HTTP_PORT}/dlna"},
+    "roon": {"name": "Roon", "url": f"http://127.0.0.1:{HTTP_PORT}/roon"},
+    "snapcast": {"name": "Snapcast", "url": f"http://127.0.0.1:{HTTP_PORT}/snapcast"},
     "timer": {"name": "Timer", "url": f"http://127.0.0.1:{HTTP_PORT}/timer"},
     "alert": {"name": "Alert", "url": f"http://127.0.0.1:{HTTP_PORT}/alert", "hidden": True},
     "settings": {"name": "Settings", "url": f"http://127.0.0.1:{HTTP_PORT}/settings", "hidden": True},
@@ -147,12 +158,17 @@ for key, flag, default in (("airplay", "ENABLE_AIRPLAY", "yes"), ("ma", "ENABLE_
                            ("spotify_web", "ENABLE_SPOTIFY_WEB", "no"), ("timer", "ENABLE_TIMER", "yes"),
                            ("bluetooth", "ENABLE_BLUETOOTH", "yes"), ("caldera", "ENABLE_CALDERA", "no"),
                            ("youtube_music", "ENABLE_YOUTUBE_MUSIC", "no"), ("bbc_sounds", "ENABLE_BBC_SOUNDS", "no"),
-                           ("tidal", "ENABLE_TIDAL", "no"), ("qobuz", "ENABLE_QOBUZ", "no")):
+                           ("tidal", "ENABLE_TIDAL", "no"), ("qobuz", "ENABLE_QOBUZ", "no"),
+                           ("jellyfin", "ENABLE_JELLYFIN", "no"), ("dlna", "ENABLE_DLNA", "no"),
+                           ("roon", "ENABLE_ROON", "no"), ("snapcast", "ENABLE_SNAPCAST", "no")):
     if not cfg_yes(flag, default):
         SOURCES.pop(key)
 if "spotify" not in SOURCES:
     SOURCES.pop("spotify_web", None)
-WEB_APPS = ("plexamp", "apple", "ma", "spotify_web", "settings", "ha", "youtube_music", "bbc_sounds", "tidal", "qobuz")
+if not JELLYFIN_URL:
+    SOURCES.pop("jellyfin", None)                 # needs your Jellyfin server's address
+WEB_APPS = ("plexamp", "apple", "ma", "spotify_web", "settings", "ha", "youtube_music", "bbc_sounds", "tidal", "qobuz",
+            "jellyfin")
 # Web players that play on the screen: (source, host suffixes, sign-in origins to clear on sign-out)
 WEB_PLAYERS = {"spotify_web": (("spotify.com",), ()),
                "youtube_music": (("music.youtube.com", "accounts.google.com", "accounts.youtube.com"), ("https://music.youtube.com", "https://www.youtube.com",
@@ -161,6 +177,9 @@ WEB_PLAYERS = {"spotify_web": (("spotify.com",), ()),
                                                         "https://session.bbc.co.uk")),
                "tidal": (("tidal.com",), ("https://listen.tidal.com", "https://login.tidal.com", "https://tidal.com")),
                "qobuz": (("qobuz.com",), ("https://play.qobuz.com", "https://www.qobuz.com"))}
+if "jellyfin" in SOURCES:
+    _ju = urllib.parse.urlparse(JELLYFIN_URL)
+    WEB_PLAYERS["jellyfin"] = ((_ju.hostname.lower(),), (f"{_ju.scheme}://{_ju.netloc}",))
 
 
 def parse_custom_players(text):
@@ -216,7 +235,8 @@ def source_for_url(url):
     if u.netloc == f"127.0.0.1:{HTTP_PORT}":
         if u.path.startswith("/guide"):
             return "settings"                    # the setup guides open inside the Settings tab
-        for key in ("airplay", "spotify", "settings", "timer", "alert", "bluetooth", "caldera"):
+        for key in ("airplay", "spotify", "settings", "timer", "alert", "bluetooth", "caldera", "dlna", "roon",
+                    "snapcast"):
             if u.path.startswith("/" + key):
                 return key
         return "home"
@@ -349,7 +369,7 @@ def now_art(src):
         return f"/api/art/plexamp?v={abs(hash(ST.plex_art_key)) % 100000}"
     np = ST.np.get(src) or {}
     url = np.get("art_url") or np.get("art") or ""
-    return url if url.startswith("https://") else ""
+    return url if url.startswith(("https://", "http://")) else ""
 
 
 def state_json():
@@ -388,6 +408,10 @@ def state_json():
             "text_y": ST.text_y,
             "shortcuts": [{"id": k, **v} for k, v in SHORTCUTS.items()],
             "alert": bool(ST.alert),
+            "dlna": dict(ST.np.get("dlna", {}), playing=bool(ST.playing.get("dlna"))),
+            "roon": dict(ST.np.get("roon", {}), playing=bool(ST.playing.get("roon"))),
+            "snapcast": dict(ST.np.get("snapcast", {}), playing=bool(ST.playing.get("snapcast")),
+                             server=bool(SNAP.host())),
             "caldera": dict(ST.np.get("caldera", {}), playing=bool(ST.playing.get("caldera")),
                             remote=bool(CALDERA.base)),
             "bluetooth": dict({k: v for k, v in ST.bt.items() if k != "player"},
@@ -914,7 +938,8 @@ def on_started(src):
             pause_source(other)
     # Show the app that just started playing (e.g. Plexamp started from the phone).
     auto = cfg("AUTO_SHOW_SOURCES", "plexamp airplay ma spotify bluetooth").replace(",", " ").split()
-    if auto and (src in ("bluetooth", "caldera", "youtube_music", "bbc_sounds", "tidal", "qobuz") or src.startswith("web_")):    # newer sources follow the on/off switch
+    if auto and (src in ("bluetooth", "caldera", "youtube_music", "bbc_sounds", "tidal", "qobuz", "jellyfin", "dlna",
+                         "roon", "snapcast") or src.startswith("web_")):    # newer sources follow the on/off switch
         auto.append(src)
     if src == "airplay" and not cfg_yes("AUTO_SHOW_AIRPLAY"):
         auto = [a for a in auto if a != "airplay"]
@@ -937,6 +962,13 @@ def pause_source(src):
     elif src == "ma":
         sudo("/usr/bin/systemctl", "restart", "plexpie-squeezelite")
         set_playing("ma", False)
+    elif src == "dlna":
+        DLNA.pause()
+    elif src == "roon":                       # Roon has no local pause: restarting the bridge stops the zone
+        sudo("/usr/bin/systemctl", "restart", "plexpie-roon")
+        set_playing("roon", False)
+    elif src == "snapcast":
+        SNAP.mute(True)
     elif src == "caldera":
         if CALDERA.base:
             CALDERA.pause()
@@ -965,6 +997,8 @@ def switch_source(src):
     if src not in SOURCES:
         return False
     VIEWPORT.restore()
+    if src == "snapcast":
+        spawn(SNAP.mute, False)               # opening Snapcast un-does "Pause all"
     ok = BROWSER.show(src)
     if ok:
         with ST.lock:
@@ -1676,6 +1710,158 @@ def set_volume(value):
     mark_changed()
 
 
+# ------------------------------------------------- UPnP / DLNA, Roon, Snapcast
+def procs_named(*names):
+    out = []
+    for d in glob.glob("/proc/[0-9]*"):
+        try:
+            with open(d + "/comm") as f:
+                comm = f.read().strip().lower()
+        except OSError:
+            continue
+        if any(n in comm for n in names):
+            out.append(int(d[6:]))
+    return out
+
+
+class Dlna:
+    """gmediarender (plexpie-dlna) answers UPnP AVTransport on a fixed local port."""
+    PORT = 49494
+    URL = f"http://127.0.0.1:{PORT}/upnp/control/rendertransport1"
+    NS = "urn:schemas-upnp-org:service:AVTransport:1"
+
+    def _soap(self, action, args="<InstanceID>0</InstanceID>"):
+        body = (f'<?xml version="1.0"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" '
+                f's:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"><s:Body><u:{action} xmlns:u="{self.NS}">'
+                f'{args}</u:{action}></s:Body></s:Envelope>').encode()
+        req = urllib.request.Request(self.URL, data=body, method="POST", headers={
+            "Content-Type": 'text/xml; charset="utf-8"', "SOAPACTION": f'"{self.NS}#{action}"'})
+        with urllib.request.urlopen(req, timeout=2) as r:
+            return r.read()
+
+    def info(self):
+        """(state or None, metadata or None)."""
+        try:
+            st = re.search(rb"<CurrentTransportState>([^<]*)<", self._soap("GetTransportInfo"))
+            pos = self._soap("GetPositionInfo")
+        except Exception:
+            return None, None
+        m = re.search(rb"<TrackMetaData>(.*?)</TrackMetaData>", pos, re.S)
+        md = {}
+        if m:
+            import html as _html
+            didl = _html.unescape(m.group(1).decode("utf-8", "replace"))
+            for key, tag in (("title", "dc:title"), ("artist", "upnp:artist"), ("album", "upnp:album"),
+                             ("art", "upnp:albumArtURI")):
+                mm = re.search(rf"<{tag}[^>]*>([^<]*)</{tag}>", didl)
+                if mm:
+                    md[key] = _html.unescape(mm.group(1)).strip()
+            if not md.get("artist"):
+                mm = re.search(r"<dc:creator[^>]*>([^<]*)</dc:creator>", didl)
+                md["artist"] = mm.group(1).strip() if mm else ""
+        return (st.group(1).decode() if st else None), md
+
+    def pause(self):
+        try:
+            self._soap("Pause")
+        except Exception:
+            sudo("/usr/bin/systemctl", "restart", "plexpie-dlna")
+            set_playing("dlna", False)
+
+
+DLNA = Dlna()
+
+
+def _set_np(src, md):
+    with ST.lock:
+        if ST.np.get(src) != md:
+            ST.np[src] = md
+            mark_changed()
+
+
+def poll_dlna(streams):
+    state, md = DLNA.info()
+    if state is None:
+        playing = any(v for k, v in streams.items() if "gmediarender" in k)
+    else:
+        playing = state == "PLAYING"
+    set_playing("dlna", playing)
+    md = md or {}
+    if md.get("art") and not md["art"].startswith(("http://", "https://")):
+        md["art"] = ""
+    _set_np("dlna", {k: md.get(k, "") for k in ("title", "artist", "album", "art")} if playing or md.get("title") else {})
+
+
+def poll_roon(streams):
+    """Roon Bridge gives no track details locally: playing or not comes from the sound system."""
+    pids = procs_named("raat", "roon")
+    playing = any(v for k, v in streams.items() if "raat" in k or "roon" in k) or (bool(pids) and caldera_on_dac(pids))
+    set_playing("roon", playing)
+
+
+class Snap:
+    """Snapcast: the client plays; your Snapcast server (JSON-RPC, port 1780) knows what's on."""
+    def host(self):
+        h = cfg("SNAPCAST_HOST").strip()
+        if h:
+            return h
+        for p in DISCOVERED_SNAP.get("list", []):
+            return p
+        return ""
+
+    def rpc(self, method, params=None):
+        h = self.host()
+        if not h:
+            return None
+        body = json.dumps({"id": 1, "jsonrpc": "2.0", "method": method, "params": params or {}}).encode()
+        hostport = h if re.search(r":\d+$", h) else f"{h}:1780"       # Snapcast's control port
+        req = urllib.request.Request(f"http://{hostport}/jsonrpc", data=body, method="POST",
+                                     headers={"Content-Type": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=2) as r:
+                return json.loads(r.read()).get("result")
+        except Exception:
+            return None
+
+    def me(self, status):
+        """Our client and its group in Server.GetStatus (matched by host name)."""
+        for g in (status or {}).get("server", {}).get("groups", []):
+            for c in g.get("clients", []):
+                if (c.get("host", {}).get("name", "").lower() == NODE.lower() or c.get("id", "").lower() == NODE.lower()):
+                    return c, g
+        return None, None
+
+    def mute(self, muted):
+        st = self.rpc("Server.GetStatus")
+        c, _ = self.me(st)
+        if c:
+            vol = dict(c.get("config", {}).get("volume", {}), muted=muted)
+            self.rpc("Client.SetVolume", {"id": c["id"], "volume": vol})
+
+
+SNAP = Snap()
+DISCOVERED_SNAP = {"list": []}
+
+
+def poll_snapcast(streams):
+    st = SNAP.rpc("Server.GetStatus")
+    c, g = SNAP.me(st)
+    if c and g:
+        stream = next((s for s in st["server"].get("streams", []) if s.get("id") == g.get("stream_id")), {})
+        muted = c.get("config", {}).get("volume", {}).get("muted") or g.get("muted")
+        playing = stream.get("status") == "playing" and not muted
+        meta = (stream.get("properties") or {}).get("metadata") or {}
+        artist = meta.get("artist")
+        md = {"title": meta.get("title", "") or "", "artist": ", ".join(artist) if isinstance(artist, list) else (artist or ""),
+              "album": meta.get("album", "") or "", "art": meta.get("artUrl", "") or "",
+              "stream": stream.get("id", "")}
+    else:                                       # no server to ask: going by the sound system
+        playing = any(v for k, v in streams.items() if "snapclient" in k)
+        md = {}
+    set_playing("snapcast", playing)
+    _set_np("snapcast", md)
+
+
 def poll_caldera(streams):
     pids = caldera_pids()
     CALDERA.find(pids)
@@ -1953,8 +2139,14 @@ def fast_poller():
                         if ST.np.get("plexamp") != md:
                             ST.np["plexamp"] = md
                             mark_changed()
-            if "ma" in SOURCES or "caldera" in SOURCES:
+            if any(k in SOURCES for k in ("ma", "caldera", "dlna", "roon", "snapcast")):
                 streams = pw_streams()
+            if "dlna" in SOURCES:
+                poll_dlna(streams)
+            if "roon" in SOURCES:
+                poll_roon(streams)
+            if "snapcast" in SOURCES and n % 2 == 0:
+                poll_snapcast(streams)
             if "ma" in SOURCES:
                 set_playing("ma", streams.get("squeezelite", False))
             if "caldera" in SOURCES:
@@ -2294,9 +2486,10 @@ def watchdog():
 # --------------------------------------------------------------------- settings
 OPTIONAL_UNITS = {"ENABLE_AIRPLAY": "plexpie-airplay", "ENABLE_SPOTIFY": "plexpie-spotify",
                   "ENABLE_BLUETOOTH": "plexpie-bluetooth",
-                  "ENABLE_MUSIC_ASSISTANT": "plexpie-squeezelite", "ENABLE_CALDERA": "plexpie-caldera"}
+                  "ENABLE_MUSIC_ASSISTANT": "plexpie-squeezelite", "ENABLE_CALDERA": "plexpie-caldera",
+                  "ENABLE_DLNA": "plexpie-dlna", "ENABLE_ROON": "plexpie-roon", "ENABLE_SNAPCAST": "plexpie-snapcast"}
 OPTIONAL_DEFAULTS = {"ENABLE_AIRPLAY": "yes", "ENABLE_SPOTIFY": "no", "ENABLE_MUSIC_ASSISTANT": "yes",
-                     "ENABLE_CALDERA": "no",
+                     "ENABLE_CALDERA": "no", "ENABLE_DLNA": "no", "ENABLE_ROON": "no", "ENABLE_SNAPCAST": "no",
                      "ENABLE_BLUETOOTH": "yes"}
 CALDERA_LINKED = os.path.join(SETTINGS_DIR, "caldera-linked")       # written by the installer after sign-in
 CALDERA_DEVICE_FILE = os.path.join(SETTINGS_DIR, "caldera-device")  # which output caldera-run picked
@@ -2675,6 +2868,13 @@ def discovery_loop():
     while True:
         try:
             discover_players(force=True)
+            if "snapcast" in SOURCES and not cfg("SNAPCAST_HOST"):
+                found = []
+                for line in (run(["avahi-browse", "-rtpk", "_snapcast-jsonrpc._tcp"], 8) or "").splitlines():
+                    f = line.split(";")
+                    if len(f) > 8 and f[0] == "=" and f[2] == "IPv4":
+                        found.append(f[7])
+                DISCOVERED_SNAP["list"] = sorted(set(found))
         except Exception as e:
             log.warning("player discovery: %s", e)
         time.sleep(30)
@@ -2813,6 +3013,7 @@ SIGN_OUT_ORIGINS = {
               "https://authorize.music.apple.com"],
     "spotify_web": ["https://open.spotify.com", "https://spotify.com", "https://www.spotify.com",
                     "https://accounts.spotify.com"],
+    "jellyfin": list(WEB_PLAYERS.get("jellyfin", ((), ()))[1]),
     "youtube_music": list(WEB_PLAYERS["youtube_music"][1]),
     "bbc_sounds": list(WEB_PLAYERS["bbc_sounds"][1]),
     "tidal": list(WEB_PLAYERS["tidal"][1]),
@@ -2857,13 +3058,26 @@ def accounts():
         out.append({"id": "spotify_web", "name": "Spotify web player",
                     "status": "Sign in on the screen", "ok": None, "action": "Sign out"})
     for key, label in [("youtube_music", "YouTube Music"), ("bbc_sounds", "BBC Sounds"), ("tidal", "TIDAL"),
-                       ("qobuz", "Qobuz")] + \
+                       ("qobuz", "Qobuz"), ("jellyfin", "Jellyfin")] + \
             [(k, v["name"]) for k, v in SOURCES.items() if k.startswith("web_")]:
         if key in SOURCES:
             out.append({"id": key, "name": label, "status": "Sign in on the screen", "ok": None, "action": "Sign out"})
     if "ma" in SOURCES:
         out.append({"id": "ma", "name": "Music Assistant",
                     "status": "Reachable" if ST.ma_up else "Not reachable", "ok": ST.ma_up})
+    if "jellyfin" in SOURCES:
+        pass                                      # listed with the web players below
+    if "dlna" in SOURCES:
+        out.append({"id": "dlna", "name": "UPnP / DLNA", "status": "Running" if procs_named("gmediarender") else "Not running",
+                    "ok": bool(procs_named("gmediarender"))})
+    if "roon" in SOURCES:
+        ok_r = bool(procs_named("roonbridge", "raat"))
+        out.append({"id": "roon", "name": "Roon", "status": "Running: enable it in Roon › Settings › Audio" if ok_r
+                    else "Not running", "ok": ok_r})
+    if "snapcast" in SOURCES:
+        h = SNAP.host()
+        out.append({"id": "snapcast", "name": "Snapcast", "status": f"Server {h}" if h else "Looking for a Snapcast server",
+                    "ok": bool(h)})
     if "caldera" in SOURCES:
         linked = os.path.exists(CALDERA_LINKED)
         running = bool(caldera_pids())
@@ -3010,8 +3224,8 @@ def reset_plexamp_screen():
     log.info("reset the Plexamp screen")
 
 
-HOME_ORDER = ("plexamp", "apple", "airplay", "spotify", "bluetooth", "ma", "caldera", "youtube_music", "bbc_sounds",
-              "tidal", "qobuz")
+HOME_ORDER = ("plexamp", "jellyfin", "apple", "tidal", "qobuz", "youtube_music", "bbc_sounds", "airplay", "spotify",
+              "bluetooth", "dlna", "caldera", "ma", "roon", "snapcast")
 
 
 def home_tiles():
@@ -3036,7 +3250,8 @@ def settings_json(local, host=None, token=None):
                                   "NIGHT_DIM": "no", "AUTO_BRIGHTNESS": "no",
                                   "PHONE_ACCESS": "yes", "SCREEN_SHARING": "no", "ENABLE_CALDERA": "no",
                                   "ENABLE_YOUTUBE_MUSIC": "no", "ENABLE_BBC_SOUNDS": "no", "ENABLE_TIDAL": "no",
-                                  "ENABLE_QOBUZ": "no"}.get(k, "yes"))
+                                  "ENABLE_QOBUZ": "no", "ENABLE_JELLYFIN": "no", "ENABLE_DLNA": "no",
+                                  "ENABLE_ROON": "no", "ENABLE_SNAPCAST": "no"}.get(k, "yes"))
         else:
             vals[k] = cfg(k)
     vals["MA_HOST"] = vals.get("MA_HOST") or cfg("HA_HOST")
@@ -3058,6 +3273,9 @@ def settings_json(local, host=None, token=None):
     installed = {flag: subprocess.run(["systemctl", "cat", unit], capture_output=True).returncode == 0
                  for flag, unit in OPTIONAL_UNITS.items()}
     installed["ENABLE_CALDERA"] = installed.get("ENABLE_CALDERA", False) and caldera_bin() is not None
+    for flag, binary in (("ENABLE_DLNA", "/usr/bin/gmediarender"), ("ENABLE_ROON", "/opt/RoonBridge/start.sh"),
+                         ("ENABLE_SNAPCAST", "/usr/bin/snapclient")):
+        installed[flag] = installed.get(flag, False) and os.path.exists(binary)
     addr = lan_address()
     ok, wifi = admin("wifi-status", timeout=10)
     try:
@@ -3283,7 +3501,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return self._send(200, json.dumps(peers_json()).encode())
         if path in ("/", "/index.html"):
             return self._file("index.html")
-        if path in ("/airplay", "/spotify", "/bluetooth", "/caldera"):
+        if path in ("/airplay", "/spotify", "/bluetooth", "/caldera", "/dlna", "/roon", "/snapcast"):
             return self._file("nowplaying.html")
         if path == "/settings":
             return self._file("settings.html")

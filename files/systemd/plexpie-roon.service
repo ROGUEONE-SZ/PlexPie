@@ -1,0 +1,22 @@
+[Unit]
+Description=PlexPie Roon Bridge (Roon Ready speaker)
+After=network-online.target user@@UID@.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=@USER@
+Group=@USER@
+Environment=HOME=@HOME@
+Environment=XDG_RUNTIME_DIR=/run/user/@UID@
+Environment=ROON_DATAROOT=@HOME@/.local/share/roon
+EnvironmentFile=/etc/plexpie/plexpie.conf
+EnvironmentFile=-@HOME@/.config/plexpie/settings.env
+# Only when switched on (Settings -> Configuration -> Roon)
+ExecCondition=/bin/sh -c '[ "$${ENABLE_ROON:-no}" = yes ] && [ -x /opt/RoonBridge/start.sh ]'
+ExecStart=/opt/RoonBridge/start.sh
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

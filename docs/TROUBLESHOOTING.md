@@ -142,6 +142,18 @@ rotated, set Settings › Screen › Rotation (above). The log shows what the to
 
 ---
 
+### Jellyfin, UPnP/DLNA, Roon or Snapcast
+
+- **Jellyfin tile doesn't show:** it needs your server's address (Settings › Configuration › Jellyfin).
+  `192.168.1.20` is enough; PlexPie adds Jellyfin's usual port 8096.
+- **The player isn't in BubbleUPnP / mconnect:** same network as the phone, and Settings › Configuration ›
+  UPnP / DLNA says *Running*. Log: `journalctl -u plexpie-dlna -n 50`.
+- **Roon doesn't list the player:** in Roon › Settings › Audio, look under the player's name and press
+  *Enable*. "System Default" shares the DAC with the other apps. Log: `journalctl -u plexpie-roon -n 50`.
+- **Snapcast plays nothing:** put the player in a group with a stream in Snapweb. If the server isn't found,
+  enter its address in Settings › Configuration › Snapcast. Log: `journalctl -u plexpie-snapcast -n 50`.
+- **Not installed yet** in Settings: run `bash configure.sh`, answer yes, then `sudo bash install.sh`.
+
 ### I lost my admin phone, or a device has the wrong access
 
 The player's own screen is always admin: Settings › Remote access lets you change any device's level

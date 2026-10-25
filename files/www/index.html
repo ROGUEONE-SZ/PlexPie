@@ -7,12 +7,12 @@
 <style>
   :root {
     --bg: #0b0b0f; --panel: #16161c; --line: #26262e; --text: #f4f4f7; --muted: #8e8e99;
-    --plexamp: #f5a524; --apple: #fa3c5a; --airplay: #3b8cf6; --ma: #19c2a8; --spotify: #1ed760; --timer: #ff5a4f; --bt: #7b8cff; --ha: #41bdf5; --caldera: #ff8a3d; --ytm: #ff3355; --bbc: #ff7a2e; --tidal: #33d6d6; --qobuz: #4a90e2; --lamp: #ffd166;
+    --plexamp: #f5a524; --apple: #fa3c5a; --airplay: #3b8cf6; --ma: #19c2a8; --spotify: #1ed760; --timer: #ff5a4f; --bt: #7b8cff; --ha: #41bdf5; --caldera: #ff8a3d; --ytm: #ff3355; --bbc: #ff7a2e; --tidal: #33d6d6; --qobuz: #4a90e2; --jelly: #aa5cc3; --dlna: #4cc38a; --roon: #6f8cff; --snap: #e0a03a; --lamp: #ffd166;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden;
     font-family: "Inter", "Noto Sans", "DejaVu Sans", system-ui, sans-serif; }
-  body { display: grid; grid-template-rows: var(--hh, 54px) 1fr var(--fh, 76px); grid-template-columns: minmax(0, 1fr); height: 100vh;
+  body { display: grid; grid-template-rows: var(--hh, 54px) auto 1fr var(--fh, 76px); grid-template-columns: minmax(0, 1fr); height: 100vh;
     padding: 0 var(--pad, 14px); font-size: var(--fs, 16px); }
 
   header, footer { zoom: var(--z, 1); }
@@ -31,6 +31,14 @@
   /* a long title glides back and forth instead of pushing the screen wider */
   .np .track.long span { animation: glide var(--glide, 10s) ease-in-out infinite alternate; }
   @keyframes glide { 0%, 15% { transform: translateX(0); } 85%, 100% { transform: translateX(var(--dx, 0)); } }
+  header { grid-row: 1; } #tabs { grid-row: 2; } main { grid-row: 3; } footer { grid-row: 4; }   /* rows stay put when the tabs are hidden */
+  /* tabs: tile groups when there are many tiles */
+  #tabs { display: flex; gap: 8px; justify-content: center; padding-top: var(--gap, 12px); zoom: var(--z, 1); }
+  #tabs button { position: relative; border: 0; border-radius: 999px; padding: 7px 16px; font: inherit; font-size: 14px; font-weight: 700;
+    background: var(--panel); color: var(--muted); }
+  #tabs button.on { background: var(--text); color: var(--bg); }
+  #tabs button .d { position: absolute; top: 4px; right: 6px; width: 7px; height: 7px; border-radius: 50%; background: #30d158; display: none; }
+  #tabs button.live .d { display: block; }
   /* the playing tile shows the album cover */
   .tile .cover { position: absolute; inset: 0; border-radius: inherit; background-size: cover; background-position: center;
     opacity: 0; transition: opacity .6s; pointer-events: none; }
@@ -137,6 +145,7 @@
   </button>
 </header>
 
+<nav id="tabs" class="hidden"></nav>
 <main id="tiles">
   <button class="tile" data-src="plexamp" style="--c: var(--plexamp)">
     <span class="eq"><i></i><i></i><i></i></span>
@@ -204,6 +213,30 @@
       <circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5"/><path d="M12 5.5a6.5 6.5 0 0 1 6.5 6.5" opacity=".6"/></svg>
     <div><div class="label">Qobuz</div><div class="sub">Hi-res, on this screen</div></div>
   </button>
+  <button class="tile" data-src="jellyfin" style="--c: var(--jelly)">
+    <span class="eq"><i></i><i></i><i></i></span>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 3c-3 4-7 11-7 14a7 7 0 0 0 14 0c0-3-4-10-7-14z"/><path d="M12 10c-1.3 2-3 5-3 6.5a3 3 0 0 0 6 0c0-1.5-1.7-4.5-3-6.5z"/></svg>
+    <div><div class="label">Jellyfin</div><div class="sub">Your server</div></div>
+  </button>
+  <button class="tile" data-src="dlna" style="--c: var(--dlna)">
+    <span class="eq"><i></i><i></i><i></i></span>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 21h8M12 17v4"/><path d="M9 11l2 2 4-4"/></svg>
+    <div><div class="label">UPnP / DLNA</div><div class="sub">Phone, NAS apps</div></div>
+  </button>
+  <button class="tile" data-src="roon" style="--c: var(--roon)">
+    <span class="eq"><i></i><i></i><i></i></span>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="9"/><path d="M8 12a4 4 0 0 1 8 0"/><circle cx="12" cy="12" r="1.5"/></svg>
+    <div><div class="label">Roon</div><div class="sub">Roon Ready</div></div>
+  </button>
+  <button class="tile" data-src="snapcast" style="--c: var(--snap)">
+    <span class="eq"><i></i><i></i><i></i></span>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 12h3l3-7 4 14 3-7h3"/></svg>
+    <div><div class="label">Snapcast</div><div class="sub">Multi-room</div></div>
+  </button>
   <button class="tile" data-src="ha" style="--c: var(--ha)">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <path d="M3 11.5L12 4l9 7.5"/><path d="M5.5 9.5V20h13V9.5"/><circle cx="12" cy="14" r="2"/><path d="M12 16v4M10.5 12.6L8.5 11M13.5 12.6l2-1.6"/></svg>
@@ -243,7 +276,15 @@ const post = (path, body) => fetch(path, {method: "POST", headers: {"Content-Typ
 const SUBS = {plexamp: "Your library", apple: "On this screen", airplay: "iPhone, iPad, Mac",
               spotify: "Spotify Connect", ma: "Your speakers", timer: "Intervals · countdown", bluetooth: "Any device", ha: "Your dashboard",
               caldera: "Multi-room", youtube_music: "On this screen", bbc_sounds: "Radio · podcasts",
-              tidal: "On this screen", qobuz: "Hi-res, on this screen"};
+              tidal: "On this screen", qobuz: "Hi-res, on this screen", jellyfin: "Your server",
+              dlna: "Phone, NAS apps", roon: "Roon Ready", snapcast: "Multi-room"};
+// Groups for the tabs (shown when there are more than 8 tiles): by how you start the music
+const GROUP = {plexamp: "screen", jellyfin: "screen", apple: "screen", tidal: "screen", qobuz: "screen",
+  youtube_music: "screen", bbc_sounds: "screen", airplay: "phone", spotify: "phone", bluetooth: "phone", dlna: "phone",
+  caldera: "multi", ma: "multi", roon: "multi", snapcast: "multi", ha: "home", timer: "home"};
+const GROUPS = [["screen", "On screen"], ["phone", "From phone"], ["multi", "Multi-room"], ["home", "Home"]];
+const groupOf = k => GROUP[k] || (k.startsWith("web_") ? "screen" : "home");
+let curTab = null, lastNow = null;
 const ICON_PAUSE = '<rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/>';
 const ICON_PLAY = '<path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/>';
 const POWER = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v9"/><path d="M6.3 7.3a8 8 0 1 0 11.4 0"/></svg>';
@@ -263,6 +304,25 @@ function renderShortcuts(list) {
     b.classList.toggle("on", !!x.on); b.querySelector("span").textContent = x.name; });
 }
 
+let tabsKey = "";
+function renderTabs(groups, s) {
+  const el = $("tabs");
+  el.classList.toggle("hidden", !groups.length);
+  document.body.classList.toggle("tabbed", !!groups.length);
+  const key = groups.map(g => g[0]).join(",");
+  if (key !== tabsKey) {
+    tabsKey = key;
+    el.innerHTML = groups.map(([g, n]) => `<button data-tab="${g}"><span class="d"></span>${n}</button>`).join("");
+  }
+  el.querySelectorAll("[data-tab]").forEach(b => {
+    b.classList.toggle("on", b.dataset.tab === curTab);
+    b.classList.toggle("live", Object.entries(s.playing_by_source || {}).some(([k, v]) => v && groupOf(k) === b.dataset.tab));
+  });
+}
+$("tabs").addEventListener("click", e => {
+  const b = e.target.closest("[data-tab]"); if (!b) return;
+  curTab = b.dataset.tab; poll();
+});
 function setTrack(text) {
   const box = $("nptrack"), span = box.firstElementChild;
   if (span.textContent === text) return;
@@ -290,12 +350,20 @@ function render(s) {
   if ((s.clock || "auto") !== clockFmt) { clockFmt = s.clock || "auto"; clock(); }
   $("name").textContent = s.player_name || "PlexPie";
   const tiles = [...document.querySelectorAll(".tile")];
+  const enabledKeys = tiles.map(t => t.dataset.src).filter(k => s.sources && k in s.sources);
+  const useTabs = enabledKeys.length > 8;
+  const groupsHere = GROUPS.filter(([g]) => enabledKeys.some(k => groupOf(k) === g));
+  if (s.now_source && s.now_source !== lastNow) curTab = groupOf(s.now_source);   // music started: show its group
+  lastNow = s.now_source;
+  if (!groupsHere.some(([g]) => g === curTab)) curTab = groupsHere.length ? groupsHere[0][0] : null;
+  renderTabs(useTabs ? groupsHere : [], s);
   let shown = 0;
   tiles.forEach(t => {
     const src = t.dataset.src;
     const enabled = s.sources && src in s.sources;
-    t.style.display = enabled ? "" : "none";
-    if (!enabled) return;
+    const inTab = !useTabs || groupOf(src) === curTab;
+    t.style.display = enabled && inTab ? "" : "none";
+    if (!enabled || !inTab) return;
     shown++;
     const playing = s.playing_by_source && s.playing_by_source[src];
     t.classList.toggle("playing", !!playing);
@@ -352,7 +420,8 @@ function fit(n) {
   root.setProperty("--z", z.toFixed(2));
   root.setProperty("--hh", px(Math.max(48, short * 0.11, 54 * z)));
   root.setProperty("--fh", px(Math.max(64, short * 0.15, 76 * z)));
-  const gridH = H - Math.max(48, short * 0.11, 54 * z) - Math.max(64, short * 0.15, 76 * z) - 2 * Math.max(10, short * 0.025);
+  const tabsH = document.body.classList.contains("tabbed") ? (34 * z + Math.max(10, short * 0.025)) : 0;
+  const gridH = H - Math.max(48, short * 0.11, 54 * z) - Math.max(64, short * 0.15, 76 * z) - 2 * Math.max(10, short * 0.025) - tabsH;
   const gridW = W - 2 * Math.max(12, short * 0.028);
   let best = null;
   for (let cols = 1; cols <= n; cols++) {

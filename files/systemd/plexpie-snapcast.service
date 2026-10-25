@@ -1,0 +1,22 @@
+[Unit]
+Description=PlexPie Snapcast speaker (snapclient)
+After=network-online.target user@@UID@.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=@USER@
+Group=@USER@
+Environment=HOME=@HOME@
+Environment=XDG_RUNTIME_DIR=/run/user/@UID@
+EnvironmentFile=/etc/plexpie/plexpie.conf
+EnvironmentFile=-@HOME@/.config/plexpie/settings.env
+# Only when switched on (Settings -> Configuration -> Snapcast)
+ExecCondition=/bin/sh -c '[ "$${ENABLE_SNAPCAST:-no}" = yes ] && [ -x /usr/bin/snapclient ]'
+# SNAPCAST_HOST empty = find the Snapcast server on the network
+ExecStart=/bin/sh -c 'H="$${SNAPCAST_HOST:-}"; H="$${H%%%%:*}"; exec /usr/bin/snapclient $${H:+--host "$$H"} --hostID "$$(hostname)" --player alsa --soundcard default'
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

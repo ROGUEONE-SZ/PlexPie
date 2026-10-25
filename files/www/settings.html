@@ -184,8 +184,7 @@
       <!-- Configuration: the list of apps -->
       <section data-page="config">
         <div class="page-intro">Switch apps on or off, sign in, and set each one up. Every app has step-by-step setup instructions.</div>
-        <h3>Music</h3><div class="group" id="applist-music"></div>
-        <h3>Home</h3><div class="group" id="applist-home"></div>
+        <div id="applists"></div>
       </section>
 
       <section data-page="app-plexamp" data-parent="config" data-title="Plexamp">
@@ -205,6 +204,48 @@
             <button class="btn" data-signout="apple">Sign out</button></div></div>
         <div class="note">Your Apple ID password is never stored by PlexPie. Apple keeps you signed in on its own page.</div>
         <div class="group" data-guide="apple"></div>
+      </section>
+
+      <section data-page="app-jellyfin" data-parent="config" data-title="Jellyfin">
+        <div class="group"><div class="row"><div class="t"><b>Jellyfin</b><small>Your Jellyfin server's music, on the screen</small></div>
+          <label class="sw"><input type="checkbox" id="ENABLE_JELLYFIN"><span></span></label></div>
+          <div class="row"><div class="t"><b>Server address</b><small>e.g. 192.168.1.20 or http://jellyfin.local:8096</small></div>
+            <input id="JELLYFIN_URL" type="text" placeholder="192.168.1.20:8096" autocapitalize="off" autocorrect="off"></div>
+          <div class="row"><div class="t"><b>Jellyfin account</b><small>Sign in on the screen</small></div>
+            <button class="btn" data-signout="jellyfin">Sign out</button></div></div>
+        <div class="note">To send music from the Jellyfin app on your phone, switch on <b>UPnP / DLNA</b> too and use Jellyfin's DLNA plugin, or play from the phone with AirPlay or Bluetooth.</div>
+        <div class="group" data-guide="jellyfin"></div>
+      </section>
+
+      <section data-page="app-dlna" data-parent="config" data-title="UPnP / DLNA">
+        <div class="group"><div class="row"><div class="t"><b>UPnP / DLNA speaker</b><small>Apps like BubbleUPnP, mconnect, Jellyfin and NAS music apps can play to this player</small></div>
+          <label class="sw"><input type="checkbox" id="ENABLE_DLNA"><span></span></label></div>
+          <div class="row"><span class="dot" id="acct-dlna-dot"></span><div class="t"><b>Status</b><small id="acct-dlna"></small></div></div></div>
+        <div class="group hidden" data-missing="ENABLE_DLNA"><div class="row"><div class="t"><b>Not installed yet</b>
+          <small>On the Pi, run <code>bash configure.sh</code>, answer yes to UPnP / DLNA, then <code>sudo bash install.sh</code>.</small></div></div></div>
+        <div class="note">Tip: BubbleUPnP (Android) and mconnect (iPhone) can also stream TIDAL and Qobuz to it.</div>
+        <div class="group" data-guide="dlna"></div>
+      </section>
+
+      <section data-page="app-roon" data-parent="config" data-title="Roon">
+        <div class="group"><div class="row"><div class="t"><b>Roon Bridge</b><small>This player becomes a speaker in Roon (needs a Roon subscription and a Roon Server)</small></div>
+          <label class="sw"><input type="checkbox" id="ENABLE_ROON"><span></span></label></div>
+          <div class="row"><span class="dot" id="acct-roon-dot"></span><div class="t"><b>Status</b><small id="acct-roon"></small></div></div></div>
+        <div class="group hidden" data-missing="ENABLE_ROON"><div class="row"><div class="t"><b>Not installed yet</b>
+          <small>On the Pi, run <code>bash configure.sh</code>, answer yes to Roon, then <code>sudo bash install.sh</code>. It downloads Roon Bridge from Roon Labs.</small></div></div></div>
+        <div class="note">In Roon › Settings › Audio, enable this player once. Pick "System Default" to share the DAC with the other apps, or the DAC itself for bit-perfect (then other apps can't play while Roon does).</div>
+        <div class="group" data-guide="roon"></div>
+      </section>
+
+      <section data-page="app-snapcast" data-parent="config" data-title="Snapcast">
+        <div class="group"><div class="row"><div class="t"><b>Snapcast speaker</b><small>Plays in sync with your other Snapcast speakers</small></div>
+          <label class="sw"><input type="checkbox" id="ENABLE_SNAPCAST"><span></span></label></div>
+          <div class="row"><span class="dot" id="acct-snapcast-dot"></span><div class="t"><b>Status</b><small id="acct-snapcast"></small></div></div>
+          <div class="row"><div class="t"><b>Server address</b><small>Empty finds it on the network</small></div>
+            <input id="SNAPCAST_HOST" type="text" placeholder="192.168.1.20" autocapitalize="off" autocorrect="off"></div></div>
+        <div class="group hidden" data-missing="ENABLE_SNAPCAST"><div class="row"><div class="t"><b>Not installed yet</b>
+          <small>On the Pi, run <code>bash configure.sh</code>, answer yes to Snapcast, then <code>sudo bash install.sh</code>.</small></div></div></div>
+        <div class="group" data-guide="snapcast"></div>
       </section>
 
       <section data-page="app-tidal" data-parent="config" data-title="TIDAL">
@@ -456,7 +497,7 @@
         <div class="group local-only" id="guideqr"></div>
         <div class="group remote-only"><div class="row link" data-href="/guide.pdf"><div class="icon" style="background:#ff453a"></div>
           <div class="t"><b>Full setup guide (PDF)</b><small>Everything from the memory card to every app. Save, share or print it.</small></div><span class="chev">›</span></div></div>
-        <h3>Guides</h3><div class="group" id="guidelist"></div>
+        <div id="guidelist"></div>
       </section>
 
       <!-- System -->
@@ -508,6 +549,10 @@ const I = {
   spotify: svg('<circle cx="12" cy="12" r="10"/><path d="M7 9.5c3.5-1 7-.6 10 1M7.5 13c3-.8 5.6-.4 8 .8M8 16.3c2.4-.6 4.4-.3 6 .6"/>'),
   bt: svg('<path d="m7 7 10 10-5 5V2l5 5L7 17"/>'),
   ma: svg('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3"/>'),
+  drop: svg('<path d="M12 3c-3 4-7 11-7 14a7 7 0 0 0 14 0c0-3-4-10-7-14z"/><path d="M12 10c-1.3 2-3 5-3 6.5a3 3 0 0 0 6 0c0-1.5-1.7-4.5-3-6.5z"/>'),
+  dlna: svg('<rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 21h8M12 17v4"/><path d="M9 11l2 2 4-4"/>'),
+  roon: svg('<circle cx="12" cy="12" r="9"/><path d="M8 12a4 4 0 0 1 8 0"/><circle cx="12" cy="12" r="1.5"/>'),
+  snap: svg('<path d="M4 12h3l3-7 4 14 3-7h3"/>'),
   wave: svg('<path d="M2 12c2.5-5 5-5 7.5 0s5 5 7.5 0 3.5-3 5-1.5"/><path d="M2 17c2.5-3 5-3 7.5 0s5 3 7.5 0"/>'),
   disc: svg('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5"/><path d="M12 5.5a6.5 6.5 0 0 1 6.5 6.5"/>'),
   order: svg('<path d="M8 6h12M8 12h12M8 18h12M3 6h.01M3 12h.01M3 18h.01"/>'),
@@ -541,50 +586,63 @@ const CATS = [
 ];
 // id, name, icon, color, group, enable flag, guide id
 const APPS = [
-  ["plexamp", "Plexamp", I.plex, "#e5a00d", "music", null],
-  ["apple", "Apple Music", I.apple, "#fa2d48", "music", "ENABLE_APPLE_MUSIC_WEB"],
-  ["airplay", "AirPlay", I.airplay, "#0a84ff", "music", "ENABLE_AIRPLAY"],
-  ["spotify", "Spotify", I.spotify, "#1db954", "music", ["ENABLE_SPOTIFY", "ENABLE_SPOTIFY_WEB"]],
-  ["bluetooth", "Bluetooth", I.bt, "#0a6cff", "music", "ENABLE_BLUETOOTH"],
-  ["ma", "Music Assistant", I.ma, "#18a0e0", "music", "ENABLE_MUSIC_ASSISTANT"],
-  ["caldera", "Caldera Music", I.caldera, "#e8742c", "music", "ENABLE_CALDERA"],
-  ["youtube_music", "YouTube Music", I.ytm, "#ff0033", "music", "ENABLE_YOUTUBE_MUSIC"],
-  ["bbc_sounds", "BBC Sounds", I.radio, "#ff4c00", "music", "ENABLE_BBC_SOUNDS"],
-  ["tidal", "TIDAL", I.wave, "#1fb5b5", "music", "ENABLE_TIDAL"],
-  ["qobuz", "Qobuz", I.disc, "#3b7dd8", "music", "ENABLE_QOBUZ"],
+  ["plexamp", "Plexamp", I.plex, "#e5a00d", "screen", null],
+  ["jellyfin", "Jellyfin", I.drop, "#aa5cc3", "screen", "ENABLE_JELLYFIN"],
+  ["apple", "Apple Music", I.apple, "#fa2d48", "screen", "ENABLE_APPLE_MUSIC_WEB"],
+  ["tidal", "TIDAL", I.wave, "#1fb5b5", "screen", "ENABLE_TIDAL"],
+  ["qobuz", "Qobuz", I.disc, "#3b7dd8", "screen", "ENABLE_QOBUZ"],
+  ["youtube_music", "YouTube Music", I.ytm, "#ff0033", "screen", "ENABLE_YOUTUBE_MUSIC"],
+  ["bbc_sounds", "BBC Sounds", I.radio, "#ff4c00", "screen", "ENABLE_BBC_SOUNDS"],
+  ["airplay", "AirPlay", I.airplay, "#0a84ff", "phone", "ENABLE_AIRPLAY"],
+  ["spotify", "Spotify", I.spotify, "#1db954", "phone", ["ENABLE_SPOTIFY", "ENABLE_SPOTIFY_WEB"]],
+  ["bluetooth", "Bluetooth", I.bt, "#0a6cff", "phone", "ENABLE_BLUETOOTH"],
+  ["dlna", "UPnP / DLNA", I.dlna, "#2fa36b", "phone", "ENABLE_DLNA"],
+  ["caldera", "Caldera Music", I.caldera, "#e8742c", "multi", "ENABLE_CALDERA"],
+  ["ma", "Music Assistant", I.ma, "#18a0e0", "multi", "ENABLE_MUSIC_ASSISTANT"],
+  ["roon", "Roon", I.roon, "#5b74f0", "multi", "ENABLE_ROON"],
+  ["snapcast", "Snapcast", I.snap, "#d0912c", "multi", "ENABLE_SNAPCAST"],
   ["ha", "Home Assistant", I.ha, "#18bcf2", "home", null],
   ["timer", "Workout timer", I.timer, "#ff9f0a", "home", "ENABLE_TIMER"],
 ];
+const APP_GROUPS = [["screen", "On this screen"], ["phone", "From your phone"], ["multi", "Multi-room and other systems"], ["home", "Home"]];
 const GUIDES = [
-  ["build", "Build and install", "Parts, memory card, wiring, installing", I.build, "#636366"],
-  ["plexamp", "Plexamp", "Link your Plex account and play", I.plex, "#e5a00d"],
-  ["apple", "Apple Music", "Sign in once on the screen", I.apple, "#fa2d48"],
-  ["airplay", "AirPlay", "Play from an iPhone, iPad or Mac", I.airplay, "#0a84ff"],
-  ["spotify", "Spotify", "Spotify Connect and the web player", I.spotify, "#1db954"],
-  ["bluetooth", "Bluetooth", "Pair a phone, tablet or computer", I.bt, "#0a6cff"],
-  ["ma", "Music Assistant", "Use it as a Music Assistant speaker", I.ma, "#18a0e0"],
-  ["caldera", "Caldera Music", "Multi-room with other Caldera speakers", I.caldera, "#e8742c"],
-  ["youtube_music", "YouTube Music", "The YouTube Music web player on the screen", I.ytm, "#ff0033"],
-  ["bbc_sounds", "BBC Sounds", "BBC radio and podcasts on the screen", I.radio, "#ff4c00"],
-  ["tidal", "TIDAL", "The TIDAL web player on the screen", I.wave, "#1fb5b5"],
-  ["qobuz", "Qobuz", "The Qobuz web player on the screen", I.disc, "#3b7dd8"],
-  ["custom", "Your web players", "Add any music website as a tile", I.plus, "#5e5ce6"],
-  ["ha", "Home Assistant", "Controls, dashboard tile, launcher buttons", I.ha, "#18bcf2"],
-  ["timer", "Workout timer", "Intervals, countdown, stopwatch", I.timer, "#ff9f0a"],
-  ["eq", "Equalizer", "Presets and room correction", I.eq, "#ff375f"],
-  ["remote", "Remote access", "Change settings from any device", I.devices, "#30d158"],
-  ["screen", "Screen sharing", "See and use the screen from a Mac, iPad or iPhone", I.laptop, "#636366"],
-  ["desktop", "Desktop and command line", "Use the Pi as a computer, then come back", I.power, "#636366"],
-  ["backup", "Backup and restore", "Keep your settings safe", I.backup, "#ff9f0a"],
-  ["help", "Troubleshooting", "Quick fixes for common problems", I.update, "#8e8e93"],
+  ["build", "Build and install", "Parts, memory card, wiring, installing", I.build, "#636366", "start"],
+  ["plexamp", "Plexamp", "Link your Plex account and play", I.plex, "#e5a00d", "screen"],
+  ["jellyfin", "Jellyfin", "Your Jellyfin server's music on the screen", I.drop, "#aa5cc3", "screen"],
+  ["apple", "Apple Music", "Sign in once on the screen", I.apple, "#fa2d48", "screen"],
+  ["tidal", "TIDAL", "The TIDAL web player on the screen", I.wave, "#1fb5b5", "screen"],
+  ["qobuz", "Qobuz", "The Qobuz web player on the screen", I.disc, "#3b7dd8", "screen"],
+  ["youtube_music", "YouTube Music", "The YouTube Music web player on the screen", I.ytm, "#ff0033", "screen"],
+  ["bbc_sounds", "BBC Sounds", "BBC radio and podcasts on the screen", I.radio, "#ff4c00", "screen"],
+  ["custom", "Your web players", "Add any music website as a tile", I.plus, "#5e5ce6", "screen"],
+  ["airplay", "AirPlay", "Play from an iPhone, iPad or Mac", I.airplay, "#0a84ff", "phone"],
+  ["spotify", "Spotify", "Spotify Connect and the web player", I.spotify, "#1db954", "phone"],
+  ["bluetooth", "Bluetooth", "Pair a phone, tablet or computer", I.bt, "#0a6cff", "phone"],
+  ["dlna", "UPnP / DLNA", "Play from BubbleUPnP, mconnect, Jellyfin or a NAS", I.dlna, "#2fa36b", "phone"],
+  ["caldera", "Caldera Music", "Multi-room with other Caldera speakers", I.caldera, "#e8742c", "multi"],
+  ["ma", "Music Assistant", "Use it as a Music Assistant speaker", I.ma, "#18a0e0", "multi"],
+  ["roon", "Roon", "Use it as a Roon speaker", I.roon, "#5b74f0", "multi"],
+  ["snapcast", "Snapcast", "Join your Snapcast multi-room system", I.snap, "#d0912c", "multi"],
+  ["ha", "Home Assistant", "Controls, dashboard tile, launcher buttons", I.ha, "#18bcf2", "home"],
+  ["timer", "Workout timer", "Intervals, countdown, stopwatch", I.timer, "#ff9f0a", "home"],
+  ["eq", "Equalizer", "Presets and room correction", I.eq, "#ff375f", "everyday"],
+  ["remote", "Remote access", "Change settings from any device", I.devices, "#30d158", "everyday"],
+  ["screen", "Screen sharing", "See and use the screen from a Mac, iPad or iPhone", I.laptop, "#636366", "everyday"],
+  ["desktop", "Desktop and command line", "Use the Pi as a computer, then come back", I.power, "#636366", "everyday"],
+  ["backup", "Backup and restore", "Keep your settings safe", I.backup, "#ff9f0a", "everyday"],
+  ["help", "Troubleshooting", "Quick fixes for common problems", I.update, "#8e8e93", "everyday"],
 ];
-const FIELDS = ["ENABLE_APPLE_MUSIC_WEB", "ENABLE_AIRPLAY", "ENABLE_SPOTIFY", "ENABLE_SPOTIFY_WEB", "ENABLE_MUSIC_ASSISTANT", "ENABLE_CALDERA", "ENABLE_YOUTUBE_MUSIC", "ENABLE_BBC_SOUNDS", "ENABLE_TIDAL", "ENABLE_QOBUZ",
+const GUIDE_GROUPS = [["start", "Get started"], ["screen", "On this screen"], ["phone", "From your phone"],
+  ["multi", "Multi-room and other systems"], ["home", "Home"], ["everyday", "Everyday"]];
+const FIELDS = ["ENABLE_APPLE_MUSIC_WEB", "ENABLE_AIRPLAY", "ENABLE_SPOTIFY", "ENABLE_SPOTIFY_WEB", "ENABLE_MUSIC_ASSISTANT", "ENABLE_CALDERA", "ENABLE_YOUTUBE_MUSIC", "ENABLE_BBC_SOUNDS", "ENABLE_TIDAL", "ENABLE_QOBUZ", "ENABLE_JELLYFIN", "JELLYFIN_URL", "ENABLE_DLNA", "ENABLE_ROON",
+  "ENABLE_SNAPCAST", "SNAPCAST_HOST",
   "ENABLE_BLUETOOTH", "ENABLE_TIMER", "ENABLE_HA_DASHBOARD",
   "SCREEN_OFF_AFTER_SECS", "SCREEN_BRIGHTNESS", "AUTO_SHOW", "SWIPE_HOME", "MQTT_HOST", "MQTT_PORT",
   "MQTT_USER", "MQTT_PASS", "SHORTCUTS", "MA_HOST", "MA_URL", "PHONE_ACCESS",
   "EQ_ENABLED", "EQ_PRESET", "EQ_BANDS", "EQ_CUSTOM_TEXT", "THEME_FROM_ART", "VISUALIZER", "NIGHT_DIM",
   "NIGHT_START", "NIGHT_END", "NIGHT_BRIGHTNESS", "AUTO_BRIGHTNESS", "HA_URL", "HA_DASHBOARD", "SCREEN_SHARING", "HOME_BUTTON", "SCREEN_ROTATION", "BOOT_SPLASH", "CLOCK_FORMAT", "CUSTOM_PLAYERS", "TILE_ORDER"];
-const INSTALL_FLAG = {apple: null, airplay: "ENABLE_AIRPLAY", spotify: "ENABLE_SPOTIFY", bluetooth: "ENABLE_BLUETOOTH", ma: "ENABLE_MUSIC_ASSISTANT", caldera: "ENABLE_CALDERA"};
+const INSTALL_FLAG = {apple: null, airplay: "ENABLE_AIRPLAY", spotify: "ENABLE_SPOTIFY", bluetooth: "ENABLE_BLUETOOTH", ma: "ENABLE_MUSIC_ASSISTANT", caldera: "ENABLE_CALDERA",
+  dlna: "ENABLE_DLNA", roon: "ENABLE_ROON", snapcast: "ENABLE_SNAPCAST"};
 let data = null, page = null, dirty = false;
 const wide = () => matchMedia("(min-width: 700px)").matches;
 
@@ -623,6 +681,8 @@ function appState(id) {
   if (id === "plexamp") return (data.address_change || {}).new ? "Address changed: open to fix" : (ac.status || "On");
   if (id === "apple") return ac.ok ? "On · signed in" : ac.ok === false ? "On · not signed in" : "On";
   if (["youtube_music", "bbc_sounds", "tidal", "qobuz"].includes(id)) return "On · sign in on the screen";
+  if (id === "jellyfin") return v.JELLYFIN_URL ? "On · " + v.JELLYFIN_URL : "On · add your server's address";
+  if (["dlna", "roon", "snapcast"].includes(id)) return ac.ok ? "On · " + (id === "roon" ? "running" : ac.status) : "On · " + (ac.status || "starting");
   if (id === "bluetooth") { const b = data.bluetooth || {}; return b.connected ? `On · ${b.connected}` : "On"; }
   if (id === "ma") return ac.ok ? "On · server reachable" : "On · server not reachable";
   if (id === "caldera") { const c = data.caldera || {};
@@ -643,10 +703,10 @@ function renderNav() {
     return navRow(id, c[1], c[2], c[3], c[4] || "", id === "updates" && n ? `<span class="badge">${n}</span>` : "");
   }).join("")}</div>`).join("");
   document.querySelectorAll("#nav .navrow").forEach(r => r.classList.toggle("on", page && (page === r.dataset.go || pageParent(page) === r.dataset.go)));
-  for (const grp of ["music", "home"])
-    $("applist-" + grp).innerHTML = APPS.filter(a => a[4] === grp).map(a => navRow("app-" + a[0], a[1], a[2], a[3], appState(a[0]))).join("")
-      + (grp === "music" ? navRow("app-custom", "Your web players", I.plus, "#5e5ce6",
-          (n => n ? `${n} added` : "Add any music website")(customList().length)) : "");
+  $("applists").innerHTML = APP_GROUPS.map(([grp, title]) => `<h3>${title}</h3><div class="group">`
+    + APPS.filter(a => a[4] === grp).map(a => navRow("app-" + a[0], a[1], a[2], a[3], appState(a[0]))).join("")
+    + (grp === "screen" ? navRow("app-custom", "Your web players", I.plus, "#5e5ce6",
+        (n => n ? `${n} added` : "Add any music website")(customList().length)) : "") + "</div>").join("");
 }
 const pageEl = id => document.querySelector(`section[data-page="${id}"]`);
 const pageParent = id => (pageEl(id) || {}).dataset?.parent || null;
@@ -704,7 +764,7 @@ function render() {
   const sel = $("SCREEN_OFF_AFTER_SECS");
   if (![...sel.options].some(o => o.value === String(v.SCREEN_OFF_AFTER_SECS)))
     sel.insertAdjacentHTML("beforeend", `<option value="${esc(v.SCREEN_OFF_AFTER_SECS)}">${esc(v.SCREEN_OFF_AFTER_SECS)} seconds</option>`), sel.value = v.SCREEN_OFF_AFTER_SECS;
-  for (const id of ["plexamp", "apple", "spotify", "ma", "caldera", "ha"]) {
+  for (const id of ["plexamp", "apple", "spotify", "ma", "caldera", "ha", "dlna", "roon", "snapcast"]) {
     const a = acct(id), el = $("acct-" + id); if (!el) continue;
     el.textContent = a.status || (id === "apple" ? "Turn Apple Music on to sign in" : "Off");
     $("acct-" + id + "-dot").className = "dot " + (a.ok === true ? "ok" : a.ok === false ? "no" : "");
@@ -714,6 +774,7 @@ function render() {
   $("calderadev").textContent = !cal.device ? "Chosen when it starts"
     : /^(pipewire|default)$/.test(cal.device) ? "Shared with the other apps" : cal.device;
   $("caldera-missing").classList.toggle("hidden", data.installed.ENABLE_CALDERA !== false);
+  document.querySelectorAll("[data-missing]").forEach(e => e.classList.toggle("hidden", data.installed[e.dataset.missing] !== false));
   $("phoneurl").textContent = data.phone_url || "(no network)";
   $("pinshow").textContent = v.PHONE_PIN || "";
   $("ver").textContent = data.version;
@@ -743,8 +804,9 @@ function render() {
   $("protect").checked = !!pr.active;
   $("protbanner").classList.toggle("hidden", !pr.active);
   document.querySelectorAll("[data-guide]").forEach(g => g.innerHTML = guideRow(g.dataset.guide));
-  $("guidelist").innerHTML = GUIDES.map(g => `<div class="row ic link" data-href="/guide#${g[0]}"><div class="icon" style="background:${g[4]}">${g[3]}</div>
-    <div class="t"><b>${g[1]}</b><small>${g[2]}</small></div><span class="chev">›</span></div>`).join("");
+  $("guidelist").innerHTML = GUIDE_GROUPS.map(([grp, title]) => `<h3>${title}</h3><div class="group">` +
+    GUIDES.filter(g => g[5] === grp).map(g => `<div class="row ic link" data-href="/guide#${g[0]}"><div class="icon" style="background:${g[4]}">${g[3]}</div>
+    <div class="t"><b>${g[1]}</b><small>${g[2]}</small></div><span class="chev">›</span></div>`).join("") + "</div>").join("");
   if (data.local && data.phone_url) {
     const scan = "Point your phone or tablet camera at the code and tap the link";
     const pin = "If it asks, enter the PIN from Remote access (once per device)";

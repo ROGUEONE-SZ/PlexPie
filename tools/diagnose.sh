@@ -14,7 +14,7 @@ sec VERSIONS
 /usr/local/bin/shairport-sync -V 2>&1
 nqptp -V 2>&1 | head -1
 sec SERVICES
-for u in plexamp plexpie plexpie-airplay plexpie-squeezelite plexpie-caldera nqptp; do printf '%-22s %s\n' "$u" "$(systemctl is-active "$u")"; done
+for u in plexamp plexpie plexpie-airplay plexpie-squeezelite plexpie-caldera plexpie-dlna plexpie-roon plexpie-snapcast nqptp; do printf '%-22s %s\n' "$u" "$(systemctl is-active "$u")"; done
 systemctl --user is-active pipewire pipewire-pulse wireplumber 2>&1 | paste -sd' '
 loginctl show-user "$U" -p Linger 2>&1
 sec PIPEWIRE

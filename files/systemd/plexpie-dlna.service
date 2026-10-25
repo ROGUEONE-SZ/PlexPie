@@ -1,0 +1,22 @@
+[Unit]
+Description=PlexPie UPnP/DLNA speaker (gmediarender)
+After=network-online.target user@@UID@.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=@USER@
+Group=@USER@
+Environment=HOME=@HOME@
+Environment=XDG_RUNTIME_DIR=/run/user/@UID@
+EnvironmentFile=/etc/plexpie/plexpie.conf
+EnvironmentFile=-@HOME@/.config/plexpie/settings.env
+# Only when switched on (Settings -> Configuration -> UPnP / DLNA)
+ExecCondition=/bin/sh -c '[ "$${ENABLE_DLNA:-no}" = yes ] && [ -x /usr/bin/gmediarender ]'
+# Plays through the shared sound output ("default" = PipeWire), so it never locks the DAC
+ExecStart=/bin/sh -c 'exec /usr/bin/gmediarender -f "$$PLAYER_NAME" -u "$$(cat /etc/plexpie/dlna-uuid)" -p 49494 --gstout-audiosink=alsasink --gstout-audiodevice=default'
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

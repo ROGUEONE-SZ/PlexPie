@@ -101,6 +101,22 @@ yesno ENABLE_YOUTUBE_MUSIC "Add the YouTube Music web player on the screen?" "${
 yesno ENABLE_BBC_SOUNDS "Add BBC Sounds (BBC radio and podcasts) on the screen?" "${ENABLE_BBC_SOUNDS:-no}"
 yesno ENABLE_TIDAL "Add the TIDAL web player on the screen?" "${ENABLE_TIDAL:-no}"
 yesno ENABLE_QOBUZ "Add the Qobuz web player on the screen?" "${ENABLE_QOBUZ:-no}"
+echo
+dim "Your own server and other systems (skip the ones you don't use):"
+yesno ENABLE_JELLYFIN "Add Jellyfin (your Jellyfin server's music on the screen)?" "${ENABLE_JELLYFIN:-no}"
+if [ "$ENABLE_JELLYFIN" = yes ]; then
+  ask JELLYFIN_URL "Jellyfin server address (e.g. 192.168.1.20 or 192.168.1.20:8096)" "${JELLYFIN_URL:-}"
+else
+  JELLYFIN_URL="${JELLYFIN_URL:-}"
+fi
+yesno ENABLE_DLNA "Add a UPnP/DLNA speaker (BubbleUPnP, mconnect, NAS and Jellyfin apps can play to it)?" "${ENABLE_DLNA:-no}"
+yesno ENABLE_ROON "Add Roon Bridge (a speaker in Roon; needs a Roon subscription)?" "${ENABLE_ROON:-no}"
+yesno ENABLE_SNAPCAST "Add a Snapcast speaker (multi-room with a Snapcast server)?" "${ENABLE_SNAPCAST:-no}"
+if [ "$ENABLE_SNAPCAST" = yes ]; then
+  ask SNAPCAST_HOST "Snapcast server address (empty = find it on the network)" "${SNAPCAST_HOST:-}"
+else
+  SNAPCAST_HOST="${SNAPCAST_HOST:-}"
+fi
 
 # --------------------------------------------------------- home assistant
 echo
@@ -150,6 +166,15 @@ ENABLE_YOUTUBE_MUSIC="${ENABLE_YOUTUBE_MUSIC:-no}"
 ENABLE_BBC_SOUNDS="${ENABLE_BBC_SOUNDS:-no}"
 ENABLE_TIDAL="${ENABLE_TIDAL:-no}"
 ENABLE_QOBUZ="${ENABLE_QOBUZ:-no}"
+# Jellyfin: your server's music on the screen (address like 192.168.1.20 or 192.168.1.20:8096)
+ENABLE_JELLYFIN="${ENABLE_JELLYFIN:-no}"
+JELLYFIN_URL="${JELLYFIN_URL:-}"
+# Speakers for other systems: UPnP/DLNA renderer, Roon Bridge (Roon Ready), Snapcast client
+ENABLE_DLNA="${ENABLE_DLNA:-no}"
+ENABLE_ROON="${ENABLE_ROON:-no}"
+ENABLE_SNAPCAST="${ENABLE_SNAPCAST:-no}"
+# Snapcast server address (empty = find it on the network)
+SNAPCAST_HOST="${SNAPCAST_HOST:-}"
 # Where Caldera plays: auto = shared with the other sources, caldera = Caldera's own pick (often the DAC alone)
 CALDERA_DEVICE="${CALDERA_DEVICE:-auto}"
 # A push button between pins 5 and 6 (GPIO3 and ground) shuts the Pi down and starts it again

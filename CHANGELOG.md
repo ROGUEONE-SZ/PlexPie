@@ -2,6 +2,18 @@
 
 Already running PlexPie? **Settings › Updates › PlexPie › Update** brings you to the latest version.
 
+## 2.20 (October 25, 2026)
+- **Jellyfin:** your Jellyfin server's music on the screen (enter its address).
+- **UPnP / DLNA speaker:** play from BubbleUPnP, mconnect, Jellyfin's DLNA plugin or NAS music apps
+  (which can also stream TIDAL and Qobuz to it). Track and cover on the screen.
+- **Roon:** Roon Bridge, so the player becomes a speaker in Roon.
+- **Snapcast:** plays in sync with your Snapcast multi-room system; shows what the group plays.
+- **Groups everywhere:** On this screen · From your phone · Multi-room and other systems · Home, in
+  Settings › Configuration, in the setup guides, and as tabs on the home screen once there are more than
+  eight tiles (it jumps to the tab of whatever starts playing).
+
+The new sources are optional and off unless you choose them.
+
 ## 2.19 (October 25, 2026)
 - **TIDAL and Qobuz** web players on the screen (optional, Settings › Configuration).
 - **Home screen order:** move tiles up or down in Settings › Screen › Home screen order.

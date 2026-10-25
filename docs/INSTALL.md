@@ -133,6 +133,11 @@ shown in brackets, or type your own:
 | Let any phone, tablet or computer play to it over Bluetooth? | `yes` (it's only visible when you tap "Pair a device") |
 | Add Music Assistant? | `no`, unless you already run a Music Assistant server |
 | Add Caldera Music? | `yes` if you have (or want) other Caldera speakers for multi-room; it signs in to Plex once during the install |
+| Add YouTube Music / BBC Sounds / TIDAL / Qobuz? | `yes` for the services you use (web players on the screen) |
+| Add Jellyfin? | `yes` if you run a Jellyfin server; then type its address |
+| Add a UPnP/DLNA speaker? | `yes` to play from BubbleUPnP, mconnect, Jellyfin or NAS apps |
+| Add Roon Bridge? | `yes` only if you use Roon (subscription) |
+| Add a Snapcast speaker? | `yes` only if you run a Snapcast server |
 | Connect to Home Assistant? | `no`, unless you use Home Assistant (you can add it later) |
 | Turn the screen off after how many idle seconds? | `60` is a good start |
 

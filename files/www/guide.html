@@ -91,8 +91,14 @@
     <p class="lead hidden" id="localnote">To save, share or print these guides, go back and use <b>Send the guides to a device</b>.</p>
     <h3>Get started</h3>
     <div class="toc" id="toc1"></div>
-    <h3>Apps</h3>
-    <div class="toc" id="toc2"></div>
+    <h3>On this screen</h3>
+    <div class="toc" id="tocscreen"></div>
+    <h3>From your phone</h3>
+    <div class="toc" id="tocphone"></div>
+    <h3>Multi-room and other systems</h3>
+    <div class="toc" id="tocmulti"></div>
+    <h3>Home</h3>
+    <div class="toc" id="tochome"></div>
     <h3>Everyday</h3>
     <div class="toc" id="toc3"></div>
   </div>
@@ -148,7 +154,7 @@
   </section>
 
   <!-- ===================================================================== plexamp -->
-  <section class="g" id="plexamp" data-group="2" data-sub="Link your Plex account and play">
+  <section class="g" id="plexamp" data-group="screen" data-sub="Link your Plex account and play">
     <h2>Plexamp</h2>
     <p class="sub">Your own music library, in full quality.</p>
     <ol>
@@ -162,7 +168,18 @@
   </section>
 
   <!-- ===================================================================== apple -->
-  <section class="g" id="apple" data-group="2" data-sub="Sign in once on the screen">
+  <section class="g" id="jellyfin" data-group="screen" data-sub="Your Jellyfin server's music on the screen">
+    <h2>Jellyfin</h2>
+    <p class="sub">If you run a Jellyfin server, its music library opens right on the screen.</p>
+    <ol>
+      <li>Settings › Configuration › <b>Jellyfin</b>: switch it on, enter your server's <b>address</b> (e.g. <code>192.168.1.20</code>, or with its port <code>192.168.1.20:8096</code>) and tap <span class="k">Save</span>.</li>
+      <li>On the home screen, tap <span class="k">Jellyfin</span> and sign in with your Jellyfin user.</li>
+      <li>Browse and play. Pause all, the track name and the cover work like the other apps.</li>
+    </ol>
+    <div class="tip"><b>Play from the Jellyfin app on your phone:</b> switch on <b>UPnP / DLNA</b> as well. With Jellyfin's DLNA plugin installed on your server, the player shows up as a device to play to. AirPlay and Bluetooth work too.</div>
+  </section>
+
+  <section class="g" id="apple" data-group="screen" data-sub="Sign in once on the screen">
     <h2>Apple Music</h2>
     <p class="sub">The Apple Music web player, right on the screen.</p>
     <ol>
@@ -176,7 +193,7 @@
   </section>
 
   <!-- ===================================================================== airplay -->
-  <section class="g" id="youtube_music" data-group="2" data-sub="The YouTube Music web player on the screen">
+  <section class="g" id="youtube_music" data-group="screen" data-sub="The YouTube Music web player on the screen">
     <h2>YouTube Music</h2>
     <p class="sub">YouTube Music's web player on the screen, like Apple Music.</p>
     <ol>
@@ -187,7 +204,7 @@
     <div class="tip">You can't send music to it from the YouTube Music app on your phone (YouTube doesn't allow that for players like this). Use AirPlay or Bluetooth from your phone instead.</div>
   </section>
 
-  <section class="g" id="bbc_sounds" data-group="2" data-sub="BBC radio and podcasts on the screen">
+  <section class="g" id="bbc_sounds" data-group="screen" data-sub="BBC radio and podcasts on the screen">
     <h2>BBC Sounds</h2>
     <p class="sub">BBC radio stations, shows and podcasts on the screen.</p>
     <ol>
@@ -198,7 +215,7 @@
     <div class="tip">Live radio plays in most countries; many shows and podcasts are only available in the UK.</div>
   </section>
 
-  <section class="g" id="tidal" data-group="2" data-sub="The TIDAL web player on the screen">
+  <section class="g" id="tidal" data-group="screen" data-sub="The TIDAL web player on the screen">
     <h2>TIDAL</h2>
     <p class="sub">TIDAL's web player on the screen.</p>
     <ol>
@@ -208,7 +225,7 @@
     <div class="tip">TIDAL Connect (picking this player in the TIDAL app on your phone) is only licensed to hardware makers, so it isn't available here. To play from your phone, use AirPlay or Bluetooth.</div>
   </section>
 
-  <section class="g" id="qobuz" data-group="2" data-sub="The Qobuz web player on the screen">
+  <section class="g" id="qobuz" data-group="screen" data-sub="The Qobuz web player on the screen">
     <h2>Qobuz</h2>
     <p class="sub">Qobuz's web player on the screen, including hi-res albums.</p>
     <ol>
@@ -218,7 +235,7 @@
     <div class="tip">Qobuz Connect (playing from the Qobuz app on your phone) isn't open to projects like this yet. To play from your phone, use AirPlay or Bluetooth.</div>
   </section>
 
-  <section class="g" id="custom" data-group="2" data-sub="Add any music website as a tile">
+  <section class="g" id="custom" data-group="screen" data-sub="Add any music website as a tile">
     <h2>Your own web players</h2>
     <p class="sub">Any music, radio or audiobook website can get its own tile, like Apple Music.</p>
     <ol>
@@ -229,7 +246,7 @@
     <div class="tip">Pause all, the track name and the cover work on most sites. A few block sign-in from kiosk browsers or ask you to use their app; those can't be helped from PlexPie. Up to six web players.</div>
   </section>
 
-  <section class="g" id="airplay" data-group="2" data-sub="Play from an iPhone, iPad or Mac">
+  <section class="g" id="airplay" data-group="phone" data-sub="Play from an iPhone, iPad or Mac">
     <h2>AirPlay</h2>
     <p class="sub">Play anything from an iPhone, iPad or Mac.</p>
     <ol>
@@ -243,7 +260,7 @@
   </section>
 
   <!-- ===================================================================== spotify -->
-  <section class="g" id="spotify" data-group="2" data-sub="Spotify Connect and the web player">
+  <section class="g" id="spotify" data-group="phone" data-sub="Spotify Connect and the web player">
     <h2>Spotify</h2>
     <p class="sub">Two ways: pick the player from the Spotify app (Premium), or browse Spotify on the screen.</p>
     <h3>Spotify Connect (from your phone, tablet or computer)</h3>
@@ -260,7 +277,7 @@
   </section>
 
   <!-- ===================================================================== bluetooth -->
-  <section class="g" id="bluetooth" data-group="2" data-sub="Pair a phone, tablet or computer">
+  <section class="g" id="bluetooth" data-group="phone" data-sub="Pair a phone, tablet or computer">
     <h2>Bluetooth</h2>
     <p class="sub">Any phone, tablet or computer can play to it, even a guest's Android phone.</p>
     <ol>
@@ -274,7 +291,18 @@
   </section>
 
   <!-- ===================================================================== ma -->
-  <section class="g" id="ma" data-group="2" data-sub="Use it as a Music Assistant speaker">
+  <section class="g" id="dlna" data-group="phone" data-sub="Play from BubbleUPnP, mconnect, Jellyfin or a NAS">
+    <h2>UPnP / DLNA</h2>
+    <p class="sub">The player becomes a standard network speaker (a "renderer") that many apps can play to.</p>
+    <ol>
+      <li>On the Pi, run <code>bash configure.sh</code>, answer <b>yes</b> to <b>UPnP / DLNA</b>, then <code>sudo bash install.sh</code>.</li>
+      <li>Settings › Configuration › <b>UPnP / DLNA</b> shows it running.</li>
+      <li>In an app like <b>BubbleUPnP</b> (Android), <b>mconnect</b> (iPhone), Jellyfin, or your NAS's music app (Synology, QNAP…), pick <b><span data-name>your player</span></b> as the speaker or renderer.</li>
+    </ol>
+    <div class="tip">BubbleUPnP and mconnect can also stream TIDAL and Qobuz to it, a way to play those from your phone. The screen shows the track and cover when the app sends them.</div>
+  </section>
+
+  <section class="g" id="ma" data-group="multi" data-sub="Use it as a Music Assistant speaker">
     <h2>Music Assistant</h2>
     <p class="sub">If you run Music Assistant (usually inside Home Assistant), the player becomes one of its speakers.</p>
     <ol>
@@ -287,7 +315,7 @@
   </section>
 
   <!-- ===================================================================== caldera -->
-  <section class="g" id="caldera" data-group="2" data-sub="Multi-room with other Caldera speakers">
+  <section class="g" id="caldera" data-group="multi" data-sub="Multi-room with other Caldera speakers">
     <h2>Caldera Music</h2>
     <p class="sub">Caldera Music is a free Plex Labs player. With it, the player shows up in Plexamp's speaker list and can play in sync with other Caldera speakers around the house.</p>
     <ol>
@@ -300,7 +328,30 @@
   </section>
 
   <!-- ===================================================================== ha -->
-  <section class="g" id="ha" data-group="2" data-sub="Controls, dashboard tile, launcher buttons">
+  <section class="g" id="roon" data-group="multi" data-sub="Use it as a Roon speaker">
+    <h2>Roon</h2>
+    <p class="sub">With Roon Bridge, the player becomes a speaker in Roon. You need a Roon subscription and a Roon Server (Core) on your network.</p>
+    <ol>
+      <li>On the Pi, run <code>bash configure.sh</code>, answer <b>yes</b> to <b>Roon</b>, then <code>sudo bash install.sh</code>. It downloads Roon Bridge from Roon Labs.</li>
+      <li>In the Roon app, open <b>Settings › Audio</b>. Under the player's name, <span class="k">Enable</span> the output:
+        <b>System Default</b> shares the DAC with the other apps; the DAC's own name is bit-perfect but takes the DAC while Roon plays.</li>
+      <li>Pick the new zone in Roon and play. The screen shows <b>Playing via Roon</b>; track details stay in the Roon app.</li>
+    </ol>
+    <div class="tip"><span class="k">Pause all</span> stops Roon by restarting the bridge for a moment.</div>
+  </section>
+
+  <section class="g" id="snapcast" data-group="multi" data-sub="Join your Snapcast multi-room system">
+    <h2>Snapcast</h2>
+    <p class="sub">If you run a Snapcast server (on its own, or with Music Assistant or Mopidy), the player plays in sync with your other Snapcast speakers.</p>
+    <ol>
+      <li>On the Pi, run <code>bash configure.sh</code>, answer <b>yes</b> to <b>Snapcast</b>, then <code>sudo bash install.sh</code>.</li>
+      <li>It finds the server on your network by itself. If not, enter its address in Settings › Configuration › <b>Snapcast</b>.</li>
+      <li>Put the player in a group in your Snapcast app (Snapweb, Snapdroid). The screen shows what the group plays.</li>
+    </ol>
+    <div class="tip"><span class="k">Pause all</span> mutes this player in Snapcast; tap the Snapcast tile to unmute it.</div>
+  </section>
+
+  <section class="g" id="ha" data-group="home" data-sub="Controls, dashboard tile, launcher buttons">
     <h2>Home Assistant</h2>
     <p class="sub">Control the player from Home Assistant, show a dashboard on the screen, and add your own buttons.</p>
     <h3>1. Connect (MQTT)</h3>
@@ -327,7 +378,7 @@
   </section>
 
   <!-- ===================================================================== timer -->
-  <section class="g" id="timer" data-group="2" data-sub="Intervals, countdown, stopwatch">
+  <section class="g" id="timer" data-group="home" data-sub="Intervals, countdown, stopwatch">
     <h2>Workout timer</h2>
     <p class="sub">Big, readable, with beeps. Keeps the screen on while it runs.</p>
     <ol>
@@ -478,7 +529,7 @@ function fill() {
 }
 function toc() {
   const items = [...document.querySelectorAll("section.g")];
-  for (const n of [1, 2, 3])
+  for (const n of [1, "screen", "phone", "multi", "home", 3])
     $("toc" + n).innerHTML = items.filter(s => s.dataset.group == n).map(s =>
       `<a href="#${s.id}"><span><b>${s.querySelector("h2").textContent}</b><small>${s.dataset.sub}</small></span></a>`).join("");
 }

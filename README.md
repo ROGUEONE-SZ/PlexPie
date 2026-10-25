@@ -1,9 +1,9 @@
 <p align="center"><img src="docs/logo.png" width="96" alt="PlexPie logo"></p>
 <h1 align="center">PlexPie</h1>
-<p align="center"><b>A Raspberry Pi music appliance: one touchscreen for all your music, controlled from Home Assistant.</b></p>
+<p align="center"><b>A Raspberry Pi music appliance: one touchscreen for all your music (your own server, streaming services, your phone and your multi-room system), controlled from Home Assistant.</b></p>
 
 <p align="center">
-  <a href="#install"><img src="https://img.shields.io/badge/version-2.19-0a84ff" alt="Version 2.19"></a>
+  <a href="#install"><img src="https://img.shields.io/badge/version-2.20-0a84ff" alt="Version 2.20"></a>
   <a href="LICENSE.md"><img src="https://img.shields.io/badge/license-source--available%20(PolyForm%20NC)-8e8e93" alt="License: source-available, PolyForm Noncommercial"></a>
   <img src="https://img.shields.io/badge/Raspberry%20Pi-4%20%7C%205-c51a4a?logo=raspberrypi&logoColor=white" alt="Raspberry Pi 4 or 5">
   <img src="https://img.shields.io/badge/Raspberry%20Pi%20OS-64--bit%20Lite%20or%20Desktop-c51a4a" alt="Raspberry Pi OS 64-bit">
@@ -21,9 +21,14 @@
 
 <p align="center"><img src="docs/demo.gif" width="560" alt="Swiping home from Plexamp's now playing to the PlexPie launcher, then opening the Home Assistant dashboard"></p>
 
-Turn a Raspberry Pi with a touchscreen and a DAC into a one-screen music player:
-**Plexamp**, **AirPlay 2**, **Spotify Connect**, the **Apple Music** web player, **Bluetooth**, **Music Assistant** and **Caldera Music**, all
-on one launcher and all controllable from **Home Assistant**.
+Turn a Raspberry Pi with a touchscreen and a DAC into a one-screen music player for everything you listen to:
+
+- **Your own music server:** Plexamp (Plex) and Jellyfin, right on the screen.
+- **Streaming services on the screen:** Apple Music, TIDAL, Qobuz, YouTube Music, BBC Sounds, plus any music website you add yourself.
+- **From your phone:** AirPlay 2, Spotify Connect, Bluetooth, and UPnP/DLNA (BubbleUPnP, mconnect, NAS apps).
+- **Multi-room and other systems:** Caldera Music, Music Assistant, Roon and Snapcast.
+
+One source plays at a time, the screen follows what's playing, and everything is controllable from **Home Assistant**.
 
 > **New to Raspberry Pi?** Follow the **[step-by-step guide](docs/INSTALL.md)**: shopping list,
 > wiring your DAC to a receiver or speakers, preparing the memory card, installing, and first use.
@@ -40,19 +45,45 @@ on one launcher and all controllable from **Home Assistant**.
   <img src="docs/alert.png" width="49%" alt="Doorbell alert with camera picture">
 </p>
 
+**On this screen**
+
 | Source | What it is |
 |---|---|
-| **Plexamp** | Plexamp headless with its full touch interface; also controllable from the Plexamp app on your phone or tablet. Lossless (FLAC/hi-res) to your DAC |
+| **Plexamp** | Plexamp headless with its full touch interface; also controllable from the Plexamp app on your phone. Lossless (FLAC/hi-res) to your DAC |
+| **Jellyfin** | Your Jellyfin server's web app on the screen (enter its address in Settings) |
+| **Apple Music, TIDAL, Qobuz, YouTube Music, BBC Sounds** | Their web players on the screen; sign in once on the screen |
+| **Your own web players** | Add any music, radio or audiobook website (TuneIn, SoundCloud, Audible…) as its own tile |
+
+**From your phone**
+
+| Source | What it is |
+|---|---|
 | **AirPlay** | AirPlay 2 receiver (shairport-sync). The screen shows cover art, track and the stream format |
 | **Spotify** | Spotify Connect receiver (go-librespot): pick the Pi in the Spotify app (Premium). Optional Spotify web player on the screen |
-| **Bluetooth** | Any phone, tablet or computer can play to it: tap **Pair a device**, then pick the player in its Bluetooth settings |
-| **Apple Music** | music.apple.com on the screen (Chromium + Widevine), zoomed so it shows the full desktop layout |
-| **Music Assistant** | The Pi becomes a Music Assistant player (Squeezelite), and MA's own interface opens on the screen |
-| **Caldera** | Optional [Caldera Music](https://caldera.homes/music/headless/) (Plex Labs): the Pi joins your other Caldera speakers for multi-room, in sync, from Plexamp's speaker list. Shares the DAC with the other apps |
-| **YouTube Music, BBC Sounds, TIDAL, Qobuz** | Optional web players on the screen, like Apple Music: sign in on the screen (BBC Sounds' shows are mostly UK only) |
-| **Your own web players** | Add any music, radio or audiobook website (TuneIn, SoundCloud, Audible…) as its own tile: Settings › Configuration › Your web players |
-| **Timer** | Workout timer: intervals (work / rest / rounds), countdown and stopwatch, with big digits and beeps |
-| **Home** | The launcher: now playing, volume, pause all, screen off, and your Home Assistant buttons |
+| **Bluetooth** | Any phone, tablet or computer: tap **Pair a device**, then pick the player in its Bluetooth settings |
+| **UPnP / DLNA** | A network speaker (gmediarender) for BubbleUPnP, mconnect, Jellyfin's DLNA plugin and NAS music apps; those apps can stream TIDAL and Qobuz to it too |
+
+**Multi-room and other systems**
+
+| Source | What it is |
+|---|---|
+| **Caldera Music** | [Caldera](https://caldera.homes/music/headless/) (Plex Labs): plays in sync with your other Caldera speakers, from Plexamp's speaker list |
+| **Music Assistant** | The Pi becomes a Music Assistant player (Squeezelite), and MA's interface opens on the screen. Also works with Lyrion (Logitech Media Server) |
+| **Roon** | Roon Bridge from Roon Labs: the Pi becomes a speaker in Roon (Roon subscription needed) |
+| **Snapcast** | A Snapcast client: plays in sync with your other Snapcast speakers |
+
+**Home**
+
+| | |
+|---|---|
+| **Home Assistant** | A Home Assistant dashboard on the screen, plus your own launcher buttons |
+| **Timer** | Workout timer: intervals, countdown and stopwatch, with big digits and beeps |
+
+With more than eight tiles, the home screen groups them into tabs (**On screen · From phone · Multi-room · Home**), and jumps to the tab of whatever starts playing. You choose the order in Settings › Screen › Home screen order.
+
+<img src="docs/home-tabs.png" width="480" alt="Home screen with tabs: On screen, From phone, Multi-room, Home; a UPnP/DLNA tile playing">
+
+All of these are optional except Plexamp: answer the setup questions, or switch them on and off in Settings › Configuration.
 
 How it behaves:
 

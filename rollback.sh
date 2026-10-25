@@ -18,9 +18,11 @@ rm -rf /usr/share/plymouth/themes/plexpie
 rm -f /etc/avahi/services/plexpie.service
 
 echo "==> Stopping PlexPie services"
-systemctl disable --now plexpie plexpie-airplay plexpie-squeezelite plexpie-caldera nqptp 2>/dev/null
+systemctl disable --now plexpie plexpie-airplay plexpie-squeezelite plexpie-caldera plexpie-dlna plexpie-roon plexpie-snapcast nqptp 2>/dev/null
 rm -f /etc/systemd/system/plexpie.service /etc/systemd/system/plexpie-airplay.service \
       /etc/systemd/system/plexpie-squeezelite.service /etc/systemd/system/plexpie-caldera.service \
+      /etc/systemd/system/plexpie-dlna.service /etc/systemd/system/plexpie-roon.service \
+      /etc/systemd/system/plexpie-snapcast.service \
       /etc/systemd/system/plexamp.service.d/plexpie.conf \
       /etc/sudoers.d/plexpie /etc/udev/rules.d/99-plexpie-backlight.rules
 rm -f "$UHOME/.config/wireplumber/wireplumber.conf.d/51-plexpie-dac.conf" \

@@ -62,6 +62,9 @@
   body.full h1 { font-size: 30px; margin: 10px 0 4px; }
   body.bluetooth .art { background: linear-gradient(145deg, #2a3170, #101018); }
   body.caldera .art { background: linear-gradient(145deg, #7a3a12, #101018); }
+  body.dlna .art { background: linear-gradient(145deg, #1d5a3e, #101018); }
+  body.roon .art { background: linear-gradient(145deg, #2c3a7a, #101018); }
+  body.snapcast .art { background: linear-gradient(145deg, #6b4a12, #101018); }
   .btn.ghost { background: rgba(255,255,255,.1); color: var(--text); margin-left: 8px; }
   html, body { touch-action: pan-x pan-y; } /* plexpie-nopinch: no accidental pinch-zoom on the touchscreen */
   * { scrollbar-width: none; } ::-webkit-scrollbar { display: none; } /* plexpie-noscrollbar: touch scrolling, no desktop scroll bars */
@@ -89,8 +92,7 @@
 </div>
 <script>
 const $ = (id) => document.getElementById(id);
-const SRC = location.pathname.startsWith("/spotify") ? "spotify" : location.pathname.startsWith("/bluetooth") ? "bluetooth"
-  : location.pathname.startsWith("/caldera") ? "caldera" : "airplay";
+const SRC = (["spotify", "bluetooth", "caldera", "dlna", "roon", "snapcast"].find(k => location.pathname.startsWith("/" + k))) || "airplay";
 document.body.classList.add(SRC);
 let artKey = null;
 
@@ -100,6 +102,18 @@ if (SRC === "spotify") document.querySelector(".art svg").outerHTML = ICON_SPOTI
 if (SRC === "bluetooth") document.querySelector(".art svg").outerHTML = ICON_BT;
 const ICON_CALDERA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="7" height="12" rx="1.5"/><rect x="14" y="7" width="7" height="12" rx="1.5"/><circle cx="6.5" cy="14.5" r="1.8"/><circle cx="17.5" cy="14.5" r="1.8"/><path d="M8.5 4.5c2-1.3 5-1.3 7 0"/></svg>';
 if (SRC === "caldera") document.querySelector(".art svg").outerHTML = ICON_CALDERA;
+// UPnP/DLNA, Roon and Snapcast: speakers other apps play to
+const RECEIVERS = {
+  dlna: {via: "UPnP / DLNA", icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 21h8M12 17v4"/><path d="M9 11l2 2 4-4"/></svg>',
+    hint: n => `In an app like <b>BubbleUPnP</b>, <b>mconnect</b> or your NAS's music app, pick <b>${n}</b> as the speaker (renderer).`},
+  roon: {via: "Roon", icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M8 12a4 4 0 0 1 8 0"/><circle cx="12" cy="12" r="1.5"/></svg>',
+    hint: n => `In <b>Roon</b>, open <b>Settings › Audio</b>, enable this player once, then pick it as a zone. Track details show in the Roon app.`},
+  snapcast: {via: "Snapcast", icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h3l3-7 4 14 3-7h3"/></svg>',
+    hint: (n, s) => s.server === false ? "Looking for your Snapcast server. Set its address in Settings › Configuration › Snapcast for track details."
+      : `Play to your Snapcast server (Music Assistant, Mopidy, Spotify…). This player joins the group it's in.`},
+};
+if (RECEIVERS[SRC]) document.querySelector(".art svg").outerHTML = RECEIVERS[SRC].icon;
+$("img").addEventListener("error", () => { $("art").classList.remove("has"); $("bg").classList.remove("on"); });
 const btPost = (action) => fetch("/api/bluetooth", {method: "POST", headers: {"Content-Type": "application/json"},
   body: JSON.stringify({action})}).then(poll);
 $("pair").onclick = () => btPost("pair");
@@ -133,7 +147,7 @@ function theme(s) {
   document.body.classList.toggle("themed", !!s.accent);
   if (s.accent) document.body.style.setProperty("--art", s.accent);
   mode = s.visualizer || "bars";
-  const playing = !!((SRC === "bluetooth" ? s.bluetooth : SRC === "spotify" ? s.spotify : SRC === "caldera" ? s.caldera : s.airplay) || {}).playing;
+  const playing = !!((["bluetooth", "spotify", "caldera", "dlna", "roon", "snapcast"].includes(SRC) ? s[SRC] : s.airplay) || {}).playing;
   const want = mode !== "off" && playing;
   document.body.classList.toggle("viz", want);
   if (!want) document.body.classList.remove("full");
@@ -169,6 +183,24 @@ function draw() {
 }
 requestAnimationFrame(draw);
 
+function renderReceiver(s) {
+  const r = RECEIVERS[SRC], c = s[SRC] || {};
+  const has = !!(c.title || c.artist);
+  $("info").classList.toggle("playing", !!c.playing);
+  $("status").textContent = c.playing ? `Playing via ${r.via}` : (has ? "Paused" : `Ready for ${r.via}`);
+  $("title").textContent = has ? (c.title || "Unknown track") : (c.playing ? r.via : s.player_name);
+  $("artist").textContent = c.artist || "";
+  $("album").textContent = c.album || "";
+  $("fmt").textContent = ""; $("fmt").className = "fmt";
+  $("hint").innerHTML = (has || c.playing) ? "" : r.hint(s.player_name, c);
+  const url = c.art || "";
+  if (url !== artKey) {
+    artKey = url;
+    if (url) { $("img").src = url; $("art").classList.add("has"); $("bg").style.backgroundImage = `url(${url})`; $("bg").classList.add("on"); }
+    else { $("art").classList.remove("has"); $("bg").classList.remove("on"); }
+  }
+}
+
 function renderCaldera(s) {
   const c = s.caldera || {};
   const has = !!(c.title || c.artist);
@@ -185,6 +217,7 @@ function render(s) {
   theme(s);
   if (SRC === "bluetooth") return renderBt(s);
   if (SRC === "caldera") return renderCaldera(s);
+  if (RECEIVERS[SRC]) return renderReceiver(s);
   const a = (SRC === "spotify" ? s.spotify : s.airplay) || {};
   const has = !!(a.title || a.artist);
   const via = SRC === "spotify" ? "Spotify Connect" : "AirPlay";
