@@ -10,6 +10,9 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: write          # lets a failed run leave its log as a comment on the commit
+
 jobs:
   install:
     name: ${{ matrix.name }}
@@ -19,11 +22,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {name: "Debian 13 (Intel/AMD) + AirPlay build", image: "debian:13", runner: "ubuntu-24.04", airplay: "yes"}
-          - {name: "Debian 12 (Intel/AMD)", image: "debian:12", runner: "ubuntu-24.04", airplay: "no"}
-          - {name: "Ubuntu 24.04 (Intel/AMD)", image: "ubuntu:24.04", runner: "ubuntu-24.04", airplay: "no"}
-          - {name: "Debian 13 (ARM, like Raspberry Pi OS)", image: "debian:13", runner: "ubuntu-24.04-arm", airplay: "no"}
-          - {name: "Ubuntu 24.04 (ARM)", image: "ubuntu:24.04", runner: "ubuntu-24.04-arm", airplay: "no"}
+          - {name: "Debian 13 (Intel/AMD) + AirPlay build", slug: debian13-amd64, image: "debian:13", runner: "ubuntu-24.04", airplay: "yes"}
+          - {name: "Debian 12 (Intel/AMD)", slug: debian12-amd64, image: "debian:12", runner: "ubuntu-24.04", airplay: "no"}
+          - {name: "Ubuntu 24.04 (Intel/AMD)", slug: ubuntu2404-amd64, image: "ubuntu:24.04", runner: "ubuntu-24.04", airplay: "no"}
+          - {name: "Debian 13 (ARM, like Raspberry Pi OS)", slug: debian13-arm64, image: "debian:13", runner: "ubuntu-24.04-arm", airplay: "no"}
+          - {name: "Ubuntu 24.04 (ARM)", slug: ubuntu2404-arm64, image: "ubuntu:24.04", runner: "ubuntu-24.04-arm", airplay: "no"}
     steps:
       - uses: actions/checkout@v4
 
@@ -81,5 +84,18 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: ${{ matrix.image }}-${{ matrix.runner }}
+          name: ${{ matrix.slug }}
           path: out/
+
+      - name: Leave the end of the log on the commit (so it's readable without downloading)
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "### Install test failed: ${{ matrix.name }}"
+            echo '```'
+            tail -n 70 out/plexpie-install.log 2>/dev/null | sed -E 's/(token|password|pass)=[^ ]+/\1=(hidden)/Ig'
+            echo '```'
+          } > comment.md
+          gh api repos/${{ github.repository }}/commits/${{ github.sha }}/comments -F body=@comment.md >/dev/null || true
