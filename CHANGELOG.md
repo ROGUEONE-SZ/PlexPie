@@ -2,6 +2,15 @@
 
 Already running PlexPie? **Settings › Updates › PlexPie › Update** brings you to the latest version.
 
+## 2.22 (October 25, 2026)
+- **Control from anywhere (optional):** turn on Tailscale in Settings › Remote access (or in the setup wizard),
+  scan a code to sign in, and the remote control and Settings work away from home. Only your own devices can
+  reach the player, nothing is opened on your router, and the PIN, device levels and admin approval work the
+  same as at home. Free for personal use. A Tailscale you set up yourself before stays exactly as it is.
+- **New screenshots** throughout the README, the step-by-step guide and the PDF guide, including the setup
+  wizard, portrait mode and Tailscale.
+- Fix: the Wi-Fi icon and the address shown for your phone ignore Tailscale's own connection.
+
 ## 2.21 (October 25, 2026)
 - **Runs on more than a Pi (beta):** Intel/AMD PCs (mini PCs, NUCs, old laptops) with Debian or Ubuntu, and
   other 64-bit ARM boards (community supported). On PCs the screen uses Google Chrome, so Apple Music, TIDAL

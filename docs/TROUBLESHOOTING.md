@@ -179,6 +179,22 @@ They find each other with Bonjour/mDNS, like AirPlay. Both players need PlexPie 
 be on the same network (not a guest Wi-Fi). Check on each one: `systemctl is-active avahi-daemon`
 should say `active`. A player that changed its address is found again within a minute.
 
+### Away from home (Tailscale) doesn't work
+
+- **"Couldn't install Tailscale":** the player needs internet to download it from Tailscale's own
+  repository. The details are in `/var/log/plexpie-update.log`; turn the switch off and on again to retry.
+- **The sign-in code doesn't appear:** tap **Sign in** under Away from home. Sign-in links expire after
+  a while; tapping it again makes a new one.
+- **"Waiting for approval in your Tailscale admin console":** your Tailscale account requires new devices
+  to be approved. Approve the player at login.tailscale.com › Machines.
+- **The away address doesn't open on the phone:** the Tailscale app on the phone must be on and signed in
+  to the same account. If the name-style address (`…ts.net`) doesn't open, MagicDNS is off in your
+  Tailscale settings: use the `100.x.y.z` address from the Tailscale app instead.
+- **It asks for the PIN again:** that's expected once, because the away address is a different address.
+- **Another player's Settings won't open away from home:** that player needs Tailscale switched on too.
+- **"Set up outside PlexPie":** Tailscale was already on this machine before PlexPie installed it, so
+  PlexPie doesn't change it. Manage it with the `tailscale` command or Tailscale's admin console.
+
 ### It shows Raspberry Pi text when it starts or shuts down
 
 Since 2.15 it shows the PlexPie logo instead (Settings › System › **PlexPie start-up screen**). The

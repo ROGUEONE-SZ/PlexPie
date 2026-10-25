@@ -5,7 +5,7 @@ You don't need to know Linux. You will copy and paste a few commands, and every 
 for you. Plan on about **an hour**: 15 minutes of setup, then 15 to 30 minutes of the Pi installing
 things on its own.
 
-<img src="launcher.png" width="80%" alt="The PlexPie home screen playing Hotel California by Eagles">
+<img src="launcher.png" width="80%" alt="The PlexPie home screen with Plexamp playing">
 
 **Contents**
 
@@ -127,6 +127,8 @@ It first asks how you want to set up:
   plex.tv/claim on your phone), which apps you want, Home Assistant, and your phone. You can skip the rest of
   this step and the Plexamp step below; the wizard covers them.
 - **2) Answer the questions here**, as described below.
+
+<img src="wizard-name.png" width="24%" alt="Setup wizard: name"> <img src="wizard-plexamp.png" width="24%" alt="Setup wizard: link Plexamp"> <img src="wizard-apps.png" width="24%" alt="Setup wizard: apps"> <img src="wizard-phone.png" width="24%" alt="Setup wizard: your phone">
 
 A short setup wizard asks a few questions. Press <kbd>Enter</kbd> to accept the suggested answer
 shown in brackets, or type your own:
@@ -292,6 +294,15 @@ device** shows a QR code; on your phone or tablet tap **Save as PDF**, **Share**
 
 To keep it on your home screen like an app: **Share → Add to Home Screen** on iPhone, or
 **⋮ → Add to Home screen** on Android.
+
+**Away from home (optional):** to use the remote control and Settings from anywhere, turn on
+**Settings › Remote access › Control from anywhere** and tap **Save**. The player installs
+[Tailscale](https://tailscale.com) (free for personal use) and shows a code: scan it and sign in.
+Install the Tailscale app on your phone with the same account, then scan the second code. Only your
+own devices can reach the player, and nothing is opened on your router. The full steps are in the
+player's setup guide **Away from home**.
+
+<img src="tailscale-signin.png" width="49%" alt="Sign in to Tailscale by scanning a code"> <img src="tailscale.png" width="49%" alt="Connected, with the address away from home">
 
 ## 10. Optional: Home Assistant
 

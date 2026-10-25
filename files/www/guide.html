@@ -146,10 +146,12 @@
       <li>Paste this line and press Enter:
         <pre>curl -fsSL https://raw.githubusercontent.com/ROGUEONE-SZ/PlexPie/main/get.sh | bash</pre></li>
       <li>Press <span class="k">Enter</span> for <b>Quick setup</b>: it installs everything, then a <b>setup wizard</b> on the screen asks for the name, links Plexamp (scan the QR code on your phone), and lets you pick your apps. Or choose <b>2</b> to answer the questions in the terminal.</li>
+      <li>With Quick setup you're done here: follow the wizard on the screen (or on your phone at the address it shows). The next step is only for option 2.</li>
       <li>When it asks for a <b>claim code</b>: open <code>plex.tv/claim</code> on any device, copy the code, paste it, press Enter, type the player name, and press Ctrl+C when Plexamp says it's ready.</li>
       <li>It takes 15 to 30 minutes. When it's done, the screen shows the PlexPie home screen.</li>
       <li>Screen standing up instead of lying down (the Touch Display 2 starts in portrait)? Settings › Screen › <b>Rotation</b> › Right or Left.</li>
     </ol>
+    <figure class="pair"><img src="/img/wizard-plexamp.png" alt="Setup wizard: link Plexamp with a QR code"><img src="/img/wizard-apps.png" alt="Setup wizard: choose your apps"></figure>
     <div class="tip"><b>Can't connect?</b> Use the Pi's number address instead of <code>plexpie.local</code>. Your router's list of devices shows it, e.g. <code>ssh pi@192.168.1.42</code>.</div>
   </section>
 
@@ -446,6 +448,7 @@
       <li>Back on the player, scan the second code (<b>Your remote control, from anywhere</b>), or open the <b>Address away from home</b> it shows. Enter the PIN once.</li>
       <li>On an iPhone: Share › <b>Add to Home Screen</b>. That icon works at home and away, as long as the Tailscale app is on.</li>
     </ol>
+    <figure class="pair"><img src="/img/tailscale-signin.png" alt="Sign in to Tailscale by scanning the code"><img src="/img/tailscale.png" alt="Connected, with the address away from home"></figure>
     <div class="tip"><b>What it doesn't do:</b> nothing is opened on your router and the player isn't on the public internet. Only devices signed in to your Tailscale account can reach it, and they still need the PIN or your admin's approval, exactly like at home.</div>
     <h3>Good to know</h3>
     <ul>

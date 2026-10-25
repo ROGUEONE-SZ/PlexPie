@@ -37,7 +37,7 @@ One source plays at a time, the screen follows what's playing, and everything is
 > No Linux knowledge needed.
 
 <p>
-  <img src="docs/launcher.png" width="49%" alt="Home screen playing Hotel California by Eagles in Plexamp">
+  <img src="docs/launcher.png" width="49%" alt="Home screen: Plexamp playing with its cover on the tile, sleep timer, Wi-Fi and clock in the top bar">
   <img src="docs/airplay.png" width="49%" alt="AirPlay now-playing screen with cover, track and stream format">
 </p>
 <p><img src="docs/launcher-wide.png" width="99%" alt="The same home screen on an ultrawide monitor over HDMI"></p>
@@ -83,7 +83,12 @@ One source plays at a time, the screen follows what's playing, and everything is
 
 With more than eight tiles, the home screen groups them into tabs (**On screen · From phone · Multi-room · Home**), and jumps to the tab of whatever starts playing. You choose the order in Settings › Screen › Home screen order.
 
-<img src="docs/home-tabs.png" width="480" alt="Home screen with tabs: On screen, From phone, Multi-room, Home; a UPnP/DLNA tile playing">
+<p>
+  <img src="docs/home-tabs.png" width="62%" alt="Home screen with tabs: On screen, From phone, Multi-room, Home; a UPnP/DLNA tile playing">
+  <img src="docs/portrait.png" width="21%" alt="The home screen in portrait on a Pi Touch Display 2">
+</p>
+
+In portrait (like the Pi Touch Display 2 standing up) the tiles rearrange to fit.
 
 All of these are optional except Plexamp: answer the setup questions, or switch them on and off in Settings › Configuration.
 
@@ -106,6 +111,8 @@ How it behaves:
 - **Power-cut protection.** An optional read-only mode, so pulling the plug can't damage the memory card.
 - **Admin phone and one remote for all players.** Make your phone the admin: new devices tap *Ask the admin* instead of typing the PIN, and you choose Full access or Controls only. Link your other PlexPie players once, then control them all (and open their Settings without a PIN) from one remote you add to your home screen.
   <br><img src="docs/phone-remote-control.png" width="260" alt="Remote control on an iPhone: two players, a pending request to connect, play/pause, volume and apps">
+- **Control from anywhere (optional).** Turn on Tailscale in Settings › Remote access, sign in by scanning a code, and your remote control and Settings work away from home too: at work, on mobile data, on holiday. Only your own devices can reach the player, nothing is opened on your router, and the PIN and admin approval still apply. Free for personal use.
+  <br><img src="docs/tailscale.png" width="420" alt="Settings › Remote access › Away from home: Tailscale connected, with the away-from-home address and a QR code"> <img src="docs/phone-tailscale.png" width="170" alt="The same on a phone">
 - **Looks like an appliance.** The PlexPie logo while it starts and shuts down, straight into the launcher: no Raspberry Pi text (switch it off in Settings › System for troubleshooting).
 - **Screen sharing.** See and use the player's screen from a Mac (Screen Sharing), iPad or iPhone (RealVNC Viewer); off by default, home network only, password = your PIN.
 - **Works with a mouse, keyboard or any monitor.** A Home tab appears for a mouse or screen sharing, the Home key or Esc twice go home, the pointer hides for touch, and the screen fills anything from a 7" touchscreen to an ultrawide.
@@ -191,6 +198,13 @@ It asks one thing:
 2. **Answer the questions in the terminal**, the classic way: name, sources, Home Assistant, screen sleep, and
    linking Plexamp with a claim code during the install.
 
+<p>
+  <img src="docs/wizard-name.png" width="24%" alt="Setup wizard: name your player">
+  <img src="docs/wizard-plexamp.png" width="24%" alt="Setup wizard: link Plexamp with a QR code for plex.tv/claim">
+  <img src="docs/wizard-apps.png" width="24%" alt="Setup wizard: choose your apps, grouped">
+  <img src="docs/wizard-phone.png" width="24%" alt="Setup wizard: your phone, with the PIN, and Tailscale for away from home">
+</p>
+
 Either way, sign in to Apple Music and the other web players on the screen the first time you open them.
 The wizard can be run again any time from Settings › System › Setup wizard.
 
@@ -229,12 +243,12 @@ Settings is laid out like an iPad: categories on the left, details on the right 
 - **Sound:** the equalizer, with a live curve of what it does.
 - **Network:** Wi-Fi on/off, current network, scan and join (the password goes to NetworkManager, not PlexPie).
 - **Updates:** **PlexPie** and **Raspberry Pi OS** are separate rows. **Check now** looks in the background; when something's found the button becomes **Update**, with a list of what's new, and a live progress bar (step, package and elapsed time) while it installs. Raspberry Pi OS asks for a restart only when it needs one. Both check by themselves twice a day, and Home Assistant gets two update entities with Install buttons.
-- **Remote access:** the address, a QR code to scan, the PIN, and the list of **registered devices** (e.g. "iPad · Safari, last used today") with **Sign out** for each.
+- **Remote access:** the address, a QR code to scan, the PIN, the list of **registered devices** (e.g. "iPad · Safari, last used today") with **Sign out** for each, your admin device, your other PlexPie players, and **Away from home** (Tailscale: install, sign in by QR code, and the address that works from anywhere).
 - **Backup:** on the screen, scan the QR code to download the backup on your phone, tablet or computer; restore from the same page.
 - **Setup guides:** step-by-step instructions with pictures for every app; **Send the guides to a device** by QR code, then save as PDF, share or print.
 - **System:** exit to the Raspberry Pi desktop or command line until the next restart (Back to PlexPie icon, or type `plexpie`), screen sharing (see and use the player's screen from a Mac, iPad or iPhone, password = your PIN), power-cut protection, restart, reboot, shut down.
 
-From another device, only Settings and the guides are reachable, and only with the PIN. Five wrong tries pause logins for a minute. A device stays signed in for a year (renewed each visit); **New PIN** signs every device out.
+From another device, only Settings, the remote control and the guides are reachable, and only with the PIN (or your admin's approval). That's the same away from home over Tailscale. Five wrong tries pause logins for a minute. A device stays signed in for a year (renewed each visit); **New PIN** signs every device out.
 
 To keep it on your home screen: open the page, then **Share → Add to Home Screen** (iPhone) or **⋮ → Add to Home screen** (Android). It opens like an app.
 
